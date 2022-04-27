@@ -11,15 +11,20 @@ Supporting Material
 - `motiflets`: Code implementing k-Motiflet
 - `datasets`: Use cases in the paper
 
-# Motiflets
+# k-Motiflets
 
-This TS is an ECG from the Long Term Atrial Fibrillation (LTAF) database, which 
+Here we illustrate how to use k-Motiflets. 
+
+The following TS is an ECG from the Long Term Atrial Fibrillation (LTAF) database, which 
 is often used for demonstrations in motif discovery (MD). The problem is particularly 
 difficult for MD as actually two motifs exists: The first half of the TS contains a 
 rectangular calibration signal with 6 occurrences, and the second half shows ECG 
 heartbeats with 16 to 17 occurrences. 
 
 ![The ECG heartbeat dataset](images/ts_ecg.png)
+
+The major challenges in motif discovery are to learn the length of interesting motifs
+and to find the largest set of the same motif, i.e. all repetitions.
 
 # Learning the motif length `l`
 
@@ -56,4 +61,6 @@ We finally plot these motifs:
 
 <img src="images/motiflets.png" width="600">
 
+The first repetitions perfectly match the calibration signal (orange), while the latter 16 
+repetitions perfectly match the ECG waves (green).
 
