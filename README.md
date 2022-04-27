@@ -10,8 +10,13 @@ Supporting Material
 - `csvs`: The results of the scalability experiments
 - `motiflets`: Code implementing k-Motiflet
 - `datasets`: Use cases in the paper
+- `jars`: Java code of the competitors used in out paper: EMMA, Latent Motifs and Set Finder.
 
 # k-Motiflets
+
+Intuitively speaking, k-Motiflets are the largest set of exactly k similar subsequences.
+
+# Usage
 
 Here we illustrate how to use k-Motiflets. 
 
@@ -42,7 +47,7 @@ motif_length = plot_motif_length_selection(
 The plot shows that meaningful motifs are within a range of 0.8s to 1s, equal
 to roughly a heartbeat rate of 60-80 bpm.
 
-# Learning motif size `k`
+# Learning the motif size `k`
 
 To extract meaningful motif sizes from this use case, we run
 
