@@ -166,8 +166,6 @@ def plot_elbow(ks,
         exclusion=exclusion)
 
     print("Chosen window-size:", m)
-    if plot_elbows:
-        plot_elbow_points(dataset, elbow_points, dists)
 
     print("Identified Elbow Points", elbow_points)
     # for elbow in elbow_points:
@@ -181,6 +179,9 @@ def plot_elbow(ks,
 
     if filter:
         elbow_points = filter_unqiue(elbow_points, candidates, motif_length)
+
+    if plot_elbows:
+        plot_elbow_points(dataset, elbow_points, dists)
 
     plot_grid_motiflets(
         dataset, data, candidates, elbow_points,
