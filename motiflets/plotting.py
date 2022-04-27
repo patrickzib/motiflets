@@ -223,7 +223,7 @@ def check_unique(elbow_points_1, elbow_points_2, motif_length):
 def plot_motif_length_selection(ks, data, dataset, motif_length_range, ds_name):
     # raw_data = data.values if isinstance(data, pd.Series) else data
     index = data.index if isinstance(data, pd.Series) else np.arange(len(data))
-    header = " in " + data.index.name if isinstance(data, pd.Series) else ""
+    header = " in " + data.index.name if isinstance(data, pd.Series) and data.index.name != None else ""
 
     best_motif_length, au_pdfs, elbow, top_motiflets = \
         ml.find_au_pef_motif_length(
