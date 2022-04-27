@@ -32,7 +32,7 @@ motif_length = plot_motif_length_selection(
     ks, series, file, 
     motif_length_range=length_range, ds_name=ds_name)
 ```
-![](images/plot_au_ef.png)
+<img src="images/plot_au_ef.png" width="250">
 
 The plot shows that meaningful motifs are within a range og 0.8 to 1 second, equal
 to roughly a heartbeat rate of 60-80 bpm.
@@ -47,13 +47,14 @@ dists, motiflets, elbow_points = plot_elbow(
     motif_length=motif_length, method_name="K-Motiflets", ground_truth=df_gt)
 ```
 
-Elbow points illustrate meaningful motif sizes. Here, 6, 9 and 16 are elbows. 
+The variable `elbow_points` holds the characteristic motif sizes.  
+Elbow points represent meaningful motif sizes. Here, 6, 9 and 16 are elbows. 
 While k=9 also shows an elbow, our method filters it, as it is very similar to k=16.
 
-![](images/elbows.png)
+<img src="images/elbows.png" width="250">
 
 We finally plot these motifs:
 
-![](images/motiflets.png)
+<img src="images/motiflets.png" width="500">
 
-The variable `elbow_points` holds the characteristic motif sizes.
+
