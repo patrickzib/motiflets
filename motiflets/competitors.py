@@ -81,7 +81,7 @@ def get_valmod_motif_set(
     return filter_non_trivial_matches(np.array(list(motif_set)), motif_length)
 
 
-def get_k_motiflets_ranged(
+def get_k_motifs_ranged(
         data,
         file,
         motif_length,
@@ -95,7 +95,7 @@ def get_k_motiflets_ranged(
     last_size = 2
 
     for r in range(1, max_r + 1, max(1, int(max_r / 10))):
-        k_motifset = get_k_motiflets(data, file, motif_length, r, D_full)
+        k_motifset = get_k_motifs(data, file, motif_length, r, D_full)
 
         if len(k_motifset) > last_size:
             pairwise_dist = ml.get_pairwise_extent(D_full, k_motifset)
@@ -104,7 +104,7 @@ def get_k_motiflets_ranged(
         last_size = max(last_size, len(k_motifset))
 
 
-def get_k_motiflets(
+def get_k_motifs(
         data,
         file,
         motif_length,
