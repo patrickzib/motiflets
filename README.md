@@ -16,6 +16,12 @@ Supporting Material
 
 Intuitively speaking, k-Motiflets are the largest set of exactly k similar subsequences.
 
+# Showcase
+
+The following video highlights the ease of use of $k$-Motiflets using an ECG recording from the Long Term Atrial Fibrillation (LTAF) database.
+
+https://user-images.githubusercontent.com/7783034/173186103-c8b6302e-2434-4a09-89f4-ddad2e63f997.mp4
+
 # Usage
 
 Here we illustrate how to use k-Motiflets. 
