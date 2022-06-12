@@ -79,3 +79,15 @@ We finally plot these motifs:
 The first repetitions perfectly match the calibration signal (orange), while the latter 16 
 repetitions perfectly match the ECG waves (green).
 
+
+# Competitor Methods
+
+We then pretended to have an oracle, used the optimal values $r=d/2$ and $l=125$ to find motif sets using the competitor methods. Here are the results for EMMA, VALMOD, and Learning Motifs:
+
+<img src="images/competitors.png" width="600">
+
+None of the competitors is able to find all occurrences, **even using an oracle on the optimal values**. Thus, failure to provide the exact similarity threshold needed by each method, results in a missed, too small or blurred motif set.
+
+**We may improve the results with an extensive trial-and-error tuning of the real-valued threshold, though. Yet, $k$-Motiflets discovered all occurences of the two top motifs without any additional tuning by simply setting $k=6$ or $k=16$, and we can even learn these two values using the elbow-plot presented above.**
+
+
