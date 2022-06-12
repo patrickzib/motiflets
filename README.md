@@ -20,6 +20,9 @@ Intuitively speaking, k-Motiflets are the largest set of exactly k similar subse
 
 The following video highlights the ease of use of $k$-Motiflets using an ECG recording from the Long Term Atrial Fibrillation (LTAF) database.
 
+**In essence, there is no need for tuning any real-valued similarity threshold via trial-and-error, as is teh case for virtually all motif set competitors. 
+Instead, for $k$-Motiflets we may either directly set the maximal number of repetitions $k$ of a motif, or simply learn this value from the data.**
+
 https://user-images.githubusercontent.com/7783034/173186103-c8b6302e-2434-4a09-89f4-ddad2e63f997.mp4
 
 # Usage
@@ -39,7 +42,7 @@ and to find the largest set of the same motif, i.e. all repetitions.
 
 # Learning the motif length `l`
 
-We first extract meaningful motif lengths from this use case:
+We first extract meaningful **motif lengths (l)** from this use case:
 
 ```
 ks = 20
@@ -55,16 +58,17 @@ to roughly a heartbeat rate of 60-80 bpm.
 
 # Learning the motif size `k`
 
-To extract meaningful motif sizes from this use case, we run
+To extract meaningful **motif sizes (k)** from this use case, we run 
 
 ```
 dists, motiflets, elbow_points = plot_elbow(
-    20, series, file, ds_name=ds_name, plot_elbows=True,
+    ks, series, file, ds_name=ds_name, plot_elbows=True,
     motif_length=motif_length, method_name="K-Motiflets", ground_truth=df_gt)
 ```
 
-The variable `elbow_points` holds the characteristic motif sizes.  
-Elbow points represent meaningful motif sizes. Here, 6 and 16 are elbows.
+The variable `elbow_points` holds characteristic motif sizes found.  
+Elbow points represent meaningful motif sizes. Here, $6$ and $16$ are elbows, which are 
+the 6 calibration waves and the 16 heartbeats.
 
 <img src="images/elbows.png" width="300">
 
