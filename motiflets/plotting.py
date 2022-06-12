@@ -16,7 +16,7 @@ matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 
 # Store figures??
-save_fig = False
+save_fig = True
 
 def plot_dataset(name, data, ds_name, ground_truth=None):
     plot_motifset(name, data, ds_name=ds_name, ground_truth=ground_truth)
@@ -127,10 +127,19 @@ def plot_motifset(
 
 
 def plot_elbow_points(
-        name, elbow_points, dists):
-    fig, ax = plt.subplots(figsize=(4, 4), constrained_layout=True)
-    ax.set_title("EF - Elbow Points")
-    ax.plot(range(2, len(np.sqrt(dists))), dists[2:], "b", label="Extent (d)")
+        name, data, motif_length, 
+        elbow_points, candidates, dists):
+    
+    if isinstance(data, pd.Series):
+        data_raw = data.values
+        data_index = data.index
+    else:
+        data_raw = data
+        data_index = np.arange(len(data))
+
+    fig, ax = plt.subplots(figsize=(8, 4), constrained_layout=True)
+    ax.set_title(name + "\nElbow Points")
+    ax.plot(range(2, len(np.sqrt(dists))), dists[2:], "b", label="Extent")
 
     lim1 = plt.ylim()[0]
     lim2 = plt.ylim()[1]
@@ -139,10 +148,31 @@ def plot_elbow_points(
             elbow, lim1, lim2,
             linestyles="--", label=str(elbow) + "-Motiflet"
         )
-    ax.set(xlabel='Size (k)', ylabel='Extent (d)')
+    ax.set(xlabel='Size (k)', ylabel='Extent')
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+
+    motiflets = candidates[elbow_points]
+    for i, motiflet in enumerate(motiflets):
+        if motiflet is not None:
+            axins = ax.inset_axes(
+                 [(elbow_points[i]-3) / (len(candidates)-2), 0.7, 0.3, 0.3])
+
+            df = pd.DataFrame()
+            df["time"] = data_index[range(0, motif_length)]
+            for aa, pos in enumerate(motiflet):
+                df[str(aa)] = zscore(data_raw[pos:pos + motif_length])
+
+            df_melt = pd.melt(df, id_vars="time")
+
+            _ = sns.lineplot(ax=axins, data=df_melt, x="time", y="value", ci=99,
+                             color=sns.color_palette()[i])
+            axins.set_xlabel("")
+            axins.set_ylabel("")
+            axins.xaxis.set_major_formatter(plt.NullFormatter())
+            axins.yaxis.set_major_formatter(plt.NullFormatter())
+
     if save_fig:
-        plt.savefig("../images/" + name + "_elbow.pdf", bbox_inches='tight')
+        plt.savefig("../images/" + name.replace(" ", "-") + "_elbow.pdf", bbox_inches='tight')
     plt.show()
 
 
@@ -153,7 +183,7 @@ def plot_elbow(ks,
                ds_name=None,
                exclusion=None,
                idx=None,
-               plot_elbows=False,
+               plot_elbows=True,
                ground_truth=None,
                filter=True,
                method_name=None):
@@ -181,7 +211,7 @@ def plot_elbow(ks,
         elbow_points = filter_unqiue(elbow_points, candidates, motif_length)
 
     if plot_elbows:
-        plot_elbow_points(dataset, elbow_points, dists)
+        plot_elbow_points(ds_name, data, motif_length, elbow_points, candidates, dists)
 
     plot_grid_motiflets(
         dataset, data, candidates, elbow_points,
@@ -314,7 +344,7 @@ def plot_grid_motiflets(
         ax_elbow = fig.add_subplot(gs[2, :])
         ax_elbow.set_title("(c) Significant Elbow Points on " + (
             ds_name if ds_name is not None else name))
-        ax_elbow.plot(range(len(np.sqrt(dist))), dist, "b", label="Extent (d)")
+        ax_elbow.plot(range(len(np.sqrt(dist))), dist, "b", label="Extent")
         lim1 = plt.ylim()[0]
         lim2 = plt.ylim()[1]
         for elbow in elbow_points:
@@ -322,7 +352,7 @@ def plot_grid_motiflets(
                 elbow, lim1, lim2,
                 label=str(elbow) + "-Motiflet"
             )
-        ax_elbow.set(xlabel='Size (k)', ylabel='Extent (d)')
+        ax_elbow.set(xlabel='Size (k)', ylabel='Extent')
         ax_elbow.xaxis.set_major_locator(MaxNLocator(integer=True))
 
     gs = fig.add_gridspec(dims, grid_dim)
@@ -347,7 +377,6 @@ def plot_grid_motiflets(
 
     y_labels = []
     motiflets = candidates[elbow_points]
-
     for i, motiflet in enumerate(motiflets):
         if motiflet is not None:
             off = int(i / grid_dim)
@@ -360,7 +389,7 @@ def plot_grid_motiflets(
                 df[str(aa)] = zscore(data_raw[pos:pos + motif_length])
                 ratio = 0.8  # (np.max(data_raw) - np.min(data_raw)) / 10
                 rect = Rectangle(
-                    (data_index[pos], -i),  # np.min(data_raw) - 2 * ratio - i * ratio),
+                    (data_index[pos], -i),  
                     data_index[pos + motif_length - 1] - data_index[pos],
                     ratio,
                     facecolor=sns.color_palette()[
@@ -434,7 +463,6 @@ def plot_grid_motiflets(
     ax_bars.set_yticks(-np.arange(len(y_labels)) + 0.5)
     ax_bars.set_yticklabels(y_labels)
     ax_bars.set_ylim([-len(motiflets)+1, 1])
-
     # ax_bars.legend(loc="best")
 
     if (ground_truth is not None and len(ground_truth) > 0):
