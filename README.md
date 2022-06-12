@@ -82,7 +82,7 @@ repetitions perfectly match the ECG waves (green).
 
 # Competitor Methods
 
-We then pretended to have an oracle, used the optimal values $r=d/2$ and $l=125$ to find motif sets using the competitor methods. Here are the results for EMMA, VALMOD, and Learning Motifs:
+We then pretended to have an oracle, used the optimal values $r=d/2$ and $l=125$ to find motif sets using the competitor methods. Here are the results for EMMA, VALMOD, Set Motifs, and Learning Motifs:
 
 <img src="images/competitors.png" width="600">
 
