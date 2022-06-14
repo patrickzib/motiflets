@@ -127,8 +127,7 @@ def plot_motifset(
 
 
 def plot_elbow_points(
-        name, data, motif_length, 
-        elbow_points, candidates, dists):
+        name, data, motif_length, elbow_points, candidates, dists):
     
     if isinstance(data, pd.Series):
         data_raw = data.values
@@ -183,7 +182,7 @@ def plot_elbow(ks,
                ds_name=None,
                exclusion=None,
                idx=None,
-               plot_elbows=True,
+               plot_elbows=False,
                ground_truth=None,
                filter=True,
                method_name=None):
@@ -196,13 +195,7 @@ def plot_elbow(ks,
         exclusion=exclusion)
 
     print("Chosen window-size:", m)
-
     print("Identified Elbow Points", elbow_points)
-    # for elbow in elbow_points:
-    #    plot_motifset(file, data, 
-    #                np.array(candxidates)[elbow], 
-    #                np.array(dists)[elbow], m,
-    #                idx=idx)
 
     if exclusion is not None and idx is None:
         idx = "top-2"
@@ -520,6 +513,7 @@ def plot_competitors(
         motifsets,
         motif_length,
         prefix="",
+        filter=True,
         target_cardinalities=None,
         ground_truth=None):
     # convert to numpy array
@@ -532,19 +526,21 @@ def plot_competitors(
     # max radius
     for elem in motifsets:
         if len(elem) > 1:
-            print("r:", np.max(D_full[elem[0], elem[1:]]),
+            print("r:", ml.get_radius(D_full, elem),
                   "d:", ml.get_pairwise_extent(D_full, elem, upperbound=np.inf))
 
     last = -1
     motifsets_filtered = []
     for motifset in motifsets:
-        if (len(motifset) > last):
+        if ((len(motifset) > last) or (not filter)):
             motifsets_filtered.append(motifset)
             last = len(motifset)
     motifsets_filtered = np.array(motifsets_filtered)
 
     elbow_points = np.arange(len(motifsets_filtered))
-    elbow_points = filter_unqiue(elbow_points, motifsets_filtered, motif_length)
+
+    if filter:
+        elbow_points = filter_unqiue(elbow_points, motifsets_filtered, motif_length)
 
     dists = [ml.get_pairwise_extent(D_full, motiflet_pos, upperbound=np.inf)
              for motiflet_pos in motifsets_filtered]

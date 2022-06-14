@@ -41,10 +41,11 @@ def get_valmod_motif_set_ranged(
         steps=10
 ):
     D_full = ml.compute_distances_full(data, motif_length)
+    m_half = motif_length // 2
 
     # get pair motif
     pair_motif, pair_motif_dist, D_full = get_pair_motif(D_full)
-    yield (pair_motif, pair_motif_dist)
+    yield pair_motif
 
     # perform range search around each offset
     last_size = 2
@@ -54,7 +55,13 @@ def get_valmod_motif_set_ranged(
         # filter trivial matches
         if len(motif_set) > last_size:
             dist = ml.get_pairwise_extent(D_full, motif_set)
-            yield (motif_set, dist)
+            yield motif_set
+
+            for pos in motif_set:
+                trivialMatchRange = (max(0, pos - m_half),
+                             min(pos + m_half, len(D_full)))
+                D_full[:, trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
+
 
         last_size = len(motif_set)
 
@@ -90,7 +97,7 @@ def get_k_motifs_ranged(
 
     # get pair motif
     pair_motif, pair_motif_dist, _ = get_pair_motif(D_full)
-    yield (pair_motif, pair_motif_dist)
+    yield (pair_motif)
 
     last_size = 2
 
@@ -99,7 +106,7 @@ def get_k_motifs_ranged(
 
         if len(k_motifset) > last_size:
             pairwise_dist = ml.get_pairwise_extent(D_full, k_motifset)
-            yield (k_motifset, pairwise_dist)
+            yield (k_motifset)
 
         last_size = max(last_size, len(k_motifset))
 

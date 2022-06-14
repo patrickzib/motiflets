@@ -151,25 +151,41 @@ def compute_distances_full(ts, m):
 
     return D
 
+@njit(fastmath=True)
+def get_radius(D_full, motiflet_pos, upperbound=np.inf):
+    """ Requires the full matrix!!! """
+
+    motiflet_radius = np.inf
+    
+    for ii in range(len(motiflet_pos) - 1):
+        i = motiflet_pos[ii]
+        current = np.float32(0.0)
+        for jj in range(1, len(motiflet_pos)):
+            if (i != jj):
+                j = motiflet_pos[jj]
+                current = max(current, D_full[i, j])
+        motiflet_radius = min(current, motiflet_radius)
+
+    return motiflet_radius
+
+
+
 
 @njit(fastmath=True)
 def get_pairwise_extent(D_full, motiflet_pos, upperbound=np.inf):
     """ Requires the full matrix!!! """
 
-    # for i in motiflet_pos:
-    #    for j in motiflet_pos[i+1::]:
-
-    motiflet_range = np.float32(0.0)
+    motiflet_extent = np.float32(0.0)
     for ii in range(len(motiflet_pos) - 1):
         i = motiflet_pos[ii]
         for jj in range(ii + 1, len(motiflet_pos)):
             j = motiflet_pos[jj]
 
-            motiflet_range = max(motiflet_range, D_full[i, j])
-            if motiflet_range >= upperbound:
+            motiflet_extent = max(motiflet_extent, D_full[i, j])
+            if motiflet_extent >= upperbound:
                 return np.inf
 
-    return motiflet_range
+    return motiflet_extent
 
 
 @njit
@@ -404,9 +420,10 @@ def search_k_motiflets_elbow(ks,
 @njit
 def candidate_dist(D_full, pool, upperbound, m):
     motiflet_candidate_dist = 0
+    m_half = m / 2
     for i in pool:
         for j in pool:
-            if ((i != j and np.abs(i - j) < m / 2)
+            if ((i != j and np.abs(i - j) < m_half)
                     or (i != j and D_full[i, j] > upperbound)):
                 return np.inf
 
@@ -420,7 +437,6 @@ def candidate_dist(D_full, pool, upperbound, m):
 # @njit
 def find_k_motiflets(ts, D_full, m, k, upperbound=None):
     n = len(ts) - m + 1
-    k_halve_m = k * int(m / 2)
 
     motiflet_dist = upperbound
     if upperbound is None:
@@ -430,18 +446,132 @@ def find_k_motiflets(ts, D_full, m, k, upperbound=None):
         motiflet_pos = motiflet_candidate
 
     # allow subsequence itself
-    np.fill_diagonal(D_full, 0)
+    np.fill_diagonal(D_full, 0) 
+    k_halve_m = k * int(m / 2)
 
+    def exact_inner(ii, k_halve_m, D_full, 
+                            motiflet_dist, motiflet_pos, m) :
+
+        for i in np.arange(ii, min(n, ii+m)): # in runs of m
+            D_candidates = np.argwhere(D_full[i] <= motiflet_dist).flatten()
+            if (len(D_candidates) >= k and
+                    np.ptp(D_candidates) > k_halve_m):
+                # exhaustive search over all subsets
+                for permutation in itertools.combinations(D_candidates, k):
+                    if np.ptp(permutation) > k_halve_m:
+                        dist = candidate_dist(D_full, permutation, motiflet_dist, m)
+                        if dist < motiflet_dist:
+                            motiflet_dist = dist
+                            motiflet_pos = np.copy(permutation)
+        return motiflet_dist, motiflet_pos
+
+
+    motiflet_dists, motiflet_poss = zip(*Parallel(n_jobs=-1)(    
+                delayed(exact_inner)(
+                        i, 
+                        k_halve_m, 
+                        D_full, 
+                        motiflet_dist, 
+                        motiflet_pos, 
+                        m
+                    ) for i in range(0, n, m)))
+
+    min_pos = np.argmin(motiflet_dists)
+    motiflet_dist = motiflet_dists[min_pos]
+    motiflet_pos = motiflet_poss[min_pos]
+
+    return motiflet_dist, motiflet_pos
+
+
+"""
+k_halve_m = (k-1) * int(m / 2)
     for i in range(0, n):
         D_candidates = np.argwhere(D_full[i] <= motiflet_dist).flatten()
-        if (len(D_candidates) >= k and
+        if (len(D_candidates) >= k-1 and
+                # np.max(D_candidates) - np.min(D_candidates) > k * (m/2)
                 np.ptp(D_candidates) > k_halve_m):
             # exhaustive search over all subsets
-            for permutation in itertools.combinations(D_candidates, k):
+            for permutation in itertools.combinations(D_candidates, k-1):
                 if np.ptp(permutation) > k_halve_m:
                     dist = candidate_dist(D_full, permutation, motiflet_dist, m)
                     if dist < motiflet_dist:
-                        motiflet_dist = dist
+                        motiflet_dist = max(dist, np.max(D_full[i, D_candidates]))
                         motiflet_pos = np.copy(permutation)
+                        motiflet_pos = np.append(motiflet_pos, i)
 
     return motiflet_dist, motiflet_pos
+"""
+
+
+"""
+# Distance Matrix with Dot-Product / no-loops
+def compute_distances_knn(TS, m, k, D_full=None, exclusion=None):
+    l = len(TS) - m + 1
+    halve_m = int(m/2)
+    exclusion_m = int(m/4)
+
+    knns = np.zeros((l,k), dtype=np.int32)
+    D = np.zeros((l,k))
+
+    dot_prev = None      
+    means, stds = sliding_mean_std(TS, m)
+    
+    if exclusion is not None:
+        exclusion = exclusion.flatten()
+    else:
+        exclusion = []
+
+    for order in range(0,l) :
+        dist = None
+        
+        # use distance matrix
+        if D_full is not None:
+            dist = D_full[order]
+
+        # compute directly
+        else :
+            # first iteration O(n log n)
+            if order == 0 :
+                dot_first = sliding_dot_product(TS[:m], TS)                        
+                dot_rolled = dot_first
+            # O(1) further operations
+            else :
+                dot_rolled = np.roll(dot_prev,1) + TS[order+m-1]*TS[m-1:l+m] \
+                    - TS[order-1]*np.roll(TS[:l],1)
+                dot_rolled[0] = dot_first[order]
+
+            x_mean = means[order]
+            x_std = stds[order]
+
+            dist = 2*m*(1-(dot_rolled-m*means*x_mean)/(m*stds*x_std))        
+
+        # self-join: eclusion zone
+        trivialMatchRange = (   max(0,order - halve_m),
+                                min(order + halve_m,l) )
+        dist[trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
+
+        # for top-k retrieval
+        for mot in exclusion:
+            if (mot is not None):
+                for pos in mot:
+                    if (pos is not None):
+                        trivialMatchRange = (max(0, pos - exclusion_m),
+                                             min(pos + exclusion_m,l))
+                        dist[trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
+            D[order,:] = np.inf                        
+        
+        dist[order] = 0
+
+        # k-NN retrieval
+        idx = get_top_k_non_trivial_matches(dist, k, m, l, order)
+
+        # it might be less than k
+        ks = min(k, len(idx))
+        knns[order,:ks] = idx[:ks]  # top k
+        D[order,:ks] = dist[idx[:ks]]
+
+        if D_full is None:
+            dot_prev = dot_rolled
+
+    return D, knns
+"""
