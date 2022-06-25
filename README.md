@@ -1,6 +1,6 @@
 # Motiflets
 
-This page was built in support of our paper "Motiflets - Fast and Accurate Detection of Motifs in Time Series" by Patrick Schäfer and Ulf Leser.
+This page was built in support of our paper "Motiflets - Simple and Accurate Detection of Motifs in Time Series" by Patrick Schäfer and Ulf Leser.
 
 The paper is completely self-contained, the purpose of this webpage is to provide the 
 k-Motiflet code, and the raw data to readers of the paper.

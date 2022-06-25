@@ -185,7 +185,8 @@ def plot_elbow(ks,
                plot_elbows=False,
                ground_truth=None,
                filter=True,
-               method_name=None):
+               method_name=None,
+               data_array=None):
     raw_data = data.to_numpy() if isinstance(data, pd.Series) else data
     dists, candidates, elbow_points, m = ml.search_k_motiflets_elbow(
         ks,
@@ -209,7 +210,7 @@ def plot_elbow(ks,
     plot_grid_motiflets(
         dataset, data, candidates, elbow_points,
         dists, motif_length, idx=idx, ds_name=ds_name, show_elbows=plot_elbows,
-        ground_truth=ground_truth, method_name=method_name)
+        ground_truth=ground_truth, method_name=method_name, data_array=data_array)
 
     return dists, candidates, elbow_points
 
@@ -277,20 +278,23 @@ def plot_motif_length_selection(ks, data, dataset, motif_length_range, ds_name):
 
 def plot_grid_motiflets(
         name, data, candidates, elbow_points, dist,
-        motif_length, font_size=24,
+        motif_length, font_size=20,
         idx=None, ds_name=None,
         ground_truth=None,
         method_name=None,
         method_names=None,
-        show_elbows=False):
+        show_elbows=False,
+        color_palette=sns.color_palette(),
+        grid_dim=5,
+        plot_index=None,
+        data_array=None):
     sns.set_context("paper",
                     rc={"font.size": font_size, "axes.titlesize": font_size - 8,
                         "axes.labelsize": font_size - 8})
 
-    grid_dim = 5
     label_cols = 2
 
-    count_plots = 2
+    count_plots = 3 if len(candidates[elbow_points]) > 6 else 2
     if show_elbows:
         count_plots = count_plots + 1
 
@@ -299,8 +303,8 @@ def plot_grid_motiflets(
 
     dims = int(np.ceil(len(elbow_points) / grid_dim)) + count_plots
 
-    fig = plt.figure(constrained_layout=True, figsize=(10, dims * 3))
-    gs = fig.add_gridspec(dims, grid_dim, hspace=0.5, wspace=0.5)
+    fig = plt.figure(constrained_layout=True, figsize=(10, dims * 2))
+    gs = fig.add_gridspec(dims, grid_dim, hspace=0.5, wspace=0.4)
 
     ax_ts = fig.add_subplot(gs[0, :])
     ax_ts.set_title("(a) Dataset: " + (ds_name if ds_name is not None else name) + "")
@@ -312,8 +316,21 @@ def plot_grid_motiflets(
         data_raw = data
         data_index = np.arange(len(data))
 
-    _ = sns.lineplot(x=data_index, y=data_raw, ax=ax_ts, linewidth=1)
+    if data_array is None:
+        _ = sns.lineplot(x=data_index, y=data_raw, ax=ax_ts, linewidth=1)
+
+    if data_array is not None:
+        last_offset = 0
+        for d in data_array:
+            d_data = d.values
+            d_index = np.arange(last_offset, last_offset+len(d_data))
+            _ = sns.lineplot(x=d_index, y=d_data, ax=ax_ts, label=d.name, linewidth=1)
+            last_offset = last_offset + len(d_data)
+
+        ax_ts.legend()
+
     sns.despine()
+
 
     for aaa, column in enumerate(ground_truth):
         for offsets in ground_truth[column]:
@@ -330,11 +347,17 @@ def plot_grid_motiflets(
                                  color=sns.color_palette()[aaa + 1],
                                  )
 
-    ax_bars = fig.add_subplot(gs[1, :], sharex=ax_ts)
+    if len(candidates[elbow_points]) > 6:
+        ax_bars = fig.add_subplot(gs[1:3, :], sharex=ax_ts)
+        next_id = 3
+    else: 
+        ax_bars = fig.add_subplot(gs[1, :], sharex=ax_ts)        
+        next_id = 2
+
     ax_bars.set_title("(b) Position of Top Motif Sets")
 
     if show_elbows:
-        ax_elbow = fig.add_subplot(gs[2, :])
+        ax_elbow = fig.add_subplot(gs[next_id, :])
         ax_elbow.set_title("(c) Significant Elbow Points on " + (
             ds_name if ds_name is not None else name))
         ax_elbow.plot(range(len(np.sqrt(dist))), dist, "b", label="Extent")
@@ -356,7 +379,7 @@ def plot_grid_motiflets(
     if (show_elbows):
         ax_title.set_title('(d) Shape of Top Motif Sets by Method', pad=30)
     else:
-        ax_title.set_title('(c) Shape of Top Motif Sets by Method', pad=30)
+        ax_title.set_title('(c) Shape of Optimal Motif Sets by Method', pad=30)
 
     # Turn off axis lines and ticks of the big subplot 
     ax_title.tick_params(labelcolor=(1., 1., 1., 0.0),
@@ -369,24 +392,29 @@ def plot_grid_motiflets(
     hatches = ['/', '\\', '|', '-', '+', 'x', 'o', 'O', '.', '*']
 
     y_labels = []
+    ii = -1
     motiflets = candidates[elbow_points]
     for i, motiflet in enumerate(motiflets):
         if motiflet is not None:
-            off = int(i / grid_dim)
-            ax_motiflet = fig.add_subplot(gs[count_plots + off, i % grid_dim])
 
+            plot_minature = (plot_index == None) or (i in plot_index)
+            if plot_minature:                
+                ii = ii+1
+                off = int(ii / grid_dim)
+                ax_motiflet = fig.add_subplot(gs[count_plots + off, ii % grid_dim])                
+            
             df = pd.DataFrame()
             df["time"] = data_index[range(0, motif_length)]
 
             for aa, pos in enumerate(motiflet):
                 df[str(aa)] = zscore(data_raw[pos:pos + motif_length])
-                ratio = 0.8  # (np.max(data_raw) - np.min(data_raw)) / 10
+                ratio = 0.8 
                 rect = Rectangle(
                     (data_index[pos], -i),  
                     data_index[pos + motif_length - 1] - data_index[pos],
                     ratio,
-                    facecolor=sns.color_palette()[
-                        (len(ground_truth) + i % 5) % len(sns.color_palette())],
+                    facecolor=color_palette[
+                        (len(ground_truth) + ii % grid_dim) % len(color_palette)],
                     # hatch=hatches[i],
                     alpha=0.7
                 )
@@ -408,50 +436,53 @@ def plot_grid_motiflets(
             # if method_names is not None:
             #    label =  method_names[elbow_points[i]]
 
-            df_melt = pd.melt(df, id_vars="time")
-            _ = sns.lineplot(ax=ax_motiflet, data=df_melt, x="time", y="value", ci=99,
-                             color=sns.color_palette()[
-                                 (len(ground_truth) + i % 5) % len(
-                                     sns.color_palette())],
-                             label=label + "k=" + str(len(motiflet)) + ",\nd=" + dists
-                             )
-            ax_motiflet.set_ylabel("")
+            if plot_minature:
+                df_melt = pd.melt(df, id_vars="time")
+                _ = sns.lineplot(ax=ax_motiflet, data=df_melt, x="time", y="value", ci=99,
+                                 color=color_palette[
+                                     (len(ground_truth) + ii % grid_dim) % len(color_palette)],
+                                 label=label + "k=" + str(len(motiflet)) + ",d=" + dists
+                                 )
+                ax_motiflet.set_ylabel("")
 
-            if isinstance(data, pd.Series):
-                ax_motiflet.set_xlabel(data.index.name)
+                if isinstance(data, pd.Series):
+                    ax_motiflet.set_xlabel(data.index.name)
 
-            sns.despine()
-            ax_motiflet.legend(loc="upper right")
+                sns.despine()
+                ax_motiflet.legend(loc="upper right")
 
             if method_names is not None:
                 ax_bars.plot([], [], label=method_names[elbow_points[i]].split()[0],
                              linewidth=10,
-                             color=sns.color_palette()[
-                                 (len(ground_truth) + i % 5) % len(
-                                     sns.color_palette())])
-                ax_motiflet.set_title(method_names[elbow_points[i]])
+                             color=color_palette[
+                                 (len(ground_truth) + ii % grid_dim) % len(
+                                     color_palette)])
+                if plot_minature:
+                    ax_motiflet.set_title(method_names[elbow_points[i]])
 
             elif method_name is not None:
                 ax_bars.plot([], [], label=method_name, linewidth=10,
-                             color=sns.color_palette()[
-                                 (len(ground_truth) + i % 5) % len(
-                                     sns.color_palette())])
-                ax_motiflet.set_title(method_name + " Top-" + str(i + 1))
+                             color=color_palette[
+                                 (len(ground_truth) + ii % grid_dim) % len(
+                                     color_palette)])
+                if plot_minature:
+                    ax_motiflet.set_title(method_name + " Top-" + str(i + 1))
 
             if show_elbows:
                 axins = ax_elbow.inset_axes(
                     [elbow_points[i] / len(candidates), 0.7, 0.1, 0.2])
 
                 _ = sns.lineplot(ax=axins, data=df_melt, x="time", y="value", ci=99,
-                                 color=sns.color_palette()[
-                                     (len(ground_truth) + i % 5) % len(
-                                         sns.color_palette())])
+                                 color=color_palette[
+                                     (len(ground_truth) + ii % grid_dim) % len(
+                                         color_palette)])
                 axins.set_xlabel("")
                 axins.set_ylabel("")
                 axins.xaxis.set_major_formatter(plt.NullFormatter())
                 axins.yaxis.set_major_formatter(plt.NullFormatter())
 
-            ax_motiflet.set_yticks([])
+            if plot_minature:
+                ax_motiflet.set_yticks([])
 
     ax_bars.set_yticks(-np.arange(len(y_labels)) + 0.5)
     ax_bars.set_yticklabels(y_labels)
@@ -473,7 +504,7 @@ def plot_grid_motiflets(
                 "../images/" + name.replace(" ", "-") + "_grid_" + str(idx) + ".pdf",
                 bbox_inches='tight')
 
-    if show_elbows and save_fig:
+    if save_fig:
         plt.savefig("../images/" + name.replace(" ", "-") + "_elbows.pdf",
                     bbox_inches='tight')
 
@@ -487,7 +518,9 @@ def plot_all_competitors(
         motif_length,
         method_names=None,
         target_cardinalities=None,
-        ground_truth=None):
+        ground_truth=None,
+        plot_index=None,
+        color_palette=sns.color_palette()):
     # convert to numpy array
     data_raw = data
     if isinstance(data, pd.Series):
@@ -504,7 +537,9 @@ def plot_all_competitors(
         dists, motif_length, ds_name=name,
         # method_name=prefix,
         method_names=method_names,
-        ground_truth=ground_truth)
+        ground_truth=ground_truth,
+        color_palette=color_palette,
+        plot_index=plot_index)
 
 
 def plot_competitors(
@@ -524,10 +559,12 @@ def plot_competitors(
     D_full = ml.compute_distances_full(data_raw, motif_length)
 
     # max radius
+    """
     for elem in motifsets:
         if len(elem) > 1:
             print("r:", ml.get_radius(D_full, elem),
                   "d:", ml.get_pairwise_extent(D_full, elem, upperbound=np.inf))
+    """
 
     last = -1
     motifsets_filtered = []
@@ -551,3 +588,11 @@ def plot_competitors(
         ground_truth=ground_truth)
 
     return motifsets_filtered[elbow_points]
+
+def format_key(e):
+    key = ""
+    if e > 0:
+        key = "+"+str(e*100) + "%"
+    elif e < 0:
+        key = str(e*100) + "%"
+    return key
