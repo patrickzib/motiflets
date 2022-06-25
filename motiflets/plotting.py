@@ -209,7 +209,7 @@ def plot_elbow(ks,
 
     plot_grid_motiflets(
         dataset, data, candidates, elbow_points,
-        dists, motif_length, idx=idx, ds_name=ds_name, show_elbows=plot_elbows,
+        dists, motif_length, idx=idx, ds_name=ds_name, show_elbows=False,
         ground_truth=ground_truth, method_name=method_name, data_array=data_array)
 
     return dists, candidates, elbow_points
@@ -285,7 +285,7 @@ def plot_grid_motiflets(
         method_names=None,
         show_elbows=False,
         color_palette=sns.color_palette(),
-        grid_dim=5,
+        grid_dim=None,
         plot_index=None,
         data_array=None):
     sns.set_context("paper",
@@ -301,6 +301,13 @@ def plot_grid_motiflets(
     if ground_truth is None:
         ground_truth = []
 
+    if grid_dim is None:
+        if plot_index is not None:
+            ll = len(plot_index)
+        else:
+            ll = len(elbow_points)
+        grid_dim = int(max(2, np.ceil(ll / 2)))
+        
     dims = int(np.ceil(len(elbow_points) / grid_dim)) + count_plots
 
     fig = plt.figure(constrained_layout=True, figsize=(10, dims * 2))
