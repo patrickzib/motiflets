@@ -195,8 +195,7 @@ def plot_elbow(ks,
         motif_length,
         exclusion=exclusion)
 
-    print("Chosen window-size:", m)
-    print("Identified Elbow Points", elbow_points)
+    print("Chosen window-size:", m, "Elbow Points", elbow_points)
 
     if exclusion is not None and idx is None:
         idx = "top-2"

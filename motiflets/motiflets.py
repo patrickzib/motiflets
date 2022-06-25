@@ -325,9 +325,9 @@ def inner_au_pef(data, dataset, ks, index, m):
     if len(elbow_points > 0):
         top_motiflet = candidates[elbow_points[-1]]
 
-    print("Motif Length:", m, "\t", index[m],
-          "\tAU_PEF:", np.round(au_pefs, 3),
-          "\t#Elbows:", elbow)
+    #print("Motif Length:", m, "\t", index[m],
+    #      "\tAU_PEF:", np.round(au_pefs, 3),
+    #      "\t#Elbows:", elbow)
 
     return au_pefs, elbow, top_motiflet
 
