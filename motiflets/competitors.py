@@ -85,3 +85,58 @@ def get_valmod_motif_set(
         motif_set.update(result)
 
     return filter_non_trivial_matches(np.array(list(motif_set)), motif_length)
+
+
+def get_k_motifs_ranged(
+        data,
+        file,
+        motif_length,
+        max_r=10):
+    D_full = ml.compute_distances_full(data, motif_length)
+
+    # get pair motif
+    pair_motif, pair_motif_dist, _ = get_pair_motif(D_full)
+    yield (pair_motif)
+
+    last_size = 2
+
+    for r in range(1, max_r + 1, max(1, int(max_r / 10))):
+        k_motifset = get_k_motifs(data, file, motif_length, r, D_full)
+
+        if len(k_motifset) > last_size:
+            pairwise_dist = ml.get_pairwise_extent(D_full, k_motifset)
+            yield (k_motifset)
+
+        last_size = max(last_size, len(k_motifset))
+
+
+def get_k_motifs(
+        data,
+        file,
+        motif_length,
+        r,
+        D_full=None):
+    if D_full is None:
+        D_full = ml.compute_distances_full(data, motif_length)
+
+    # allow subsequence itself
+    np.fill_diagonal(D_full, 0)
+
+    cardinality = -1
+    k_motif_dist_var = -1
+    k_motifset = []
+    for order, dist in enumerate(D_full):
+        motif_set = np.argwhere(dist <= r).flatten()
+        if len(motif_set) > cardinality:
+            # filter trivial matches
+            motif_set = filter_non_trivial_matches(motif_set, motif_length)
+
+            # Break ties by variance of distances
+            dist_var = np.var(dist[motif_set])
+            if len(motif_set) > cardinality or \
+                    (dist_var < k_motif_dist_var and len(motif_set) == cardinality):
+                cardinality = len(motif_set)
+                k_motifset = motif_set
+                k_motif_dist_var = dist_var
+
+    return k_motifset

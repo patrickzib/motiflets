@@ -208,7 +208,7 @@ def plot_elbow(ks,
 
     plot_grid_motiflets(
         dataset, data, candidates, elbow_points,
-        dists, motif_length, idx=idx, ds_name=ds_name, show_elbows=False,
+        dists, motif_length, idx=idx, ds_name=ds_name, show_elbows=plot_elbows,
         ground_truth=ground_truth, method_name=method_name, data_array=data_array)
 
     return dists, candidates, elbow_points
@@ -602,3 +602,18 @@ def format_key(e):
     elif e < 0:
         key = str(e*100) + "%"
     return key
+
+
+def to_df(motif_sets, method_name, df, df2):
+    df_all_1 = pd.DataFrame()
+    df_all_2 = pd.DataFrame()
+    for key in motif_sets:       
+        ms_set_finder = motif_sets[key]
+        df_all_1[method_name + " Top-1 " + key] = [ms_set_finder[-1]]
+        df_all_2[method_name + " Top-2 " + key] = [ms_set_finder[-2]]
+        df[method_name + " Top-1 " + key] = [ms_set_finder[-1]]
+        df2[method_name + " Top-2 " + key] = [ms_set_finder[-2]]
+        
+    df_all = (pd.concat([df_all_1, df_all_2], axis=1)).T
+    df_all.rename(columns={0:"offsets"}, inplace=True)    
+    return df_all
