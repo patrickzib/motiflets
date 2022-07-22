@@ -20,10 +20,11 @@ def as_series(data, index_range, index_name):
 
 
 def resample(data, sampling_factor=10000):
+    factor = 1
     if len(data) > sampling_factor:
         factor = np.int32(len(data) / sampling_factor)
         data = data[::factor]
-    return data
+    return data, factor
 
 
 def read_ground_truth(dataset):
@@ -42,13 +43,17 @@ def read_dataset_with_index(dataset, sampling_factor=10000):
     data = pd.read_csv(full_path, index_col=0, squeeze=True)
     print("Dataset Original Length n: ", len(data))
 
-    data = resample(data, sampling_factor)
+    data, factor = resample(data, sampling_factor)
     print("Dataset Sampled Length n: ", len(data))
 
     data[:] = zscore(data)
 
-    gt = read_ground_truth(dataset)
+    gt = read_ground_truth(dataset)    
     if gt is not None:
+        if factor > 1:
+            for column in gt: 
+                gt[column] = gt[column].transform(
+                    lambda l : (np.array(l)) // factor)
         return data, gt
     else:
         return data
@@ -60,7 +65,7 @@ def read_dataset(dataset, sampling_factor=10000):
     data = np.array(data)[0]
     print("Dataset Original Length n: ", len(data))
 
-    data = resample(data, sampling_factor)
+    data, factor = resample(data, sampling_factor)
     print("Dataset Sampled Length n: ", len(data))
     
     # gt = read_ground_truth(dataset)    
@@ -195,9 +200,7 @@ def get_top_k_non_trivial_matches(
 
     # admissible pruning: are there enough offsets within range?
     idx2 = np.argwhere(dist < lowest_dist).flatten()
-    if (len(idx2) < k or
-            # (np.max(idx2) - np.min(idx2) < k * halve_m)
-            np.ptp(idx2) < k * halve_m):
+    if (len(idx2) < k or np.ptp(idx2) < k * halve_m):
         return np.array([order], dtype=np.int32)
 
     if dists is None:
@@ -208,7 +211,7 @@ def get_top_k_non_trivial_matches(
     idx = []  # there may be less than k, thus use a list
     for i in range(k):
         pos = np.argmin(dists)
-        if dists[pos] < lowest_dist:
+        if (not np.isnan(dists[pos])) and (dists[pos] < lowest_dist):
             idx.append(pos)
             dists[max(0, pos - halve_m):min(pos + halve_m, n)] = np.inf
         else:
@@ -216,6 +219,44 @@ def get_top_k_non_trivial_matches(
 
     return np.array(idx, dtype=np.int32)
 
+""" not working
+@njit
+def get_top_k_non_trivial_matches_with_sorting(
+        dist, k, m, n, order, lowest_dist=np.inf, dists=None):
+    halve_m = int(m / 2)
+
+    # admissible pruning: are there enough offsets within range?
+    idx2 = np.argwhere(dist < lowest_dist).flatten()
+    if (len(idx2) < k or np.ptp(idx2) < k * halve_m):
+        return np.array([order], dtype=np.int32)
+
+    if dists is None:
+        dists = np.copy(dist)
+    else:  # avoid allocating memory again
+        dists[:] = dist
+
+    idx = []  # there may be less than k, thus use a list
+
+    dists[np.isnan(dists)] = np.inf    
+    sorted_idx = np.argsort(dists)
+    trivial_match = np.zeros(len(dists))
+
+    last_pos = 0
+    for i in range(k):
+        for pos in range(last_pos, len(sorted_idx)):
+            # use next distance
+            if (dists[pos] < lowest_dist) and (trivial_match[pos] == 0):
+                idx.append(pos)
+                trivial_match[max(0, pos - halve_m):min(pos + halve_m, n)] = 1
+                last_pos = pos
+                break
+
+            # break all
+            elif dists[pos] >= lowest_dist:
+                return np.array(idx, dtype=np.int32)
+
+    return np.array(idx, dtype=np.int32)
+"""
 
 @njit
 def get_approximate_k_motiflet_inner(
@@ -233,7 +274,10 @@ def get_approximate_k_motiflet_inner(
         modulo = order % 4
         if modulo == offset:
             dist = np.copy(D[order])
-            # dist[order] = 0
+
+            #idx = get_top_k_non_trivial_matches_with_sorting(
+            #    dist, k, m, n, order, lowest_dist, dists=dist_buffer)
+
             idx = get_top_k_non_trivial_matches(
                 dist, k, m, n, order, lowest_dist, dists=dist_buffer)
 
@@ -251,21 +295,6 @@ def get_approximate_k_motiflet_inner(
 def get_approximate_k_motiflet(ts, m, k, D, upper_bound=np.inf):
     n = len(ts) - m + 1
 
-    """
-    # is not faster, as admissible pruning does not work :(
-    # iterate all subsequences
-    result = Parallel(n_jobs=4)(    
-        delayed(get_approximate_k_motiflet_inner)(
-                n, m, k, D, i, upper_bound=np.inf
-            ) for i in np.arange(4))
-
-    result = np.array(result)
-    candidates = result[:,0]
-    dists = result[:,1]
-    motiflet_candidate = candidates[np.argmin(dists)]
-    motiflet_dist = dists[np.argmin(dists)]
-    """
-
     motiflet_dist = upper_bound
     motiflet_candidate = None
 
@@ -277,6 +306,38 @@ def get_approximate_k_motiflet(ts, m, k, D, upper_bound=np.inf):
             motiflet_candidate = candidate
 
     return motiflet_candidate, motiflet_dist
+
+
+
+@njit
+def check_unique(elbow_points_1, elbow_points_2, motif_length):
+    uniques = True
+    count = 0
+    for a in elbow_points_1:  # smaller motiflet
+        for b in elbow_points_2:  # larger motiflet
+            if (abs(a - b) < (motif_length / 8)):
+                count = count + 1
+                break
+
+        if count >= len(elbow_points_1) / 2:
+            return False
+    return True
+
+
+def filter_unqiue(elbow_points, candidates, motif_length):
+    filtered_ebp = []
+    for i in range(len(elbow_points)):
+        unique = True
+        for j in range(i + 1, len(elbow_points)):
+            unique = check_unique(
+                candidates[elbow_points[i]], candidates[elbow_points[j]], motif_length)
+            if not unique:
+                break
+        if unique:
+            filtered_ebp.append(elbow_points[i], )
+
+    #print("Elbows", filtered_ebp)
+    return np.array(filtered_ebp)
 
 
 @njit
@@ -319,17 +380,18 @@ def inner_au_pef(data, dataset, ks, index, m):
         return None, None, None
 
     au_pefs = ((dists - dists.min()) / (dists.max() - dists.min())).sum() / len(dists)
-    elbow = len(elbow_points)
+    elbow_points = filter_unqiue(elbow_points, candidates, m)
 
     top_motiflet = None
     if len(elbow_points > 0):
+        elbows = len(elbow_points)
         top_motiflet = candidates[elbow_points[-1]]
+    else:
+        # pair motif
+        elbows = 1
+        top_motiflet = candidates[0]
 
-    #print("Motif Length:", m, "\t", index[m],
-    #      "\tAU_PEF:", np.round(au_pefs, 3),
-    #      "\t#Elbows:", elbow)
-
-    return au_pefs, elbow, top_motiflet
+    return au_pefs, elbows, top_motiflet
 
 
 def find_au_pef_motif_length(data, dataset, ks, motif_length_range):
@@ -353,7 +415,7 @@ def find_au_pef_motif_length(data, dataset, ks, motif_length_range):
     condition = np.argwhere(elbows == 0).flatten()
     au_pefs[condition] = np.inf
 
-    return motif_length_range[np.argmin(au_pefs)], au_pefs, elbows, top_motiflets
+    return motif_length_range[np.nanargmin(au_pefs)], au_pefs, elbows, top_motiflets
 
 
 def search_k_motiflets_elbow(ks,
@@ -455,7 +517,7 @@ def find_k_motiflets(ts, D_full, m, k, upperbound=None):
         for i in np.arange(ii, min(n, ii+m)): # in runs of m
             D_candidates = np.argwhere(D_full[i] <= motiflet_dist).flatten()
             if (len(D_candidates) >= k and
-                    np.ptp(D_candidates) > k_halve_m):
+                    np.ptp(D_candidates) > k_halve_m):            
                 # exhaustive search over all subsets
                 for permutation in itertools.combinations(D_candidates, k):
                     if np.ptp(permutation) > k_halve_m:
@@ -476,102 +538,8 @@ def find_k_motiflets(ts, D_full, m, k, upperbound=None):
                         m
                     ) for i in range(0, n, m)))
 
-    min_pos = np.argmin(motiflet_dists)
+    min_pos = np.nanargmin(motiflet_dists)
     motiflet_dist = motiflet_dists[min_pos]
     motiflet_pos = motiflet_poss[min_pos]
 
     return motiflet_dist, motiflet_pos
-
-
-"""
-k_halve_m = (k-1) * int(m / 2)
-    for i in range(0, n):
-        D_candidates = np.argwhere(D_full[i] <= motiflet_dist).flatten()
-        if (len(D_candidates) >= k-1 and
-                # np.max(D_candidates) - np.min(D_candidates) > k * (m/2)
-                np.ptp(D_candidates) > k_halve_m):
-            # exhaustive search over all subsets
-            for permutation in itertools.combinations(D_candidates, k-1):
-                if np.ptp(permutation) > k_halve_m:
-                    dist = candidate_dist(D_full, permutation, motiflet_dist, m)
-                    if dist < motiflet_dist:
-                        motiflet_dist = max(dist, np.max(D_full[i, D_candidates]))
-                        motiflet_pos = np.copy(permutation)
-                        motiflet_pos = np.append(motiflet_pos, i)
-
-    return motiflet_dist, motiflet_pos
-"""
-
-
-"""
-# Distance Matrix with Dot-Product / no-loops
-def compute_distances_knn(TS, m, k, D_full=None, exclusion=None):
-    l = len(TS) - m + 1
-    halve_m = int(m/2)
-    exclusion_m = int(m/4)
-
-    knns = np.zeros((l,k), dtype=np.int32)
-    D = np.zeros((l,k))
-
-    dot_prev = None      
-    means, stds = sliding_mean_std(TS, m)
-    
-    if exclusion is not None:
-        exclusion = exclusion.flatten()
-    else:
-        exclusion = []
-
-    for order in range(0,l) :
-        dist = None
-        
-        # use distance matrix
-        if D_full is not None:
-            dist = D_full[order]
-
-        # compute directly
-        else :
-            # first iteration O(n log n)
-            if order == 0 :
-                dot_first = sliding_dot_product(TS[:m], TS)                        
-                dot_rolled = dot_first
-            # O(1) further operations
-            else :
-                dot_rolled = np.roll(dot_prev,1) + TS[order+m-1]*TS[m-1:l+m] \
-                    - TS[order-1]*np.roll(TS[:l],1)
-                dot_rolled[0] = dot_first[order]
-
-            x_mean = means[order]
-            x_std = stds[order]
-
-            dist = 2*m*(1-(dot_rolled-m*means*x_mean)/(m*stds*x_std))        
-
-        # self-join: eclusion zone
-        trivialMatchRange = (   max(0,order - halve_m),
-                                min(order + halve_m,l) )
-        dist[trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
-
-        # for top-k retrieval
-        for mot in exclusion:
-            if (mot is not None):
-                for pos in mot:
-                    if (pos is not None):
-                        trivialMatchRange = (max(0, pos - exclusion_m),
-                                             min(pos + exclusion_m,l))
-                        dist[trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
-            D[order,:] = np.inf                        
-        
-        dist[order] = 0
-
-        # k-NN retrieval
-        idx = get_top_k_non_trivial_matches(dist, k, m, l, order)
-
-        # it might be less than k
-        ks = min(k, len(idx))
-        knns[order,:ks] = idx[:ks]  # top k
-        D[order,:ks] = dist[idx[:ks]]
-
-        if D_full is None:
-            dot_prev = dot_rolled
-
-    return D, knns
-"""

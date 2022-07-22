@@ -195,13 +195,15 @@ def plot_elbow(ks,
         motif_length,
         exclusion=exclusion)
 
-    print("Chosen window-size:", m, "Elbow Points", elbow_points)
+    print("Chosen window-size:", m)
 
     if exclusion is not None and idx is None:
         idx = "top-2"
 
     if filter:
-        elbow_points = filter_unqiue(elbow_points, candidates, motif_length)
+        elbow_points = ml.filter_unqiue(elbow_points, candidates, motif_length)
+    
+    print("Elbow Points", elbow_points)
 
     if plot_elbows:
         plot_elbow_points(ds_name, data, motif_length, elbow_points, candidates, dists)
@@ -214,36 +216,6 @@ def plot_elbow(ks,
     return dists, candidates, elbow_points
 
 
-def filter_unqiue(elbow_points, candidates, motif_length):
-    filtered_ebp = []
-    for i in range(len(elbow_points)):
-        unique = True
-        for j in range(i + 1, len(elbow_points)):
-            unique = check_unique(
-                candidates[elbow_points[i]], candidates[elbow_points[j]], motif_length)
-            if not unique:
-                break
-        if unique:
-            filtered_ebp.append(elbow_points[i], )
-    print("Filtered Elbow Points", filtered_ebp)
-    return np.array(filtered_ebp)
-
-
-@njit
-def check_unique(elbow_points_1, elbow_points_2, motif_length):
-    uniques = True
-    count = 0
-    for a in elbow_points_1:  # smaller motiflet
-        for b in elbow_points_2:  # larger motiflet
-            if (abs(a - b) < (motif_length / 8)):
-                count = count + 1
-                break
-
-        if count >= len(elbow_points_1) / 2:
-            return False
-    return True
-
-
 def plot_motif_length_selection(ks, data, dataset, motif_length_range, ds_name):
     # raw_data = data.values if isinstance(data, pd.Series) else data
     index = data.index if isinstance(data, pd.Series) else np.arange(len(data))
@@ -253,10 +225,11 @@ def plot_motif_length_selection(ks, data, dataset, motif_length_range, ds_name):
         ml.find_au_pef_motif_length(
             data, dataset, ks, motif_length_range=motif_length_range)
 
+    indices = ~np.isinf(au_pdfs)
     fig, ax = plt.subplots(figsize=(5, 5))
     ax = sns.lineplot(
-        x=index[motif_length_range],
-        y=au_pdfs,
+        x=index[motif_length_range[indices]],
+        y=au_pdfs[indices],
         label="AU_EF")
     sns.despine()
     # plt.tight_layout()
@@ -583,7 +556,7 @@ def plot_competitors(
     elbow_points = np.arange(len(motifsets_filtered))
 
     if filter:
-        elbow_points = filter_unqiue(elbow_points, motifsets_filtered, motif_length)
+        elbow_points = ml.filter_unqiue(elbow_points, motifsets_filtered, motif_length)
 
     dists = [ml.get_pairwise_extent(D_full, motiflet_pos, upperbound=np.inf)
              for motiflet_pos in motifsets_filtered]
