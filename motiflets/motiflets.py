@@ -193,21 +193,55 @@ def get_pairwise_extent(D_full, motiflet_pos, upperbound=np.inf):
     return motiflet_extent
 
 
+@njit(fastmath=True)
+def ptp(idx, halve_m, k):
+    # checks if there are enough indices within range
+    # to return k non-overlapping subsequences 
+    last = -halve_m
+    count = 0
+    for i in idx:
+        if i > (halve_m + last):
+            last = i
+            count = count + 1
+    
+    return count < k
+
+
+
+@njit
+def get_top_k_non_trivial_matches_inner(
+        dist, k, m, n, order, candidates, lowest_dist=np.inf):
+    # admissible pruning: are there enough offsets within range?    
+    halve_m = int(m / 2)
+    if (len(candidates) < k):
+        return candidates
+
+    dists = np.copy(dist)    
+    idx = []  # there may be less than k, thus use a list
+    for i in range(len(candidates)):
+        can = np.argmin(dists[candidates])
+        pos = candidates[can]
+        if (not np.isnan(dists[pos])) and (dists[pos] < lowest_dist):
+            idx.append(pos)
+            dists[max(0, pos - halve_m):min(pos + halve_m, n)] = np.inf
+        else:
+            break
+
+    return np.array(idx, dtype=np.int32)
+
+
 @njit
 def get_top_k_non_trivial_matches(
-        dist, k, m, n, order, lowest_dist=np.inf, dists=None):
+        dist, k, m, n, order, lowest_dist=np.inf):
     halve_m = int(m / 2)
 
     # admissible pruning: are there enough offsets within range?
-    idx2 = np.argwhere(dist < lowest_dist).flatten()
-    if (len(idx2) < k or np.ptp(idx2) < k * halve_m):
-        return np.array([order], dtype=np.int32)
+    # idx2 = np.argwhere(dist < lowest_dist).flatten()
+    # if (len(idx2) < k) or ptp(idx2, halve_m, k):
+    #    print ("yes")
+    #    return np.array([order], dtype=np.int32)
 
-    if dists is None:
-        dists = np.copy(dist)
-    else:  # avoid allocating memory again
-        dists[:] = dist
-
+    dists = np.copy(dist)    
     idx = []  # there may be less than k, thus use a list
     for i in range(k):
         pos = np.argmin(dists)
@@ -219,94 +253,39 @@ def get_top_k_non_trivial_matches(
 
     return np.array(idx, dtype=np.int32)
 
-""" not working
-@njit
-def get_top_k_non_trivial_matches_with_sorting(
-        dist, k, m, n, order, lowest_dist=np.inf, dists=None):
-    halve_m = int(m / 2)
-
-    # admissible pruning: are there enough offsets within range?
-    idx2 = np.argwhere(dist < lowest_dist).flatten()
-    if (len(idx2) < k or np.ptp(idx2) < k * halve_m):
-        return np.array([order], dtype=np.int32)
-
-    if dists is None:
-        dists = np.copy(dist)
-    else:  # avoid allocating memory again
-        dists[:] = dist
-
-    idx = []  # there may be less than k, thus use a list
-
-    dists[np.isnan(dists)] = np.inf    
-    sorted_idx = np.argsort(dists)
-    trivial_match = np.zeros(len(dists))
-
-    last_pos = 0
-    for i in range(k):
-        for pos in range(last_pos, len(sorted_idx)):
-            # use next distance
-            if (dists[pos] < lowest_dist) and (trivial_match[pos] == 0):
-                idx.append(pos)
-                trivial_match[max(0, pos - halve_m):min(pos + halve_m, n)] = 1
-                last_pos = pos
-                break
-
-            # break all
-            elif dists[pos] >= lowest_dist:
-                return np.array(idx, dtype=np.int32)
-
-    return np.array(idx, dtype=np.int32)
-"""
-
-@njit
-def get_approximate_k_motiflet_inner(
-        n, m, k, D, offset, upper_bound=np.inf):
-    lowest_dist = upper_bound
+#@njit
+def get_approximate_k_motiflet(
+        ts, m, k, D, 
+        upper_bound=np.inf, incremental=False, all_candidates=None
+        ):
+    n = len(ts) - m + 1
+    motiflet_dist = upper_bound
     motiflet_candidate = None
+    
+    motiflet_all_candidates = []
 
     # allow subsequence itself
     np.fill_diagonal(D, 0)
 
-    # avoid allocating memory over an over
-    dist_buffer = np.copy(D[0])
-
     for order in np.arange(n):
-        modulo = order % 4
-        if modulo == offset:
-            dist = np.copy(D[order])
+        dist = np.copy(D[order])
 
-            #idx = get_top_k_non_trivial_matches_with_sorting(
-            #    dist, k, m, n, order, lowest_dist, dists=dist_buffer)
+        if incremental:
+            idx = get_top_k_non_trivial_matches_inner(
+                dist, k, m, n, order, all_candidates[order], motiflet_dist)
+        else:
+            idx = get_top_k_non_trivial_matches(dist, k, m, n, order, motiflet_dist)
 
-            idx = get_top_k_non_trivial_matches(
-                dist, k, m, n, order, lowest_dist, dists=dist_buffer)
+        motiflet_all_candidates.append(idx)
 
-            if len(idx) >= k and dist[idx[-1]] <= lowest_dist:
-                # Get get_pairwise_extent requires the full matrix 
-                motiflet_extent = get_pairwise_extent(D, idx[:k], lowest_dist)
-                if lowest_dist > motiflet_extent:
-                    lowest_dist = motiflet_extent
-                    motiflet_candidate = idx[:k]
+        if len(idx) >= k and dist[idx[-1]] <= motiflet_dist:
+            # Get get_pairwise_extent requires the full matrix 
+            motiflet_extent = get_pairwise_extent(D, idx[:k], motiflet_dist)
+            if motiflet_dist > motiflet_extent:
+                motiflet_dist = motiflet_extent
+                motiflet_candidate = idx[:k]        
 
-    return motiflet_candidate, lowest_dist
-
-
-@njit
-def get_approximate_k_motiflet(ts, m, k, D, upper_bound=np.inf):
-    n = len(ts) - m + 1
-
-    motiflet_dist = upper_bound
-    motiflet_candidate = None
-
-    for i in range(0, 4):
-        candidate, dist = get_approximate_k_motiflet_inner(
-            n, m, k, D, i, upper_bound=motiflet_dist)
-        if dist < motiflet_dist:
-            motiflet_dist = dist
-            motiflet_candidate = candidate
-
-    return motiflet_candidate, motiflet_dist
-
+    return motiflet_candidate, motiflet_dist, motiflet_all_candidates
 
 
 @njit
@@ -451,10 +430,10 @@ def search_k_motiflets_elbow(ks,
 
     upper_bound = np.inf
     exclusion_m = int(m / 3)
+    motiflet_candidates = []
 
     for test_k in tqdm(range(ks - 1, 1, -1), desc='Compute ks'):
-        # for test_k in range(ks - 1, 1, -1):
-        # print(".", end='')
+        # Top-N retrieval
         if exclusion is not None and exclusion[test_k] is not None:
             for pos in exclusion[test_k].flatten():
                 if pos is not None:
@@ -462,12 +441,22 @@ def search_k_motiflets_elbow(ks,
                                          min(pos + exclusion_m, len(D_full)))
                     D_full[:, trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
 
-        motiflet_candidate, motiflet_candidate_dist = get_approximate_k_motiflet(
-            data_raw, m, test_k, D_full, upper_bound=upper_bound)
 
-        k_motiflet_distances[test_k] = motiflet_candidate_dist
-        k_motiflet_candidates[test_k] = motiflet_candidate
-        upper_bound = motiflet_candidate_dist
+        incremental = (test_k < ks-1)
+        candidate, candidate_dist, all_candidates = get_approximate_k_motiflet(
+            data_raw, m, test_k, D_full, 
+            upper_bound=upper_bound, 
+            incremental=incremental,  # we use an incremental computation
+            all_candidates=motiflet_candidates
+            )
+        
+        if len(motiflet_candidates) == 0:
+            motiflet_candidates = all_candidates
+
+        k_motiflet_distances[test_k] = candidate_dist
+        k_motiflet_candidates[test_k] = candidate
+        upper_bound = candidate_dist
+
 
     # smoothen the line to make it monotonically increasing
     k_motiflet_distances[0:2] = k_motiflet_distances[2]
@@ -502,7 +491,7 @@ def find_k_motiflets(ts, D_full, m, k, upperbound=None):
 
     motiflet_dist = upperbound
     if upperbound is None:
-        motiflet_candidate, motiflet_dist = get_approximate_k_motiflet(
+        motiflet_candidate, motiflet_dist, _ = get_approximate_k_motiflet(
             ts, m, k, D_full, upper_bound=np.inf)
 
         motiflet_pos = motiflet_candidate
