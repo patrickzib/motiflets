@@ -156,7 +156,7 @@ def compute_distances_full(ts, m):
 
     return D
 
-@njit(fastmath=True)
+@njit(parallel=True, fastmath=True)
 def get_radius(D_full, motiflet_pos, upperbound=np.inf):
     """ Requires the full matrix!!! """
 
@@ -176,7 +176,7 @@ def get_radius(D_full, motiflet_pos, upperbound=np.inf):
 
 
 
-@njit(fastmath=True)
+@njit(parallel=True, fastmath=True)
 def get_pairwise_extent(D_full, motiflet_pos, upperbound=np.inf):
     """ Requires the full matrix!!! """
 
@@ -194,21 +194,6 @@ def get_pairwise_extent(D_full, motiflet_pos, upperbound=np.inf):
 
 
 @njit(fastmath=True)
-def ptp(idx, halve_m, k):
-    # checks if there are enough indices within range
-    # to return k non-overlapping subsequences 
-    last = -halve_m
-    count = 0
-    for i in idx:
-        if i > (halve_m + last):
-            last = i
-            count = count + 1
-    
-    return count < k
-
-
-
-@njit
 def get_top_k_non_trivial_matches_inner(
         dist, k, m, n, order, candidates, lowest_dist=np.inf):
     # admissible pruning: are there enough offsets within range?    
@@ -219,8 +204,7 @@ def get_top_k_non_trivial_matches_inner(
     dists = np.copy(dist)    
     idx = []  # there may be less than k, thus use a list
     for i in range(len(candidates)):
-        can = np.argmin(dists[candidates])
-        pos = candidates[can]
+        pos = candidates[np.argmin(dists[candidates])]
         if (not np.isnan(dists[pos])) and (dists[pos] < lowest_dist):
             idx.append(pos)
             dists[max(0, pos - halve_m):min(pos + halve_m, n)] = np.inf
@@ -230,16 +214,10 @@ def get_top_k_non_trivial_matches_inner(
     return np.array(idx, dtype=np.int32)
 
 
-@njit
+@njit(fastmath=True)
 def get_top_k_non_trivial_matches(
         dist, k, m, n, order, lowest_dist=np.inf):
     halve_m = int(m / 2)
-
-    # admissible pruning: are there enough offsets within range?
-    # idx2 = np.argwhere(dist < lowest_dist).flatten()
-    # if (len(idx2) < k) or ptp(idx2, halve_m, k):
-    #    print ("yes")
-    #    return np.array([order], dtype=np.int32)
 
     dists = np.copy(dist)    
     idx = []  # there may be less than k, thus use a list
@@ -253,6 +231,7 @@ def get_top_k_non_trivial_matches(
 
     return np.array(idx, dtype=np.int32)
 
+
 #@njit
 def get_approximate_k_motiflet(
         ts, m, k, D, 
@@ -262,12 +241,13 @@ def get_approximate_k_motiflet(
     motiflet_dist = upper_bound
     motiflet_candidate = None
     
-    motiflet_all_candidates = []
-
+    motiflet_all_candidates = np.zeros(n, dtype=object)
+    
     # allow subsequence itself
     np.fill_diagonal(D, 0)
 
-    for order in np.arange(n):
+    # TODO: parallelize??
+    for i, order in enumerate(np.arange(n)):
         dist = np.copy(D[order])
 
         if incremental:
@@ -276,10 +256,10 @@ def get_approximate_k_motiflet(
         else:
             idx = get_top_k_non_trivial_matches(dist, k, m, n, order, motiflet_dist)
 
-        motiflet_all_candidates.append(idx)
+        motiflet_all_candidates[i] = idx
 
         if len(idx) >= k and dist[idx[-1]] <= motiflet_dist:
-            # Get get_pairwise_extent requires the full matrix 
+            # get_pairwise_extent requires the full matrix 
             motiflet_extent = get_pairwise_extent(D, idx[:k], motiflet_dist)
             if motiflet_dist > motiflet_extent:
                 motiflet_dist = motiflet_extent
@@ -288,7 +268,7 @@ def get_approximate_k_motiflet(
     return motiflet_candidate, motiflet_dist, motiflet_all_candidates
 
 
-@njit
+@njit(parallel=True, fastmath=True)
 def check_unique(elbow_points_1, elbow_points_2, motif_length):
     uniques = True
     count = 0
@@ -319,7 +299,7 @@ def filter_unqiue(elbow_points, candidates, motif_length):
     return np.array(filtered_ebp)
 
 
-@njit
+@njit(parallel=True, fastmath=True)
 def find_elbow_points(dists):
     elbow_points = set()
     elbow_points.add(2)
@@ -348,12 +328,13 @@ def find_elbow_points(dists):
     return np.sort(np.array(list(set(elbow_points))))
 
 
-def inner_au_pef(data, dataset, ks, index, m):
+def inner_au_pef(data, dataset, ks, index, m, upper_bound):
     dists, candidates, elbow_points, _ = search_k_motiflets_elbow(
         ks,
         data,
         dataset,
-        m)
+        m,
+        upper_bound=upper_bound)
 
     if np.isnan(dists).any() or np.isinf(dists).any():
         return None, None, None
@@ -370,25 +351,33 @@ def inner_au_pef(data, dataset, ks, index, m):
         elbows = 1
         top_motiflet = candidates[0]
 
-    return au_pefs, elbows, top_motiflet
+    return au_pefs, elbows, top_motiflet, dists
 
 
 def find_au_pef_motif_length(data, dataset, ks, motif_length_range):
+    
+    # apply sampling for speedup only
     subsample = 2
     data = data[::subsample]
 
     index = (data.index / subsample) if isinstance(data, pd.Series) else np.arange(
         len(data))
 
-    # TODO parallel not possible when elbows are parallel, too
-    results = Parallel(n_jobs=1)(delayed(inner_au_pef)(
-        data, dataset, ks, index, int(m / subsample)) for i, m in
-                                 enumerate(motif_length_range))
+    # in reverse order
+    au_pefs = np.zeros(len(motif_length_range), dtype=object)
+    elbows = np.zeros(len(motif_length_range), dtype=object)
+    top_motiflets = np.zeros(len(motif_length_range), dtype=object)
+    
+    upper_bound = np.inf
+    for i, m in enumerate(motif_length_range[::-1]):
+        au_pefs[i], elbows[i], top_motiflets[i], dist = inner_au_pef(
+            data, dataset, ks, index, int(m / subsample), 
+            upper_bound=upper_bound)
+        upper_bound = min(dist[-1], upper_bound)
 
-    results = np.array(results)
-    au_pefs = np.array(results[:, 0], dtype=np.float64)
-    elbows = results[:, 1]
-    top_motiflets = results[:, 2]
+    au_pefs = np.array(au_pefs, dtype=np.float64)[::-1]
+    elbows =  elbows[::-1]
+    top_motiflets =  top_motiflets[::-1]
 
     # if no elbow can be found, ignore this part
     condition = np.argwhere(elbows == 0).flatten()
@@ -402,13 +391,14 @@ def search_k_motiflets_elbow(ks,
                              dataset,
                              motif_length='auto',
                              motif_length_range=None,
-                             exclusion=None):
+                             exclusion=None,
+                             upper_bound=np.inf):
     # convert to numpy array
     data_raw = data
     if isinstance(data, pd.Series):
         data_raw = data.to_numpy()
 
-        # auto motif size selection
+    # auto motif size selection
     if motif_length == 'AU_PEF' or motif_length == 'auto':
         if motif_length_range is None:
             print("Warning: no valid motiflet range set")
@@ -428,7 +418,6 @@ def search_k_motiflets_elbow(ks,
 
     D_full = compute_distances_full(data_raw, m)
 
-    upper_bound = np.inf
     exclusion_m = int(m / 3)
     motiflet_candidates = []
 
@@ -468,7 +457,7 @@ def search_k_motiflets_elbow(ks,
     return k_motiflet_distances, k_motiflet_candidates, elbow_points, m
 
 
-@njit
+@njit(parallel=True, fastmath=True)
 def candidate_dist(D_full, pool, upperbound, m):
     motiflet_candidate_dist = 0
     m_half = m / 2
