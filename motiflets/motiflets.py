@@ -216,15 +216,16 @@ def get_top_k_non_trivial_matches_inner(
 def get_top_k_non_trivial_matches(
         dist, k, m, n, order, lowest_dist=np.inf):
 
-    #dist_idx = np.nonzero(dist < lowest_dist)
-    #if (len(dist_idx) <= k):
-    #    return np.int32(dist_idx[0])
+    dist_idx = np.argwhere(dist < lowest_dist).flatten().astype(np.int32)
+    # not possible, as wehave to check for overlapps, too
+    # if (len(dist_idx) <= k):
+    #    return dist_idx
     
     halve_m = int(m / 2)
     dists = np.copy(dist)    
     idx = []  # there may be less than k, thus use a list
     for i in range(k):
-        pos = np.argmin(dists)
+        pos = dist_idx[np.argmin(dists[dist_idx])]
         if (not np.isnan(dists[pos])) and (dists[pos] < lowest_dist):
             idx.append(pos)
             dists[max(0, pos - halve_m):min(pos + halve_m, n)] = np.inf
