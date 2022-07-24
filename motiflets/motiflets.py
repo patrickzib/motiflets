@@ -156,7 +156,7 @@ def compute_distances_full(ts, m):
 
     return D
 
-@njit(parallel=True, fastmath=True)
+@njit(fastmath=True)
 def get_radius(D_full, motiflet_pos, upperbound=np.inf):
     """ Requires the full matrix!!! """
 
@@ -270,7 +270,7 @@ def get_approximate_k_motiflet(
     return motiflet_candidate, motiflet_dist, motiflet_all_candidates
 
 
-@njit(parallel=True, fastmath=True)
+@njit(fastmath=True)
 def check_unique(elbow_points_1, elbow_points_2, motif_length):
     uniques = True
     count = 0
@@ -301,7 +301,7 @@ def filter_unqiue(elbow_points, candidates, motif_length):
     return np.array(filtered_ebp)
 
 
-@njit(parallel=True, fastmath=True)
+@njit(fastmath=True)
 def find_elbow_points(dists):
     elbow_points = set()
     elbow_points.add(2)
@@ -458,7 +458,7 @@ def search_k_motiflets_elbow(ks,
     return k_motiflet_distances, k_motiflet_candidates, elbow_points, m
 
 
-@njit(parallel=True, fastmath=True)
+@njit(fastmath=True)
 def candidate_dist(D_full, pool, upperbound, m):
     motiflet_candidate_dist = 0
     m_half = m / 2
