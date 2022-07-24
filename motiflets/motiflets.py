@@ -197,28 +197,30 @@ def get_pairwise_extent(D_full, motiflet_pos, upperbound=np.inf):
 def get_top_k_non_trivial_matches_inner(
         dist, k, m, n, order, candidates, lowest_dist=np.inf):
     # admissible pruning: are there enough offsets within range?    
-    halve_m = int(m / 2)
-    if (len(candidates) < k):
+    if (len(candidates) < k):        
         return candidates
 
     dists = np.copy(dist)    
     idx = []  # there may be less than k, thus use a list
     for i in range(len(candidates)):
         pos = candidates[np.argmin(dists[candidates])]
-        if (not np.isnan(dists[pos])) and (dists[pos] < lowest_dist):
+        if dists[pos] < lowest_dist:
             idx.append(pos)
-            dists[max(0, pos - halve_m):min(pos + halve_m, n)] = np.inf
+            dists[pos] = np.inf
         else:
             break
 
     return np.array(idx, dtype=np.int32)
 
-
 @njit(fastmath=True)
 def get_top_k_non_trivial_matches(
         dist, k, m, n, order, lowest_dist=np.inf):
-    halve_m = int(m / 2)
 
+    #dist_idx = np.nonzero(dist < lowest_dist)
+    #if (len(dist_idx) <= k):
+    #    return np.int32(dist_idx[0])
+    
+    halve_m = int(m / 2)
     dists = np.copy(dist)    
     idx = []  # there may be less than k, thus use a list
     for i in range(k):
@@ -421,7 +423,7 @@ def search_k_motiflets_elbow(ks,
     exclusion_m = int(m / 3)
     motiflet_candidates = []
 
-    for test_k in tqdm(range(ks - 1, 1, -1), desc='Compute ks'):
+    for test_k in tqdm(range(ks - 1, 1, -1), desc='Compute ks'):        
         # Top-N retrieval
         if exclusion is not None and exclusion[test_k] is not None:
             for pos in exclusion[test_k].flatten():
@@ -429,7 +431,6 @@ def search_k_motiflets_elbow(ks,
                     trivialMatchRange = (max(0, pos - exclusion_m),
                                          min(pos + exclusion_m, len(D_full)))
                     D_full[:, trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
-
 
         incremental = (test_k < ks-1)
         candidate, candidate_dist, all_candidates = get_approximate_k_motiflet(
