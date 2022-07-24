@@ -176,7 +176,7 @@ def get_radius(D_full, motiflet_pos, upperbound=np.inf):
 
 
 
-@njit(parallel=True, fastmath=True)
+@njit(fastmath=True)
 def get_pairwise_extent(D_full, motiflet_pos, upperbound=np.inf):
     """ Requires the full matrix!!! """
 
