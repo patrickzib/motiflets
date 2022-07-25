@@ -4,6 +4,7 @@ import itertools
 import numpy as np
 import numpy.fft as fft
 import pandas as pd
+import heapq
 
 from os.path import exists
 from joblib import Parallel, delayed
@@ -12,6 +13,7 @@ from scipy.stats import zscore
 from tqdm import tqdm
 from ast import literal_eval
 
+slack = 0.6
 
 def as_series(data, index_range, index_name):
     series = pd.Series(data=data, index=index_range)
@@ -120,7 +122,7 @@ def sliding_mean_std(ts, m):
 # Distance Matrix with Dot-Product / no-loops
 def compute_distances_full(ts, m):
     n = len(ts) - m + 1
-    halve_m = int(m / 2)
+    halve_m = int(m * slack)
 
     D = np.zeros((n, n), dtype=np.float32)
     dot_prev = None
@@ -212,6 +214,32 @@ def get_top_k_non_trivial_matches_inner(
 
     return np.array(idx, dtype=np.int32)
 
+"""
+@njit(fastmath=True)
+def get_top_k_non_trivial_matches(
+        dist, k, m, n, order, lowest_dist=np.inf):
+
+    # create a heap
+    dist_idx = np.argwhere(dist < lowest_dist).flatten().astype(np.int32)
+    pq = list(zip(dist[dist_idx], dist_idx))
+    heapq.heapify(pq)
+
+    halve_m = int(m * slack)
+    dists = np.copy(dist)    
+    
+    idx = []  # there may be less than k, thus use a list
+    for i in range(k):
+        while pq:
+             # extract minimum from the heap
+            _, pos = heapq.heappop(pq)
+            if (not np.isnan(dists[pos])) and (dists[pos] < lowest_dist):
+                idx.append(pos)
+                dists[max(0, pos - halve_m):min(pos + halve_m, n)] = np.inf
+            else:
+                continue # not possible to break :(
+    return np.array(idx, dtype=np.int32)
+"""
+
 @njit(fastmath=True)
 def get_top_k_non_trivial_matches(
         dist, k, m, n, order, lowest_dist=np.inf):
@@ -221,7 +249,7 @@ def get_top_k_non_trivial_matches(
     # if (len(dist_idx) <= k):
     #    return dist_idx
     
-    halve_m = int(m / 2)
+    halve_m = int(m * slack)
     dists = np.copy(dist)    
     idx = []  # there may be less than k, thus use a list
     for i in range(k):
@@ -277,7 +305,7 @@ def check_unique(elbow_points_1, elbow_points_2, motif_length):
     count = 0
     for a in elbow_points_1:  # smaller motiflet
         for b in elbow_points_2:  # larger motiflet
-            if (abs(a - b) < (motif_length / 8)):
+            if (abs(a - b) < (motif_length / 4)):
                 count = count + 1
                 break
 
@@ -421,7 +449,7 @@ def search_k_motiflets_elbow(ks,
 
     D_full = compute_distances_full(data_raw, m)
 
-    exclusion_m = int(m / 3)
+    exclusion_m = int(m * slack)
     motiflet_candidates = []
 
     for test_k in tqdm(range(ks - 1, 1, -1), desc='Compute ks'):        
@@ -462,7 +490,7 @@ def search_k_motiflets_elbow(ks,
 @njit(fastmath=True)
 def candidate_dist(D_full, pool, upperbound, m):
     motiflet_candidate_dist = 0
-    m_half = m / 2
+    m_half = int(m * slack)
     for i in pool:
         for j in pool:
             if ((i != j and np.abs(i - j) < m_half)
@@ -489,7 +517,7 @@ def find_k_motiflets(ts, D_full, m, k, upperbound=None):
 
     # allow subsequence itself
     np.fill_diagonal(D_full, 0) 
-    k_halve_m = k * int(m / 2)
+    k_halve_m = k * int(m * slack)
 
     def exact_inner(ii, k_halve_m, D_full, 
                             motiflet_dist, motiflet_pos, m) :
