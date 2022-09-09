@@ -74,6 +74,20 @@ def read_dataset(dataset, sampling_factor=10000):
     return zscore(data)# , gt
 
 
+def read_segmenation_ts(file):
+    path = "../datasets/tssb/"
+    ts = pd.read_csv(path+file, header=None)
+
+    parts = file.split(".")[0].split("_")
+    true_cps = np.int32(parts[2:])
+    period_size = int(parts[1])
+
+    ds_name = parts[0]
+    
+    # _ = plot_time_series_with_change_points(ds_name, ts, true_cps)
+    return ts[0], period_size, true_cps, ds_name
+
+
 
 def calc_sliding_window(time_series, window):
     shape = time_series.shape[:-1] + (time_series.shape[-1] - window + 1, window)
@@ -158,7 +172,7 @@ def compute_distances_full(ts, m):
 
     return D
 
-@njit(fastmath=True)
+@njit(fastmath=True, cache=True)
 def get_radius(D_full, motiflet_pos, upperbound=np.inf):
     """ Requires the full matrix!!! """
 
@@ -178,7 +192,7 @@ def get_radius(D_full, motiflet_pos, upperbound=np.inf):
 
 
 
-@njit(fastmath=True)
+@njit(fastmath=True, cache=True)
 def get_pairwise_extent(D_full, motiflet_pos, upperbound=np.inf):
     """ Requires the full matrix!!! """
 
@@ -195,7 +209,7 @@ def get_pairwise_extent(D_full, motiflet_pos, upperbound=np.inf):
     return motiflet_extent
 
 
-@njit(fastmath=True)
+@njit(fastmath=True, cache=True)
 def get_top_k_non_trivial_matches_inner(
         dist, k, m, n, order, candidates, lowest_dist=np.inf):
     # admissible pruning: are there enough offsets within range?    
@@ -215,7 +229,7 @@ def get_top_k_non_trivial_matches_inner(
     return np.array(idx, dtype=np.int32)
 
 """
-@njit(fastmath=True)
+@njit(fastmath=True, cache=True)
 def get_top_k_non_trivial_matches(
         dist, k, m, n, order, lowest_dist=np.inf):
 
@@ -240,7 +254,7 @@ def get_top_k_non_trivial_matches(
     return np.array(idx, dtype=np.int32)
 """
 
-@njit(fastmath=True)
+@njit(fastmath=True, cache=True)
 def get_top_k_non_trivial_matches(
         dist, k, m, n, order, lowest_dist=np.inf):
 
@@ -299,7 +313,7 @@ def get_approximate_k_motiflet(
     return motiflet_candidate, motiflet_dist, motiflet_all_candidates
 
 
-@njit(fastmath=True)
+@njit(fastmath=True, cache=True)
 def check_unique(elbow_points_1, elbow_points_2, motif_length):
     uniques = True
     count = 0
@@ -330,8 +344,8 @@ def filter_unqiue(elbow_points, candidates, motif_length):
     return np.array(filtered_ebp)
 
 
-@njit(fastmath=True)
-def find_elbow_points(dists):
+@njit(fastmath=True, cache=True)
+def find_elbow_points(dists, alpha=2):
     elbow_points = set()
     elbow_points.add(2)
     elbow_points.clear()
@@ -350,12 +364,12 @@ def find_elbow_points(dists):
 
     while True:
         p = np.argmax(peaks)
-        if peaks[p] > 2:
+        if peaks[p] > alpha:
             elbow_points.append(p)
             peaks[p - 1:p + 2] = 0
         else:
             break
-
+    
     return np.sort(np.array(list(set(elbow_points))))
 
 
@@ -487,7 +501,7 @@ def search_k_motiflets_elbow(ks,
     return k_motiflet_distances, k_motiflet_candidates, elbow_points, m
 
 
-@njit(fastmath=True)
+@njit(fastmath=True, cache=True)
 def candidate_dist(D_full, pool, upperbound, m):
     motiflet_candidate_dist = 0
     m_half = int(m * slack)

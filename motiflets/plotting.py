@@ -1,4 +1,5 @@
 import os
+import time
 
 import matplotlib
 import numpy as np
@@ -135,7 +136,7 @@ def plot_elbow_points(
     else:
         data_raw = data
         data_index = np.arange(len(data))
-
+    
     fig, ax = plt.subplots(figsize=(8, 4), constrained_layout=True)
     ax.set_title(name + "\nElbow Points")
     ax.plot(range(2, len(np.sqrt(dists))), dists[2:], "b", label="Extent")
@@ -188,14 +189,18 @@ def plot_elbow(ks,
                method_name=None,
                data_array=None):
     raw_data = data.to_numpy() if isinstance(data, pd.Series) else data
+    print("Data", len(raw_data))
+
+    startTime = time.perf_counter()
     dists, candidates, elbow_points, m = ml.search_k_motiflets_elbow(
         ks,
         raw_data,
         dataset,
         motif_length,
         exclusion=exclusion)
+    endTime = (time.perf_counter() - startTime)
 
-    print("Chosen window-size:", m)
+    print("Chosen window-size:", m, "in", np.round(endTime, 1), "s")
 
     if exclusion is not None and idx is None:
         idx = "top-2"
@@ -208,9 +213,11 @@ def plot_elbow(ks,
     if plot_elbows:
         plot_elbow_points(ds_name, data, motif_length, elbow_points, candidates, dists)
 
+    print("Data", len(data))
+
     plot_grid_motiflets(
         dataset, data, candidates, elbow_points,
-        dists, motif_length, idx=idx, ds_name=ds_name, show_elbows=plot_elbows,
+        dists, motif_length, idx=idx, ds_name=ds_name, show_elbows=plot_elbows, font_size=24,
         ground_truth=ground_truth, method_name=method_name, data_array=data_array)
 
     return dists, candidates, elbow_points
@@ -221,20 +228,27 @@ def plot_motif_length_selection(ks, data, dataset, motif_length_range, ds_name):
     index = data.index if isinstance(data, pd.Series) else np.arange(len(data))
     header = " in " + data.index.name if isinstance(data, pd.Series) and data.index.name != None else ""
 
+    startTime = time.perf_counter()
     best_motif_length, au_pdfs, elbow, top_motiflets = \
         ml.find_au_pef_motif_length(
             data, dataset, ks, motif_length_range=motif_length_range)
-
+    endTime = (time.perf_counter() - startTime)
+    print ("\tTime", np.round(endTime, 1), "s")
+    
     indices = ~np.isinf(au_pdfs)
-    fig, ax = plt.subplots(figsize=(5, 5))
+    fig, ax = plt.subplots(figsize=(4, 4))
     ax = sns.lineplot(
         x=index[motif_length_range[indices]],
         y=au_pdfs[indices],
         label="AU_EF")
     sns.despine()
-    # plt.tight_layout()
-    ax.set_title("Best length on " + ds_name, size=16)
+    plt.tight_layout()
+    ax.set_title("Best length on " + ds_name, size=20)
     ax.set(xlabel='Motif Length' + header, ylabel='Area under EF\n(lower is better)')
+
+    for item in ([ax.xaxis.label, ax.yaxis.label] +
+             ax.get_xticklabels() + ax.get_yticklabels()):
+        item.set_fontsize(16)
 
     # plt.legend(loc="best")      
     fig.set_figheight(5)
@@ -260,9 +274,14 @@ def plot_grid_motiflets(
         grid_dim=None,
         plot_index=None,
         data_array=None):
+    sns.set(font_scale = 2)
+    sns.set_style("white")
     sns.set_context("paper",
-                    rc={"font.size": font_size, "axes.titlesize": font_size - 8,
-                        "axes.labelsize": font_size - 8})
+                    rc={"font.size": font_size, 
+                        "axes.titlesize": font_size - 8,
+                        "axes.labelsize": font_size - 8,
+                        "xtick.labelsize": font_size - 10,
+                        "ytick.labelsize": font_size - 10,})
 
     label_cols = 2
 
@@ -283,7 +302,7 @@ def plot_grid_motiflets(
     dims = int(np.ceil(len(elbow_points) / grid_dim)) + count_plots
 
     fig = plt.figure(constrained_layout=True, figsize=(10, dims * 2))
-    gs = fig.add_gridspec(dims, grid_dim, hspace=0.5, wspace=0.4)
+    gs = fig.add_gridspec(dims, grid_dim, hspace=0.8, wspace=0.4)
 
     ax_ts = fig.add_subplot(gs[0, :])
     ax_ts.set_title("(a) Dataset: " + (ds_name if ds_name is not None else name) + "")
@@ -409,7 +428,8 @@ def plot_grid_motiflets(
             if (dist is not None):
                 dist = np.array(dist)
                 dist[dist == float("inf")] = 0
-                dists = str(int(dist[elbow_points[i]]))
+                dists = str(dist[elbow_points[i]].astype(int))
+                # dists = str(int(dist[elbow_points[i]]))
 
             label = ""
             # if method_names is not None:
@@ -463,8 +483,8 @@ def plot_grid_motiflets(
             if plot_minature:
                 ax_motiflet.set_yticks([])
 
-    ax_bars.set_yticks(-np.arange(len(y_labels)) + 0.5)
-    ax_bars.set_yticklabels(y_labels)
+    ax_bars.set_yticks(-np.arange(len(y_labels)) + 0.5,)
+    ax_bars.set_yticklabels(y_labels, fontsize=12)
     ax_bars.set_ylim([-len(motiflets)+1, 1])
     # ax_bars.legend(loc="best")
 
@@ -515,6 +535,7 @@ def plot_all_competitors(
         name, data, motifsets, indices,
         dists, motif_length, ds_name=name,
         # method_name=prefix,
+        font_size=26, 
         method_names=method_names,
         ground_truth=ground_truth,
         color_palette=color_palette,
@@ -537,14 +558,6 @@ def plot_competitors(
 
     D_full = ml.compute_distances_full(data_raw, motif_length)
 
-    # max radius
-    """
-    for elem in motifsets:
-        if len(elem) > 1:
-            print("r:", ml.get_radius(D_full, elem),
-                  "d:", ml.get_pairwise_extent(D_full, elem, upperbound=np.inf))
-    """
-
     last = -1
     motifsets_filtered = []
     for motifset in motifsets:
@@ -563,7 +576,7 @@ def plot_competitors(
 
     plot_grid_motiflets(
         name, data, motifsets_filtered, elbow_points,
-        dists, motif_length, ds_name=name, method_name=prefix,
+        dists, motif_length, ds_name=name, method_name=prefix, 
         ground_truth=ground_truth)
 
     return motifsets_filtered[elbow_points]
@@ -577,16 +590,22 @@ def format_key(e):
     return key
 
 
-def to_df(motif_sets, method_name, df, df2):
+def to_df(motif_sets, method_name, df, df2=None):
     df_all_1 = pd.DataFrame()
     df_all_2 = pd.DataFrame()
     for key in motif_sets:       
         ms_set_finder = motif_sets[key]
         df_all_1[method_name + " Top-1 " + key] = [ms_set_finder[-1]]
-        df_all_2[method_name + " Top-2 " + key] = [ms_set_finder[-2]]
         df[method_name + " Top-1 " + key] = [ms_set_finder[-1]]
-        df2[method_name + " Top-2 " + key] = [ms_set_finder[-2]]
-        
-    df_all = (pd.concat([df_all_1, df_all_2], axis=1)).T
+
+        if df2 is not None:
+            df_all_2[method_name + " Top-2 " + key] = [ms_set_finder[-2]]
+            df2[method_name + " Top-2 " + key] = [ms_set_finder[-2]]
+    
+    if df2 is not None:
+        df_all = (pd.concat([df_all_1, df_all_2], axis=1)).T
+    else: 
+        df_all = df_all_1.T
+
     df_all.rename(columns={0:"offsets"}, inplace=True)    
     return df_all
