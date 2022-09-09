@@ -84,8 +84,19 @@ repetitions perfectly match the ECG waves (green).
 Data Sets: We collected five challenging real-life data sets to assess the quality and scalability of MD algorithms. For three out of these, the literature describes the existence of motifs though without actually annotating them. An overview can be found in Table 2. The five data sets are the following:
 
 - Jupyter-Notebook <a href="notebooks/use_cases_paper.ipynb">Use Cases for k-Motiflets</a>: highlights all use cases used in the paper and shows the unique ability of k-Motiflets to learn its parameters from the data and find itneresting motif sets.
+
+- Jupyter-Notebook <a href="notebooks/use_cases_motif_sets_vanilla_ice.ipynb">Vanilla Ice - Ice Ice Baby</a>: This time series is a TS extracted from the pop song Ice Ice Baby by Vanilla Ice using the 2nd MFCC channel sampled at 100Hz. This TS is particularly famous pop song, as it is alleged to have copied its riff from "Under Pressure" by Queen and David Bowie. It contains 20 repeats of the riff in 5 blocks with each riff being 3.6−4s long.
+
 - Jupyter-Notebook <a href="notebooks/use_cases_motif_sets_muscle_activation.ipynb">Muscle Activation</a> was collected from professional in-line speed skating on a large motor driven treadmill with Electromyo- graphy (EMG) data of multiple movements. It consists of 29.899 measurements at 100Hz corresponding to 30s in total. The known motifs are the muscle movement and a recovery phase.
+
 - Jupyter-Notebook <a href="notebooks/use_cases_motif_sets_ecg.ipynb">ECG Heartbeats</a> contains a patient’s (with ID 71) heartbeat from the LTAF database. It consists of 3.000 measurements at 128𝐻𝑧 corresponding to 23𝑠. The heartbeat rate is around 60 to 80 bpm. There are two motifs: A calibration signal and the actual heartbeats.
+
 - Jupyter-Notebook <a href="notebooks/use_cases_motif_sets_physiodata-spindles.ipynb">Physiodata - EEG sleep data</a> contains a recording of an after- noon nap of a healthy, nonsmoking person, between 20 to 40 years old [10]. Data was recorded with an extrathoracic strain belt. The dataset consists of 269.286 points at 100H𝑧 corresponding to 45𝑚𝑖𝑛. Known motifs are so-called sleep spindles and 𝑘-complexes.
+
 - Jupyter-Notebook <a href="notebooks/use_cases_motif_sets_winding.ipynb">Industrial Winding Process</a> is a snapshot of a process where a plastic web is unwound from a first reel (unwinding reel), goes over the second traction reel and is finally rewound on the the third rewinding reel. The recordings correspond to the traction of the second reel angular speed. The data contains 2.500 points sampled at 0.1𝑠, corresponding to 250𝑠. No documented motifs exist.
+
 - Jupyter-Notebook <a href="notebooks/use_cases_fnirs.ipynb">Functional near-infrared spectroscopy (fNIRS)</a> contains brain imag- inary data recorded at 690𝑛𝑚 intensity. There are 208.028 measurements in total. The data is known to be a difficult example, as it contains four motion artifacts, due to movements of the patient, which dominate MD. No documented motifs exist.
+
+- Jupyter-Notebook <a href="notebooks/use_cases_motif_sets_synthetic.ipynb">Semi-Synthetic with implanted Ground Truth</a>: One example series form our 25 semi-synthetic time series. To measure the precision of the different MD methods we created a semi-synthetic dataset using the first 25 datasets of an anomaly benchmark and implanted motif sets of varying sizes $k \ in [5, \dots, 10]$ of fixed length $l=500$.
+
+- Jupyter-Notebook <a href="notebooks/use_cases_motif_sets_synthetic-all.ipynb">Full results for the Semi-Synthetic Dataset with implanted Ground Truth</a>: To measure the precision of the different MD methods we created a semi-synthetic dataset using the first 25 datasets of an anomaly benchmark and implanted motif sets of varying sizes $k \ in [5, \dots, 10]$ of fixed length $l=500$.
