@@ -31,7 +31,16 @@ https://user-images.githubusercontent.com/7783034/173186103-c8b6302e-2434-4a09-8
 
 # Installation
 
-## Build from Source
+The easiest is to use pip to install motiflets.
+
+## a) Install using pip
+```
+pip install motiflets
+```
+
+You can also install  the project from source.
+
+## b) Build from Source
 
 First, download the repository.
 ```
