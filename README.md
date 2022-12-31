@@ -29,6 +29,29 @@ Instead, for $k$-Motiflets we may either directly set the maximal number of repe
 
 https://user-images.githubusercontent.com/7783034/173186103-c8b6302e-2434-4a09-89f4-ddad2e63f997.mp4
 
+# Installation
+
+The easiest is to use pip to install motiflets.
+
+## a) Install using pip
+```
+pip install motiflets
+```
+
+You can also install  the project from source.
+
+## b) Build from Source
+
+First, download the repository.
+```
+git clone https://github.com/patrickzib/motiflets.git
+```
+
+Change into the directory and build the package from source.
+```
+pip install .
+```
+
 # Usage
 
 Here we illustrate how to use k-Motiflets. 
