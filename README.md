@@ -62,7 +62,7 @@ difficult for MD as actually two motifs exists: The first half of the TS contain
 rectangular calibration signal with 6 occurrences, and the second half shows ECG 
 heartbeats with 16 to 17 occurrences. 
 
-![The ECG heartbeat dataset](images/ts_ecg.png)
+![The ECG heartbeat dataset](https://github.com/patrickzib/motiflets/raw/main/images/ts_ecg.png)
 
 The major challenges in motif discovery are to learn the length of interesting motifs
 and to find the largest set of the same motif, i.e. all repetitions.
@@ -78,7 +78,7 @@ motif_length = plot_motif_length_selection(
     ks, series, file, 
     motif_length_range=length_range, ds_name=ds_name)
 ```
-<img src="images/plot_au_ef.png" width="300">
+<img src="https://github.com/patrickzib/motiflets/raw/main/images/plot_au_ef.png" width="300">
 
 The plot shows that meaningful motifs are within a range of 0.8s to 1s, equal
 to roughly a heartbeat rate of 60-80 bpm.
@@ -97,11 +97,11 @@ The variable `elbow_points` holds characteristic motif sizes found.
 Elbow points represent meaningful motif sizes. Here, $6$ and $16$ are elbows, which are 
 the 6 calibration waves and the 16 heartbeats.
 
-<img src="images/elbows.png" width="300">
+<img src="https://github.com/patrickzib/motiflets/raw/main/images/elbows.png" width="300">
 
 We finally plot these motifs:
 
-<img src="images/motiflets.png" width="600">
+<img src="https://github.com/patrickzib/motiflets/raw/main/images/motiflets.png" width="600">
 
 The first repetitions perfectly match the calibration signal (orange), while the latter 16 
 repetitions perfectly match the ECG waves (green).
