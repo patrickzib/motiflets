@@ -105,20 +105,6 @@ def read_dataset(dataset, sampling_factor=10000):
     return zscore(data)  # , gt
 
 
-def read_segmenation_ts(file):
-    path = "../datasets/tssb/"
-    ts = pd.read_csv(path + file, header=None)
-
-    parts = file.split(".")[0].split("_")
-    true_cps = np.int32(parts[2:])
-    period_size = int(parts[1])
-
-    ds_name = parts[0]
-
-    # _ = plot_time_series_with_change_points(ds_name, ts, true_cps)
-    return ts[0], period_size, true_cps, ds_name
-
-
 def sliding_dot_product(query, ts):
     m = len(query)
     n = len(ts)
