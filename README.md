@@ -72,10 +72,10 @@ and to find the largest set of the same motif, i.e. all repetitions.
 We first extract meaningful **motif lengths (l)** from this use case:
 
 ```
-ks = 20
+k_max = 20
 length_range = np.arange(25,200,25) 
 motif_length = plot_motif_length_selection(
-    ks, series, file, 
+    k_max, series, 
     motif_length_range=length_range, ds_name=ds_name)
 ```
 <img src="https://github.com/patrickzib/motiflets/raw/main/images/plot_au_ef.png" width="300">
@@ -89,7 +89,7 @@ To extract meaningful **motif sizes (k)** from this use case, we run
 
 ```
 dists, motiflets, elbow_points = plot_elbow(
-    ks, series, file, ds_name=ds_name, plot_elbows=True,
+    ks, series, ds_name, plot_elbows=True,
     motif_length=motif_length, method_name="K-Motiflets", ground_truth=df_gt)
 ```
 
