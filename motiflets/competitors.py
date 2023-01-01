@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+"""Implementation of competitor methods.
+"""
+
 import warnings
 
 import numpy as np

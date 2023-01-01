@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+"""Compute k-Motiflets.
+
+
+"""
+
+__author__ = ["patrickzib"]
+
 import itertools
 from ast import literal_eval
 from os.path import exists
@@ -59,6 +67,31 @@ def read_dataset_with_index(dataset, sampling_factor=10000):
         return data
 
 
+def _pd_series_to_numpy(data):
+    """Converts a PD.Series to two numpy arrays.
+
+    Parameters
+    ----------
+    data: array or PD.Series
+        the TS
+
+    Returns
+    -------
+    data_index: array_like
+        The index of the time series
+    data_raw:
+        The raw data of the time series
+
+    """
+    if isinstance(data, pd.Series):
+        data_raw = data.values
+        data_index = data.index
+    else:
+        data_raw = data
+        data_index = np.arange(len(data))
+    return data_index, data_raw
+
+
 def read_dataset(dataset, sampling_factor=10000):
     full_path = '../datasets/' + dataset
     data = pd.read_csv(full_path).T
@@ -84,12 +117,6 @@ def read_segmenation_ts(file):
 
     # _ = plot_time_series_with_change_points(ds_name, ts, true_cps)
     return ts[0], period_size, true_cps, ds_name
-
-
-def calc_sliding_window(time_series, window):
-    shape = time_series.shape[:-1] + (time_series.shape[-1] - window + 1, window)
-    strides = time_series.strides + (time_series.strides[-1],)
-    return np.lib.stride_tricks.as_strided(time_series, shape=shape, strides=strides)
 
 
 def sliding_dot_product(query, ts):
@@ -171,7 +198,7 @@ def compute_distances_full(ts, m):
 
 
 @njit(fastmath=True, cache=True)
-def get_radius(D_full, motiflet_pos, upperbound=np.inf):
+def get_radius(D_full, motiflet_pos):
     """ Requires the full matrix!!! """
 
     motiflet_radius = np.inf
@@ -342,7 +369,7 @@ def find_elbow_points(dists, alpha=2):
     return np.sort(np.array(list(set(elbow_points))))
 
 
-def inner_au_pef(data, k_max, m, upper_bound):
+def inner_au_ef(data, k_max, m, upper_bound):
     dists, candidates, elbow_points, _ = search_k_motiflets_elbow(
         k_max,
         data,
@@ -352,7 +379,7 @@ def inner_au_pef(data, k_max, m, upper_bound):
     if np.isnan(dists).any() or np.isinf(dists).any():
         return None, None, None
 
-    au_pefs = ((dists - dists.min()) / (dists.max() - dists.min())).sum() / len(dists)
+    au_efs = ((dists - dists.min()) / (dists.max() - dists.min())).sum() / len(dists)
     elbow_points = filter_unique(elbow_points, candidates, m)
 
     top_motiflet = None
@@ -364,10 +391,10 @@ def inner_au_pef(data, k_max, m, upper_bound):
         elbows = 1
         top_motiflet = candidates[0]
 
-    return au_pefs, elbows, top_motiflet, dists
+    return au_efs, elbows, top_motiflet, dists
 
 
-def find_au_pef_motif_length(data, k_max, motif_length_range):
+def find_au_ef_motif_length(data, k_max, motif_length_range):
     # apply sampling for speedup only
     subsample = 2
     data = data[::subsample]
@@ -376,26 +403,26 @@ def find_au_pef_motif_length(data, k_max, motif_length_range):
         len(data))
 
     # in reverse order
-    au_pefs = np.zeros(len(motif_length_range), dtype=object)
+    au_efs = np.zeros(len(motif_length_range), dtype=object)
     elbows = np.zeros(len(motif_length_range), dtype=object)
     top_motiflets = np.zeros(len(motif_length_range), dtype=object)
 
     upper_bound = np.inf
     for i, m in enumerate(motif_length_range[::-1]):
-        au_pefs[i], elbows[i], top_motiflets[i], dist = inner_au_pef(
+        au_efs[i], elbows[i], top_motiflets[i], dist = inner_au_ef(
             data, k_max, int(m / subsample),
             upper_bound=upper_bound)
         upper_bound = min(dist[-1], upper_bound)
 
-    au_pefs = np.array(au_pefs, dtype=np.float64)[::-1]
+    au_efs = np.array(au_efs, dtype=np.float64)[::-1]
     elbows = elbows[::-1]
     top_motiflets = top_motiflets[::-1]
 
     # if no elbow can be found, ignore this part
     condition = np.argwhere(elbows == 0).flatten()
-    au_pefs[condition] = np.inf
+    au_efs[condition] = np.inf
 
-    return motif_length_range[np.nanargmin(au_pefs)], au_pefs, elbows, top_motiflets
+    return motif_length_range[np.nanargmin(au_efs)], au_efs, elbows, top_motiflets
 
 
 def search_k_motiflets_elbow(
@@ -406,16 +433,14 @@ def search_k_motiflets_elbow(
         exclusion=None,
         upper_bound=np.inf):
     # convert to numpy array
-    data_raw = data
-    if isinstance(data, pd.Series):
-        data_raw = data.to_numpy()
+    _, data_raw = _pd_series_to_numpy(data)
 
     # auto motif size selection
-    if motif_length == 'AU_PEF' or motif_length == 'auto':
+    if motif_length == 'AU_EF' or motif_length == 'auto':
         if motif_length_range is None:
             print("Warning: no valid motiflet range set")
             assert False
-        m, _, _, _ = find_au_pef_motif_length(
+        m, _, _, _ = find_au_ef_motif_length(
             data, k_max, motif_length_range)
     elif isinstance(motif_length, int) or \
             isinstance(motif_length, np.int32) or \

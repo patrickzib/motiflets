@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+"""Plotting utilities.
+"""
+
+__author__ = ["patrickzib"]
+
 import time
 
 import matplotlib
@@ -16,10 +22,42 @@ matplotlib.rcParams['ps.fonttype'] = 42
 
 
 def plot_dataset(ds_name, data, ground_truth=None):
+    """Plots a time series.
+
+    Parameters
+    ----------
+    ds_name: String
+        The name of the time series
+    data: array-like
+        The time series
+    ground_truth:
+        Ground-truth information
+
+    """
     plot_motifset(ds_name, data, ground_truth=ground_truth)
 
 
 def append_all_motif_sets(df, motif_sets, method_name, D_full):
+    """Utility function.
+
+    Parameters
+    ----------
+    df: pd.DataFrame
+        a dataframe to append to
+    motif_sets: 2d-array-like
+        The motif-sets to append under row `method_name`
+    method_name: String
+        The column to append as
+    D_full:
+        The distance matrix
+
+    Returns
+    -------
+    df: pd.DataFrame
+        the dataframe with appended data
+
+    """
+
     filtered_motif_sets = [m for m in motif_sets if m is not None]
     extent = [ml.get_pairwise_extent(D_full, motiflet) for motiflet in
               filtered_motif_sets]
@@ -37,9 +75,26 @@ def plot_motifset(
         motifset=None,
         dist=None,
         motif_length=None,
-        idx=None,
-        prefix="",
         ground_truth=None):
+    """Plots the data and the found motif sets.
+
+    Parameters
+    ----------
+    ds_name: String,
+        The name of the time series
+    data: array-like
+        The time series data
+    motifset: 2d-array like
+        The found motif set
+    dist: array like
+        The distances (extents) for each motif set
+    motif_length: int
+        The length of the motif
+    ground_truth:
+        Ground-truth information
+
+    """
+
     if motifset is not None:
         fig, axes = plt.subplots(1, 2, sharey=False,
                                  sharex=False, figsize=(20, 3),
@@ -51,12 +106,7 @@ def plot_motifset(
     if ground_truth is None:
         ground_truth = []
 
-    if isinstance(data, pd.Series):
-        data_raw = data.values
-        data_index = data.index
-    else:
-        data_raw = data
-        data_index = np.arange(len(data))
+    data_index, data_raw = ml._pd_series_to_numpy(data)
 
     axes[0].set_title(ds_name, fontsize=20)
     _ = sns.lineplot(x=data_index, y=data_raw, ax=axes[0], linewidth=1)
@@ -68,11 +118,6 @@ def plot_motifset(
                              x=data_index[np.arange(pos, pos + motif_length)],
                              y=data_raw[pos:pos + motif_length], linewidth=5,
                              color=sns.color_palette()[len(ground_truth) + 2])
-
-    if isinstance(data, pd.Series):
-        data_raw = data.to_numpy()
-    else:
-        data_raw = data
 
     for aaa, column in enumerate(ground_truth):
         for offsets in ground_truth[column]:
@@ -113,14 +158,29 @@ def plot_motifset(
     plt.show()
 
 
-def plot_elbow_points(
-        ds_name, data, motif_length, elbow_points, motifset_candidates, dists):
-    if isinstance(data, pd.Series):
-        data_raw = data.values
-        data_index = data.index
-    else:
-        data_raw = data
-        data_index = np.arange(len(data))
+def _plot_elbow_points(
+        ds_name, data, motif_length, elbow_points,
+        motifset_candidates, dists):
+    """Plots the elbow points found.
+
+    Parameters
+    ----------
+    ds_name: String
+        The name of the time series.
+    data: array-like
+        The time series data.
+    motif_length: int
+        The length of the motif.
+    elbow_points: array-like
+        The elbow points to plot.
+    motifset_candidates: 2d array-like
+        The motifset candidates. Will only extract those motif sets
+        within elbow_points.
+    dists: array-like
+        The distances (extents) for each motif set
+    """
+
+    data_index, data_raw = ml._pd_series_to_numpy(data)
 
     fig, ax = plt.subplots(figsize=(8, 4), constrained_layout=True)
     ax.set_title(ds_name + "\nElbow Points")
@@ -164,13 +224,46 @@ def plot_elbow(k_max,
                ds_name,
                motif_length,
                exclusion=None,
-               idx=None,
                plot_elbows=False,
                ground_truth=None,
                filter=True,
-               method_name=None,
-               data_array=None):
-    raw_data = data.to_numpy() if isinstance(data, pd.Series) else data
+               method_name=None):
+    """Plots the elbow-plot for k-Motiflets.
+
+    This is the method to find and plot the characteristic k-Motiflets within range
+    [2...k_max] for given a `motif_length` using elbow-plots.
+
+    Details are given within the paper Section 5.1 Learning meaningful k.
+
+    Parameters
+    ----------
+    k_max: int
+        use [2...k_max] to compute the elbow plot (user parameter).
+    data: array-like
+        the TS
+    ds_name: String
+        the name of the dataset
+    motif_length: int
+        the length of the motif (user parameter)
+    exclusion: 2d-array
+        exclusion zone - use when searching for the TOP-2 motiflets
+    plot_elbows: bool, default=False
+        plots the elbow ploints into the plot
+    ground_truth: array-like
+        uses these ground truth motif sets for plotting
+    filter: bool, default=True
+        filters overlapping motiflets from the result,
+    method_name:  String
+        used for display only.
+
+    Returns
+    -------
+        dists:          distances for each k in [2...k_max]
+        candidates:     motifset-candidates for each k
+        elbow_points:   elbow-points
+
+    """
+    _, raw_data = ml._pd_series_to_numpy(data)
     print("Data", len(raw_data))
 
     startTime = time.perf_counter()
@@ -183,46 +276,66 @@ def plot_elbow(k_max,
 
     print("Chosen window-size:", m, "in", np.round(endTime, 1), "s")
 
-    if exclusion is not None and idx is None:
-        idx = "top-2"
-
     if filter:
         elbow_points = ml.filter_unique(elbow_points, candidates, motif_length)
 
     print("Elbow Points", elbow_points)
 
     if plot_elbows:
-        plot_elbow_points(ds_name, data, motif_length, elbow_points, candidates, dists)
+        _plot_elbow_points(ds_name, data, motif_length, elbow_points, candidates, dists)
 
     print("Data", len(data))
 
     plot_grid_motiflets(
         ds_name, data, candidates, elbow_points,
-        dists, motif_length, idx=idx, show_elbows=plot_elbows,
+        dists, motif_length, show_elbows=plot_elbows,
         font_size=24,
-        ground_truth=ground_truth, method_name=method_name, data_array=data_array)
+        ground_truth=ground_truth, method_name=method_name)
 
     return dists, candidates, elbow_points
 
 
 def plot_motif_length_selection(k_max, data, motif_length_range, ds_name):
-    # raw_data = data.values if isinstance(data, pd.Series) else data
-    index = data.index if isinstance(data, pd.Series) else np.arange(len(data))
+    """Computes the AU_EF plot to extract the best motif lengths
+
+    This is the method to find and plot the characteristic motif-lengths, for k in
+    [2...k_max], using the area AU-EF plot.
+
+    Details are given within the paper 5.2 Learning Motif Length l.
+
+    Parameters
+    ----------
+    k_max: int
+        use [2...k_max] to compute the elbow plot.
+    data: array-like
+        the TS
+    motif_length_range: array-like
+        the interval of lengths
+    ds_name: String
+        Name of the time series for displaying
+
+    Returns
+    -------
+    best_motif_length: int
+        The motif length that maximizes the AU-PDF.
+
+    """
+    index, _ = ml._pd_series_to_numpy(data)
     header = " in " + data.index.name if isinstance(data,
                                                     pd.Series) and data.index.name != None else ""
 
     startTime = time.perf_counter()
-    best_motif_length, au_pdfs, elbow, top_motiflets = \
-        ml.find_au_pef_motif_length(
+    best_motif_length, au_ef, elbow, top_motiflets = \
+        ml.find_au_ef_motif_length(
             data, k_max, motif_length_range=motif_length_range)
     endTime = (time.perf_counter() - startTime)
     print("\tTime", np.round(endTime, 1), "s")
 
-    indices = ~np.isinf(au_pdfs)
+    indices = ~np.isinf(au_ef)
     fig, ax = plt.subplots(figsize=(4, 4))
     ax = sns.lineplot(
         x=index[motif_length_range[indices]],
-        y=au_pdfs[indices],
+        y=au_ef[indices],
         label="AU_EF")
     sns.despine()
     plt.tight_layout()
@@ -244,15 +357,46 @@ def plot_motif_length_selection(k_max, data, motif_length_range, ds_name):
 def plot_grid_motiflets(
         ds_name, data, candidates, elbow_points, dist,
         motif_length, font_size=20,
-        idx=None,
         ground_truth=None,
         method_name=None,
         method_names=None,
         show_elbows=False,
         color_palette=sns.color_palette(),
         grid_dim=None,
-        plot_index=None,
-        data_array=None):
+        plot_index=None):
+    """Plots the characteristic motifs for each method along the time series.
+
+    Parameters
+    ----------
+    ds_name: String
+        The name of the time series
+    data: array-like
+        The time series data
+    candidates: 2d array-like
+        The motifset candidates
+    elbow_points: array-like
+        The elbow points found. Only motif sets from the elbow points will be plotted.
+    dist: array-like
+        The distances (extents) of the motif set candidates
+    motif_length: int
+        The motif length found.
+    font_size: int
+        Font-size to use for plotting.
+    ground_truth:
+        Ground-truth information
+    method_name: String
+        Name of a single method
+    method_names: array-like
+        Name of all methods
+    show_elbows: bool
+        Show an elbow plot
+    color_palette:
+        Color-palette to use
+    grid_dim: int
+    plot_index: int
+
+    """
+
     sns.set(font_scale=2)
     sns.set_style("white")
     sns.set_context("paper",
@@ -286,26 +430,9 @@ def plot_grid_motiflets(
     ax_ts = fig.add_subplot(gs[0, :])
     ax_ts.set_title("(a) Dataset: " + ds_name + "")
 
-    if isinstance(data, pd.Series):
-        data_raw = data.values
-        data_index = data.index
-    else:
-        data_raw = data
-        data_index = np.arange(len(data))
+    data_index, data_raw = ml._pd_series_to_numpy(data)
 
-    if data_array is None:
-        _ = sns.lineplot(x=data_index, y=data_raw, ax=ax_ts, linewidth=1)
-
-    if data_array is not None:
-        last_offset = 0
-        for d in data_array:
-            d_data = d.values
-            d_index = np.arange(last_offset, last_offset + len(d_data))
-            _ = sns.lineplot(x=d_index, y=d_data, ax=ax_ts, label=d.name, linewidth=1)
-            last_offset = last_offset + len(d_data)
-
-        ax_ts.legend()
-
+    _ = sns.lineplot(x=data_index, y=data_raw, ax=ax_ts, linewidth=1)
     sns.despine()
 
     for aaa, column in enumerate(ground_truth):
@@ -481,15 +608,31 @@ def plot_all_competitors(
         motifsets,
         motif_length,
         method_names=None,
-        target_cardinalities=None,
         ground_truth=None,
         plot_index=None,
         color_palette=sns.color_palette()):
-    # convert to numpy array
-    data_raw = data
-    if isinstance(data, pd.Series):
-        data_raw = data.to_numpy()
+    """Plots the found motif sets of multiple competitor methods
 
+    Parameters
+    ----------
+    ds_name: String
+        The name of the time series
+    data: array-like
+        The time series data
+    motifsets: 2d array-like
+        The found motif sets for plotting
+    motif_length: int
+        The motif length found.
+    method_names: array-like
+        Names of the method to plot
+    ground_truth:
+        Ground-truth information
+    plot_index: int
+    color_palette: int
+    """
+
+    # convert to numpy array
+    _, data_raw = ml._pd_series_to_numpy(data)
     D_full = ml.compute_distances_full(data_raw, motif_length)
     indices = np.arange(len(motifsets))
 
@@ -513,12 +656,33 @@ def plot_competitors(
         motif_length,
         prefix="",
         filter=True,
-        target_cardinalities=None,
         ground_truth=None):
+    """Plots motif sets of a single competitor method.
+
+    Parameters
+    ----------
+    data: array-like
+        The time series data
+    ds_name: String
+        The name of the time series
+    motifsets: array-like
+        The motifset for plotting
+    motif_length: int
+        The motif length found.
+    prefix: String
+        The method name
+    filter: bool, default=True
+        filter overlapping motifs
+    ground_truth:
+        Ground-truth information
+
+    Returns
+    -------
+
+    """
+
     # convert to numpy array
-    data_raw = data
-    if isinstance(data, pd.Series):
-        data_raw = data.to_numpy()
+    _, data_raw = ml._pd_series_to_numpy(data)
 
     D_full = ml.compute_distances_full(data_raw, motif_length)
 
