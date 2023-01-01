@@ -89,7 +89,7 @@ To extract meaningful **motif sizes (k)** from this use case, we run
 
 ```
 dists, motiflets, elbow_points = plot_elbow(
-    ks, series, ds_name, plot_elbows=True,
+    k_max, series, ds_name, plot_elbows=True,
     motif_length=motif_length, method_name="K-Motiflets", ground_truth=df_gt)
 ```
 
