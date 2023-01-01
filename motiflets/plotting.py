@@ -14,9 +14,6 @@ import motiflets.motiflets as ml
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 
-# Store figures??
-save_fig = False
-
 
 def plot_dataset(ds_name, data, ground_truth=None):
     plot_motifset(ds_name, data, ground_truth=ground_truth)
@@ -113,18 +110,6 @@ def plot_motifset(
         motifset = []
 
     fig.tight_layout()
-
-    if save_fig:
-        dir_name = "../images/"
-        if idx is None:
-            plt.savefig(
-                dir_name + "/" + ds_name.replace(" ", "-") + "_" + str(prefix) +
-                "_" + str(len(motifset)) + ".pdf", bbox_inches='tight')
-        else:
-            plt.savefig(
-                dir_name + "/" + ds_name.replace(" ", "-") + "_" + str(prefix) +
-                "_" + str(len(motifset)) + "_" + str(idx) + ".pdf", bbox_inches='tight')
-
     plt.show()
 
 
@@ -171,9 +156,6 @@ def plot_elbow_points(
             axins.xaxis.set_major_formatter(plt.NullFormatter())
             axins.yaxis.set_major_formatter(plt.NullFormatter())
 
-    if save_fig:
-        plt.savefig("../images/" + ds_name.replace(" ", "-") + "_elbow.pdf",
-                    bbox_inches='tight')
     plt.show()
 
 
@@ -254,10 +236,6 @@ def plot_motif_length_selection(k_max, data, motif_length_range, ds_name):
     # plt.legend(loc="best")      
     fig.set_figheight(5)
     fig.set_figwidth(5)
-    if save_fig:
-        plt.savefig(
-            "../images/" + ds_name.replace(" ", "-") + "_motif_length_selection.pdf",
-            bbox_inches='tight')
     plt.show()
 
     return best_motif_length
@@ -494,20 +472,6 @@ def plot_grid_motiflets(
 
     plt.tight_layout()
     gs.tight_layout(fig)
-
-    if method_names is not None and save_fig:
-        if idx is None:
-            plt.savefig("../images/" + ds_name.replace(" ", "-") + "_grid.pdf",
-                        bbox_inches='tight')
-        else:
-            plt.savefig(
-                "../images/" + ds_name.replace(" ", "-") + "_grid_" + str(idx) + ".pdf",
-                bbox_inches='tight')
-
-    if save_fig:
-        plt.savefig("../images/" + ds_name.replace(" ", "-") + "_elbows.pdf",
-                    bbox_inches='tight')
-
     plt.show()
 
 
