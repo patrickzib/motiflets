@@ -78,7 +78,7 @@ motif_length = plot_motif_length_selection(
     k_max, 
     series, 
     length_range, 
-    ds_name
+    ds_name             # The name of the series
     )
 ```
 <img src="https://github.com/patrickzib/motiflets/raw/main/images/plot_au_ef.png" width="300">
@@ -94,7 +94,7 @@ To extract meaningful **motif sizes (k)** from this use case, we run
 dists, motiflets, elbow_points = plot_elbow(
     k_max, 
     series, 
-    ds_name, 
+    ds_name,            # The name of the series
     motif_length, 
     plot_elbows=True,   # Shows an elbow-plot, too
     method_name="K-Motiflets", # String to display the name

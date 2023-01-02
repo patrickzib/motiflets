@@ -27,7 +27,7 @@ def as_series(data, index_range, index_name):
     return series
 
 
-def resample(data, sampling_factor=10000):
+def _resample(data, sampling_factor=10000):
     factor = 1
     if len(data) > sampling_factor:
         factor = np.int32(len(data) / sampling_factor)
@@ -51,7 +51,7 @@ def read_dataset_with_index(dataset, sampling_factor=10000):
     data = pd.read_csv(full_path, index_col=0, squeeze=True)
     print("Dataset Original Length n: ", len(data))
 
-    data, factor = resample(data, sampling_factor)
+    data, factor = _resample(data, sampling_factor)
     print("Dataset Sampled Length n: ", len(data))
 
     data[:] = zscore(data)
@@ -98,14 +98,14 @@ def read_dataset(dataset, sampling_factor=10000):
     data = np.array(data)[0]
     print("Dataset Original Length n: ", len(data))
 
-    data, factor = resample(data, sampling_factor)
+    data, factor = _resample(data, sampling_factor)
     print("Dataset Sampled Length n: ", len(data))
 
     # gt = read_ground_truth(dataset)    
     return zscore(data)  # , gt
 
 
-def sliding_dot_product(query, ts):
+def _sliding_dot_product(query, ts):
     m = len(query)
     n = len(ts)
 
@@ -126,7 +126,7 @@ def sliding_dot_product(query, ts):
     return dot_product[trim:]
 
 
-def sliding_mean_std(ts, m):
+def _sliding_mean_std(ts, m):
     if isinstance(ts, pd.Series):
         ts = ts.to_numpy()
     s = np.insert(np.cumsum(ts), 0, 0)
@@ -150,13 +150,13 @@ def compute_distances_full(ts, m):
 
     D = np.zeros((n, n), dtype=np.float32)
     dot_prev = None
-    means, stds = sliding_mean_std(ts, m)
+    means, stds = _sliding_mean_std(ts, m)
 
     for order in range(0, n):
 
         # first iteration O(n log n)
         if order == 0:
-            dot_first = sliding_dot_product(ts[:m], ts)
+            dot_first = _sliding_dot_product(ts[:m], ts)
             dot_rolled = dot_first
         # O(1) further operations
         else:
@@ -219,7 +219,7 @@ def get_pairwise_extent(D_full, motiflet_pos, upperbound=np.inf):
 
 
 @njit(fastmath=True, cache=True)
-def get_top_k_non_trivial_matches_inner(
+def _get_top_k_non_trivial_matches_inner(
         dist, k, candidates, lowest_dist=np.inf):
     # admissible pruning: are there enough offsets within range?    
     if (len(candidates) < k):
@@ -239,7 +239,7 @@ def get_top_k_non_trivial_matches_inner(
 
 
 @njit(fastmath=True, cache=True)
-def get_top_k_non_trivial_matches(
+def _get_top_k_non_trivial_matches(
         dist, k, m, n, lowest_dist=np.inf):
     dist_idx = np.argwhere(dist < lowest_dist).flatten().astype(np.int32)
     # not possible, as wehave to check for overlapps, too
@@ -279,10 +279,10 @@ def get_approximate_k_motiflet(
         dist = np.copy(D[order])
 
         if incremental:
-            idx = get_top_k_non_trivial_matches_inner(
+            idx = _get_top_k_non_trivial_matches_inner(
                 dist, k, all_candidates[order], motiflet_dist)
         else:
-            idx = get_top_k_non_trivial_matches(dist, k, m, n, motiflet_dist)
+            idx = _get_top_k_non_trivial_matches(dist, k, m, n, motiflet_dist)
 
         motiflet_all_candidates[i] = idx
 
@@ -297,7 +297,7 @@ def get_approximate_k_motiflet(
 
 
 @njit(fastmath=True, cache=True)
-def check_unique(elbow_points_1, elbow_points_2, motif_length):
+def _check_unique(elbow_points_1, elbow_points_2, motif_length):
     count = 0
     for a in elbow_points_1:  # smaller motiflet
         for b in elbow_points_2:  # larger motiflet
@@ -310,12 +310,12 @@ def check_unique(elbow_points_1, elbow_points_2, motif_length):
     return True
 
 
-def filter_unique(elbow_points, candidates, motif_length):
+def _filter_unique(elbow_points, candidates, motif_length):
     filtered_ebp = []
     for i in range(len(elbow_points)):
         unique = True
         for j in range(i + 1, len(elbow_points)):
-            unique = check_unique(
+            unique = _check_unique(
                 candidates[elbow_points[i]], candidates[elbow_points[j]], motif_length)
             if not unique:
                 break
@@ -355,7 +355,7 @@ def find_elbow_points(dists, alpha=2):
     return np.sort(np.array(list(set(elbow_points))))
 
 
-def inner_au_ef(data, k_max, m, upper_bound):
+def _inner_au_ef(data, k_max, m, upper_bound):
     dists, candidates, elbow_points, _ = search_k_motiflets_elbow(
         k_max,
         data,
@@ -366,7 +366,7 @@ def inner_au_ef(data, k_max, m, upper_bound):
         return None, None, None
 
     au_efs = ((dists - dists.min()) / (dists.max() - dists.min())).sum() / len(dists)
-    elbow_points = filter_unique(elbow_points, candidates, m)
+    elbow_points = _filter_unique(elbow_points, candidates, m)
 
     top_motiflet = None
     if len(elbow_points > 0):
@@ -395,7 +395,7 @@ def find_au_ef_motif_length(data, k_max, motif_length_range):
 
     upper_bound = np.inf
     for i, m in enumerate(motif_length_range[::-1]):
-        au_efs[i], elbows[i], top_motiflets[i], dist = inner_au_ef(
+        au_efs[i], elbows[i], top_motiflets[i], dist = _inner_au_ef(
             data, k_max, int(m / subsample),
             upper_bound=upper_bound)
         upper_bound = min(dist[-1], upper_bound)
