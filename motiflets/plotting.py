@@ -30,8 +30,8 @@ def plot_dataset(ds_name, data, ground_truth=None):
         The name of the time series
     data: array-like
         The time series
-    ground_truth:
-        Ground-truth information
+    ground_truth: pd.Series
+        Ground-truth information as pd.Series.
 
     """
     plot_motifset(ds_name, data, ground_truth=ground_truth)
@@ -90,8 +90,8 @@ def plot_motifset(
         The distances (extents) for each motif set
     motif_length: int
         The length of the motif
-    ground_truth:
-        Ground-truth information
+    ground_truth: pd.Series
+        Ground-truth information as pd.Series.
 
     """
 
@@ -249,8 +249,8 @@ def plot_elbow(k_max,
         exclusion zone - use when searching for the TOP-2 motiflets
     plot_elbows: bool, default=False
         plots the elbow ploints into the plot
-    ground_truth: array-like
-        uses these ground truth motif sets for plotting
+    ground_truth: pd.Series
+        Ground-truth information as pd.Series.
     filter: bool, default=True
         filters overlapping motiflets from the result,
     method_name:  String
@@ -258,6 +258,7 @@ def plot_elbow(k_max,
 
     Returns
     -------
+    Tuple
         dists:          distances for each k in [2...k_max]
         candidates:     motifset-candidates for each k
         elbow_points:   elbow-points
@@ -382,8 +383,8 @@ def plot_grid_motiflets(
         The motif length found.
     font_size: int
         Font-size to use for plotting.
-    ground_truth:
-        Ground-truth information
+    ground_truth: pd.Series
+        Ground-truth information as pd.Series.
     method_name: String
         Name of a single method
     method_names: array-like
@@ -627,8 +628,8 @@ def plot_all_competitors(
         The motif length found.
     method_names: array-like
         Names of the method to plot
-    ground_truth:
-        Ground-truth information
+    ground_truth: pd.Series
+        Ground-truth information as pd.Series.
     grid_dim: int
         The dimensionality of the grid (number of columns)
     plot_index: int
@@ -677,11 +678,8 @@ def plot_competitors(
         The method name
     filter: bool, default=True
         filter overlapping motifs
-    ground_truth:
-        Ground-truth information
-
-    Returns
-    -------
+    ground_truth: pd.Series
+        Ground-truth information as pd.Series.
 
     """
 
