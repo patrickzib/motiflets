@@ -1,9 +1,6 @@
 # Motiflets
 
-This page was built in support of our paper "Motiflets - Simple and Accurate Detection of Motifs in Time Series" by Patrick Schäfer and Ulf Leser.
-
-The paper is completely self-contained, the purpose of this webpage is to provide the 
-k-Motiflet code, and the raw data to readers of the paper.
+This page was built in support of our paper "Motiflets - Simple and Accurate Detection of Motifs in Time Series" by Patrick Schäfer and Ulf Leser. 
 
 Supporting Material
 - `notebooks`: Please see the Jupyter Notebooks for use cases
@@ -136,3 +133,18 @@ Data Sets: We collected five challenging real-life data sets to assess the quali
 - Jupyter-Notebook <a href="notebooks/use_cases_motif_sets_synthetic.ipynb">Semi-Synthetic with implanted Ground Truth</a>: One example series form our 25 semi-synthetic time series. To measure the precision of the different MD methods we created a semi-synthetic dataset using the first 25 datasets of an anomaly benchmark and implanted motif sets of varying sizes $k \in [5, \dots, 10]$ of fixed length $l=500$.
 
 - Jupyter-Notebook <a href="notebooks/use_cases_motif_sets_synthetic-all.ipynb">Full results for the Semi-Synthetic Dataset with implanted Ground Truth</a>: To measure the precision of the different MD methods we created a semi-synthetic dataset using the first 25 datasets of an anomaly benchmark and implanted motif sets of varying sizes $k \in [5, \dots, 10]$ of fixed length $l=500$.
+
+## Citation
+If you use this work, please cite as:
+```
+@article{motiflets2022,
+  title={Motiflets - Simple and Accurate Detection of Motifs in Time Series},
+  author={Schäfer, Patrick and Leser, Ulf},
+  journal={Proceedings of the VLDB Endowment},
+  volume={16},
+  number={4},
+  pages={725--737},
+  year={2022},
+  publisher={PVLDB}
+}
+```
