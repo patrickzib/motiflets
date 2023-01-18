@@ -90,6 +90,7 @@ def read_ground_truth(dataset):
         print(file)
         series = pd.read_csv(
             file, index_col=0,
+            # TODO: this does not work with pandas >= 1.5
             converters={1: literal_eval, 2: literal_eval, 3: literal_eval})
         return series
     return None
