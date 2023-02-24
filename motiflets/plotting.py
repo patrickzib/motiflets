@@ -106,7 +106,7 @@ def plot_motifset(
     if ground_truth is None:
         ground_truth = []
 
-    data_index, data_raw = ml._pd_series_to_numpy(data)
+    data_index, data_raw = ml.pd_series_to_numpy(data)
 
     axes[0].set_title(ds_name, fontsize=20)
     _ = sns.lineplot(x=data_index, y=data_raw, ax=axes[0], linewidth=1)
@@ -180,7 +180,7 @@ def _plot_elbow_points(
         The distances (extents) for each motif set
     """
 
-    data_index, data_raw = ml._pd_series_to_numpy(data)
+    data_index, data_raw = ml.pd_series_to_numpy(data)
 
     fig, ax = plt.subplots(figsize=(8, 4), constrained_layout=True)
     ax.set_title(ds_name + "\nElbow Points")
@@ -264,7 +264,7 @@ def plot_elbow(k_max,
         elbow_points:   elbow-points
 
     """
-    _, raw_data = ml._pd_series_to_numpy(data)
+    _, raw_data = ml.pd_series_to_numpy(data)
     print("Data", len(raw_data))
 
     startTime = time.perf_counter()
@@ -321,7 +321,7 @@ def plot_motif_length_selection(k_max, data, motif_length_range, ds_name):
         The motif length that maximizes the AU-PDF.
 
     """
-    index, _ = ml._pd_series_to_numpy(data)
+    index, _ = ml.pd_series_to_numpy(data)
     header = " in " + data.index.name if isinstance(data,
                                                     pd.Series) and data.index.name != None else ""
 
@@ -433,7 +433,7 @@ def plot_grid_motiflets(
     ax_ts = fig.add_subplot(gs[0, :])
     ax_ts.set_title("(a) Dataset: " + ds_name + "")
 
-    data_index, data_raw = ml._pd_series_to_numpy(data)
+    data_index, data_raw = ml.pd_series_to_numpy(data)
 
     _ = sns.lineplot(x=data_index, y=data_raw, ax=ax_ts, linewidth=1)
     sns.despine()
@@ -637,7 +637,7 @@ def plot_all_competitors(
     """
 
     # convert to numpy array
-    _, data_raw = ml._pd_series_to_numpy(data)
+    _, data_raw = ml.pd_series_to_numpy(data)
     D_full = ml.compute_distances_full(data_raw, motif_length)
     indices = np.arange(len(motifsets))
 
@@ -684,7 +684,7 @@ def plot_competitors(
     """
 
     # convert to numpy array
-    _, data_raw = ml._pd_series_to_numpy(data)
+    _, data_raw = ml.pd_series_to_numpy(data)
 
     D_full = ml.compute_distances_full(data_raw, motif_length)
 

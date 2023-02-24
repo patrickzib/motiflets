@@ -141,7 +141,7 @@ def read_dataset_with_index(dataset, sampling_factor=10000):
         return data
 
 
-def _pd_series_to_numpy(data):
+def pd_series_to_numpy(data):
     """Converts a PD.Series to two numpy arrays by extracting the raw data and index.
 
     Parameters
@@ -689,7 +689,7 @@ def _inner_au_ef(data, k_max, m, upper_bound):
         upper_bound=upper_bound)
 
     if np.isnan(dists).any() or np.isinf(dists).any():
-        return None, None, None
+        return None, None, None, None
 
     au_efs = ((dists - dists.min()) / (dists.max() - dists.min())).sum() / len(dists)
     elbow_points = _filter_unique(elbow_points, candidates, m)
@@ -748,7 +748,8 @@ def find_au_ef_motif_length(data, k_max, motif_length_range):
         au_efs[i], elbows[i], top_motiflets[i], dist = _inner_au_ef(
             data, k_max, int(m / subsample),
             upper_bound=upper_bound)
-        upper_bound = min(dist[-1], upper_bound)
+        if dist is not None:
+            upper_bound = min(dist[-1], upper_bound)
 
     au_efs = np.array(au_efs, dtype=np.float64)[::-1]
     elbows = elbows[::-1]
@@ -806,7 +807,7 @@ def search_k_motiflets_elbow(
             best motif length
     """
     # convert to numpy array
-    _, data_raw = _pd_series_to_numpy(data)
+    _, data_raw = pd_series_to_numpy(data)
 
     # auto motif size selection
     if motif_length == 'AU_EF' or motif_length == 'auto':
