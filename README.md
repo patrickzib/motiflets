@@ -1,6 +1,6 @@
 # Motiflets
 
-This page was built in support of our paper "Motiflets - Simple and Accurate Detection of Motifs in Time Series" by Patrick Schäfer and Ulf Leser, published at <a href="https://www.vldb.org/pvldb/vol16/p725-schafer.pdf">PVLDB, 16(4): 725 - 737, 2022.</a>.
+This page was built in support of our paper "Motiflets - Simple and Accurate Detection of Motifs in Time Series" by Patrick Schäfer and Ulf Leser, published at <a href="https://www.vldb.org/pvldb/vol16/p725-schafer.pdf">PVLDB, 16(4): 725 - 737, 2022</a>.
 
 Supporting Material
 - `notebooks`: Please see the Jupyter Notebooks for use cases
@@ -147,6 +147,6 @@ If you use this work, please cite as:
   year={2022},
   publisher={PVLDB}
 }
+```
 
 Link to the <a href="https://www.vldb.org/pvldb/vol16/p725-schafer.pdf">paper</a>.
-```
