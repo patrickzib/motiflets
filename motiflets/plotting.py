@@ -336,7 +336,7 @@ def plot_motif_length_selection(k_max, data, motif_length_range, ds_name):
     print("\tTime", np.round(endTime, 1), "s")
 
     indices = ~np.isinf(au_ef)
-    fig, ax = plt.subplots(figsize=(4, 4))
+    fig, ax = plt.subplots(figsize=(5, 2))
     ax = sns.lineplot(
         x=index[motif_length_range[indices]],
         y=au_ef[indices],

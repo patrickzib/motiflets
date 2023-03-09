@@ -16,7 +16,7 @@ import pandas as pd
 from joblib import Parallel, delayed
 from numba import njit
 from scipy.stats import zscore
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 slack = 0.6
 
@@ -835,7 +835,9 @@ def search_k_motiflets_elbow(
     exclusion_m = int(m * slack)
     motiflet_candidates = []
 
-    for test_k in tqdm(range(k_max_ - 1, 1, -1), desc='Compute ks'):
+    for test_k in tqdm(range(k_max_ - 1, 1, -1), desc='Compute ks',
+                       leave=False,
+                       bar_format="{l_bar}{bar:10}{r_bar}{bar:-10b}"):
         # Top-N retrieval
         if exclusion is not None and exclusion[test_k] is not None:
             for pos in exclusion[test_k].flatten():
