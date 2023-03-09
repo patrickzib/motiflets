@@ -835,9 +835,8 @@ def search_k_motiflets_elbow(
     exclusion_m = int(m * slack)
     motiflet_candidates = []
 
-    for test_k in tqdm(range(k_max_ - 1, 1, -1), desc='Compute ks',
-                       leave=False,
-                       bar_format="{l_bar}{bar:10}{r_bar}{bar:-10b}"):
+    for test_k in tqdm(range(k_max_ - 1, 1, -1), desc='Compute ks (' + str(k_max_) + ")",
+                       position=0, leave=False):
         # Top-N retrieval
         if exclusion is not None and exclusion[test_k] is not None:
             for pos in exclusion[test_k].flatten():
