@@ -261,7 +261,9 @@ def _sliding_mean_std(ts, m):
     segSumSq = sSq[m:] - sSq[:-m]
 
     movmean = segSum / m
-    movstd = np.sqrt(segSumSq / m - (segSum / m) ** 2)
+    movstd_buf = segSumSq / m - (segSum / m) ** 2
+    movstd_buf[movstd_buf < 0] = 0
+    movstd = np.sqrt(movstd_buf)
 
     # avoid dividing by too small std, like 0
     movstd = np.where(abs(movstd) < 0.1, 1, movstd)
@@ -688,9 +690,7 @@ def _inner_au_ef(data, k_max, m, upper_bound):
         m,
         upper_bound=upper_bound)
 
-    if np.isnan(dists).any() or np.isinf(dists).any():
-        return None, None, None, None
-
+    dists = dists[(~np.isinf(dists)) & (~np.isnan(dists))]
     au_efs = ((dists - dists.min()) / (dists.max() - dists.min())).sum() / len(dists)
     elbow_points = _filter_unique(elbow_points, candidates, m)
 
@@ -735,8 +735,8 @@ def find_au_ef_motif_length(data, k_max, motif_length_range):
     subsample = 2
     data = data[::subsample]
 
-    index = (data.index / subsample) if isinstance(data, pd.Series) else np.arange(
-        len(data))
+    # index = (data.index / subsample) if isinstance(data, pd.Series) else np.arange(
+    #     len(data))
 
     # in reverse order
     au_efs = np.zeros(len(motif_length_range), dtype=object)
@@ -809,13 +809,16 @@ def search_k_motiflets_elbow(
     # convert to numpy array
     _, data_raw = pd_series_to_numpy(data)
 
+    # non-overlapping motifs only
+    k_max_ = min(int(len(data) / (motif_length * slack)), k_max)
+
     # auto motif size selection
     if motif_length == 'AU_EF' or motif_length == 'auto':
         if motif_length_range is None:
             print("Warning: no valid motiflet range set")
             assert False
         m, _, _, _ = find_au_ef_motif_length(
-            data, k_max, motif_length_range)
+            data, k_max_, motif_length_range)
     elif isinstance(motif_length, int) or \
             isinstance(motif_length, np.int32) or \
             isinstance(motif_length, np.int64):
@@ -824,15 +827,15 @@ def search_k_motiflets_elbow(
         print("Warning: no valid motif_length set - use 'auto' for automatic selection")
         assert False
 
-    k_motiflet_distances = np.zeros(k_max)
-    k_motiflet_candidates = np.empty(k_max, dtype=object)
+    k_motiflet_distances = np.zeros(k_max_)
+    k_motiflet_candidates = np.empty(k_max_, dtype=object)
 
     D_full = compute_distances_full(data_raw, m)
 
     exclusion_m = int(m * slack)
     motiflet_candidates = []
 
-    for test_k in tqdm(range(k_max - 1, 1, -1), desc='Compute ks'):
+    for test_k in tqdm(range(k_max_ - 1, 1, -1), desc='Compute ks'):
         # Top-N retrieval
         if exclusion is not None and exclusion[test_k] is not None:
             for pos in exclusion[test_k].flatten():
@@ -841,7 +844,7 @@ def search_k_motiflets_elbow(
                                          min(pos + exclusion_m, len(D_full)))
                     D_full[:, trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
 
-        incremental = (test_k < k_max - 1)
+        incremental = (test_k < k_max_ - 1)
         candidate, candidate_dist, all_candidates = get_approximate_k_motiflet(
             data_raw, m, test_k, D_full,
             upper_bound=upper_bound,
@@ -883,7 +886,7 @@ def candidate_dist(D_full, pool, upperbound, m):
     return motiflet_candidate_dist
 
 
-# @njit
+@njit
 def find_k_motiflets(ts, D_full, m, k, upperbound=None):
     """Exact algorithm to compute k-Motiflets
 
