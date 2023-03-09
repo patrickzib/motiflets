@@ -325,6 +325,9 @@ def plot_motif_length_selection(k_max, data, motif_length_range, ds_name):
     header = " in " + data.index.name if isinstance(data,
                                                     pd.Series) and data.index.name != None else ""
 
+    # discretizes ranges
+    motif_length_range = np.int32(motif_length_range)
+
     startTime = time.perf_counter()
     best_motif_length, au_ef, elbow, top_motiflets = \
         ml.find_au_ef_motif_length(
