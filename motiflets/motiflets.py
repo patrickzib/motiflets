@@ -88,11 +88,7 @@ def read_ground_truth(dataset):
     file = '../datasets/ground_truth/' + dataset.split(".")[0] + "_gt.csv"
     if exists(file):
         print(file)
-        series = pd.read_csv(
-            file, index_col=0,
-            # TODO: this does not work with pandas >= 1.5
-            # converters={1: literal_eval, 2: literal_eval, 3: literal_eval})
-            )
+        series = pd.read_csv(file, index_col=0)
 
         for i in range(0, series.shape[0]):
             series.iloc[i] = series.iloc[i].apply(literal_eval)
@@ -383,14 +379,14 @@ def get_pairwise_extent(D_full, motifset_pos, upperbound=np.inf):
         The extent of the motif set, if smaller than `upperbound`, else np.inf
     """
 
-    motifset_extent = np.float32(0.0)
+    motifset_extent = np.float64(0.0)
     for ii in range(len(motifset_pos) - 1):
         i = motifset_pos[ii]
         for jj in range(ii + 1, len(motifset_pos)):
             j = motifset_pos[jj]
 
             motifset_extent = max(motifset_extent, D_full[i, j])
-            if motifset_extent >= upperbound:
+            if motifset_extent > upperbound:
                 return np.inf
 
     return motifset_extent
@@ -426,7 +422,7 @@ def _get_top_k_non_trivial_matches_inner(
     idx = []  # there may be less than k, thus use a list
     for i in range(len(candidates)):
         pos = candidates[np.argmin(dists[candidates])]
-        if dists[pos] < lowest_dist:
+        if dists[pos] <= lowest_dist:
             idx.append(pos)
             dists[pos] = np.inf
         else:
@@ -458,7 +454,7 @@ def _get_top_k_non_trivial_matches(
     idx: the <= k subsequences within `lowest_dist`
 
     """
-    dist_idx = np.argwhere(dist < lowest_dist).flatten().astype(np.int32)
+    dist_idx = np.argwhere(dist <= lowest_dist).flatten().astype(np.int32)
     # not possible, as wehave to check for overlapps, too
     # if (len(dist_idx) <= k):
     #    return dist_idx
@@ -468,7 +464,7 @@ def _get_top_k_non_trivial_matches(
     idx = []  # there may be less than k, thus use a list
     for i in range(k):
         pos = dist_idx[np.argmin(dists[dist_idx])]
-        if (not np.isnan(dists[pos])) and (dists[pos] < lowest_dist):
+        if (not np.isnan(dists[pos])) and (dists[pos] <= lowest_dist):
             idx.append(pos)
             dists[max(0, pos - halve_m):min(pos + halve_m, n)] = np.inf
         else:
@@ -539,7 +535,7 @@ def get_approximate_k_motiflet(
         if len(idx) >= k and dist[idx[-1]] <= motiflet_dist:
             # get_pairwise_extent requires the full matrix 
             motiflet_extent = get_pairwise_extent(D, idx[:k], motiflet_dist)
-            if motiflet_dist > motiflet_extent:
+            if motiflet_dist >= motiflet_extent:
                 motiflet_dist = motiflet_extent
                 motiflet_candidate = idx[:k]
 
