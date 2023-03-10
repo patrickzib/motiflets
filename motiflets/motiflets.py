@@ -535,7 +535,7 @@ def get_approximate_k_motiflet(
         if len(idx) >= k and dist[idx[-1]] <= motiflet_dist:
             # get_pairwise_extent requires the full matrix 
             motiflet_extent = get_pairwise_extent(D, idx[:k], motiflet_dist)
-            if motiflet_dist >= motiflet_extent:
+            if motiflet_extent <= motiflet_dist:
                 motiflet_dist = motiflet_extent
                 motiflet_candidate = idx[:k]
 
@@ -676,7 +676,7 @@ def _inner_au_ef(data, k_max, m, upper_bound):
             Elbows found
         top_motiflet:
             Largest motiflet found (largest k), given the elbows.
-         dists: array-like
+        dists: array-like
             Distances for each k in the given interval
 
     """
@@ -851,6 +851,13 @@ def search_k_motiflets_elbow(
 
         if len(motiflet_candidates) == 0:
             motiflet_candidates = all_candidates
+
+        if candidate is None and \
+            len(k_motiflet_candidates) > test_k+1 and \
+            k_motiflet_candidates[test_k+1] is not None:
+            # This should not happen, but does?
+            candidate = k_motiflet_candidates[test_k+1][:test_k]
+            candidate_dist = get_pairwise_extent(D_full, candidate)
 
         k_motiflet_distances[test_k] = candidate_dist
         k_motiflet_candidates[test_k] = candidate
