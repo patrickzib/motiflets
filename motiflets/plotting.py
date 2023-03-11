@@ -109,7 +109,8 @@ def plot_motifset(
     data_index, data_raw = ml.pd_series_to_numpy(data)
 
     axes[0].set_title(ds_name, fontsize=20)
-    _ = sns.lineplot(x=data_index, y=data_raw, ax=axes[0], linewidth=1)
+    _ = sns.lineplot(x=data_index, y=data_raw, ax=axes[0], linewidth=1,
+                     ci=None, estimator=None)
     sns.despine()
 
     if motifset is not None:
@@ -117,7 +118,8 @@ def plot_motifset(
             _ = sns.lineplot(ax=axes[0],
                              x=data_index[np.arange(pos, pos + motif_length)],
                              y=data_raw[pos:pos + motif_length], linewidth=5,
-                             color=sns.color_palette()[len(ground_truth) + 2])
+                             color=sns.color_palette()[len(ground_truth) + 2],
+                             ci=None, estimator=None)
 
     for aaa, column in enumerate(ground_truth):
         for offsets in ground_truth[column]:
@@ -127,13 +129,15 @@ def plot_motifset(
                                  y=data_raw[offset[0]:offset[1]],
                                  label=column,
                                  color=sns.color_palette()[aaa + 1],
-                                 ax=axes[0]
+                                 ax=axes[0],
+                                 ci=None, estimator=None
                                  )
                 else:
                     sns.lineplot(x=data_index[offset[0]: offset[1]],
                                  y=data_raw[offset[0]:offset[1]],
                                  color=sns.color_palette()[aaa + 1],
-                                 ax=axes[0]
+                                 ax=axes[0],
+                                 ci=None, estimator=None
                                  )
 
     if motifset is not None:
@@ -147,7 +151,7 @@ def plot_motifset(
         for aa, pos in enumerate(motifset):
             df[str(aa)] = zscore(data_raw[pos:pos + motif_length])
         df_melt = pd.melt(df, id_vars="time")
-        _ = sns.lineplot(ax=axes[1], data=df_melt, ci=99, x="time", y="value")
+        _ = sns.lineplot(ax=axes[1], data=df_melt, ci=99, n_boot=10, x="time", y="value")
 
     sns.despine()
 
@@ -210,7 +214,7 @@ def _plot_elbow_points(
             df_melt = pd.melt(df, id_vars="time")
 
             _ = sns.lineplot(ax=axins, data=df_melt, x="time", y="value", ci=99,
-                             color=sns.color_palette()[i])
+                             n_boot=10, color=sns.color_palette()[i])
             axins.set_xlabel("")
             axins.set_ylabel("")
             axins.xaxis.set_major_formatter(plt.NullFormatter())
@@ -340,7 +344,8 @@ def plot_motif_length_selection(k_max, data, motif_length_range, ds_name):
     ax = sns.lineplot(
         x=index[motif_length_range[indices]],
         y=au_ef[indices],
-        label="AU_EF")
+        label="AU_EF",
+        ci=None, estimator=None)
     sns.despine()
     plt.tight_layout()
     ax.set_title("Best length on " + ds_name, size=20)
@@ -449,11 +454,13 @@ def plot_grid_motiflets(
                                  y=data_raw[offset[0]:offset[1]],
                                  label=column,
                                  color=sns.color_palette()[aaa + 1],
+                                 ci=None, estimator=None
                                  )
                 else:
                     sns.lineplot(x=data_index[offset[0]: offset[1]],
                                  y=data_raw[offset[0]:offset[1]],
                                  color=sns.color_palette()[aaa + 1],
+                                 ci=None, estimator=None
                                  )
 
     if len(candidates[elbow_points]) > 6:
@@ -547,8 +554,9 @@ def plot_grid_motiflets(
 
             if plot_minature:
                 df_melt = pd.melt(df, id_vars="time")
-                _ = sns.lineplot(ax=ax_motiflet, data=df_melt, x="time", y="value",
-                                 ci=99,
+                _ = sns.lineplot(ax=ax_motiflet, data=df_melt,
+                                 x="time", y="value",
+                                 ci=99, n_boot=10,
                                  color=color_palette[
                                      (len(ground_truth) + ii % grid_dim) % len(
                                          color_palette)],
@@ -583,7 +591,8 @@ def plot_grid_motiflets(
                 axins = ax_elbow.inset_axes(
                     [elbow_points[i] / len(candidates), 0.7, 0.1, 0.2])
 
-                _ = sns.lineplot(ax=axins, data=df_melt, x="time", y="value", ci=99,
+                _ = sns.lineplot(ax=axins, data=df_melt, x="time", y="value",
+                                 ci=0, n_boot=10,
                                  color=color_palette[
                                      (len(ground_truth) + ii % grid_dim) % len(
                                          color_palette)])
