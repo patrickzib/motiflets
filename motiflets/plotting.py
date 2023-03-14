@@ -21,7 +21,11 @@ matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 
 
-def plot_dataset(ds_name, data, ground_truth=None):
+def plot_dataset(
+        ds_name,
+        data,
+        ground_truth=None
+    ):
     """Plots a time series.
 
     Parameters
@@ -32,6 +36,7 @@ def plot_dataset(ds_name, data, ground_truth=None):
         The time series
     ground_truth: pd.Series
         Ground-truth information as pd.Series.
+    plain=False
 
     """
     plot_motifset(ds_name, data, ground_truth=ground_truth)
@@ -84,8 +89,8 @@ def plot_motifset(
         The name of the time series
     data: array-like
         The time series data
-    motifset: 2d-array like
-        The found motif set
+    motifset: array like
+        One found motif set
     dist: array like
         The distances (extents) for each motif set
     motif_length: int
@@ -119,6 +124,7 @@ def plot_motifset(
                              x=data_index[np.arange(pos, pos + motif_length)],
                              y=data_raw[pos:pos + motif_length], linewidth=5,
                              color=sns.color_palette()[len(ground_truth) + 2],
+                             # alpha=0.5,
                              ci=None, estimator=None)
 
     for aaa, column in enumerate(ground_truth):
@@ -150,8 +156,10 @@ def plot_motifset(
 
         for aa, pos in enumerate(motifset):
             df[str(aa)] = zscore(data_raw[pos:pos + motif_length])
+
         df_melt = pd.melt(df, id_vars="time")
-        _ = sns.lineplot(ax=axes[1], data=df_melt, ci=99, n_boot=10, x="time", y="value")
+        _ = sns.lineplot(ax=axes[1], data=df_melt, ci=99, n_boot=10,
+                         x="time", y="value")
 
     sns.despine()
 

@@ -26,16 +26,16 @@ def as_series(data, index_range, index_name):
 
     Parameters
     ----------
-    data: array-like
+    data : array-like
         The time series raw data as numpy array
-    index_range:
+    index_range :
         The index to use
-    index_name:
+    index_name :
         The name of the index to use (e.g. time)
 
     Returns
     -------
-    series: PD.Series
+    series : PD.Series
 
     """
     series = pd.Series(data=data, index=index_range)
@@ -50,17 +50,17 @@ def _resample(data, sampling_factor=10000):
 
     Parameters
     ----------
-    data: array-like
+    data : array-like
         The time series data
-    sampling_factor:
+    sampling_factor :
         The rough size of the time series after sampling
 
     Returns
     -------
     Tuple
-        data:
+        data :
             The raw data after sampling
-        factor: int
+        factor : int
             The factor used to sample the time series
 
     """
@@ -76,12 +76,12 @@ def read_ground_truth(dataset):
 
     Parameters
     ----------
-    dataset: String
+    dataset : String
         Name of the dataset
 
     Returns
     -------
-    Series: pd.Series
+    Series : pd.Series
         A series of ground-truth data
 
     """
@@ -102,18 +102,18 @@ def read_dataset_with_index(dataset, sampling_factor=10000):
 
     Parameters
     ----------
-    dataset: String
+    dataset : String
         File location.
-    sampling_factor:
+    sampling_factor :
         The time series is sampled down to roughly this number of points by skipping
         every other point.
 
     Returns
     -------
     Tuple
-        data: pd.Series
+        data : pd.Series
             The time series (z-score applied) with the index.
-        gt: pd:series
+        gt : pd:series
             Ground-truth, if available as `dataset`_gt file
 
     """
@@ -142,15 +142,15 @@ def pd_series_to_numpy(data):
 
     Parameters
     ----------
-    data: array or PD.Series
+    data : array or PD.Series
         the TS
 
     Returns
     -------
     Tuple
-        data_index: array_like
+        data_index : array_like
             The index of the time series
-        data_raw:
+        data_raw :
             The raw data of the time series
 
     """
@@ -168,15 +168,15 @@ def read_dataset(dataset, sampling_factor=10000):
 
     Parameters
     ----------
-    dataset: String
+    dataset : String
         File location.
-    sampling_factor:
+    sampling_factor :
         The time series is sampled down to roughly this number of points by skipping
         every other point.
 
     Returns
     -------
-    data: array-like
+    data : array-like
         The time series with z-score applied.
 
     """
@@ -196,14 +196,14 @@ def _sliding_dot_product(query, ts):
 
     Parameters
     ----------
-    query: array-like
+    query : array-like
         first time series, typically shorter than ts
-    ts: array-like
+    ts : array-like
         second time series, typically longer than query.
 
     Returns
     -------
-    dot_product: array-like
+    dot_product : array-like
         The result of the sliding dot-podouct
     """
 
@@ -236,17 +236,17 @@ def _sliding_mean_std(ts, m):
 
     Parameters
     ----------
-    ts: array-like
+    ts : array-like
         The time series
-    m: int
+    m : int
         The length of the sliding window to compute std and mean over.
 
     Returns
     -------
     Tuple
-        movmean: array-like
+        movmean : array-like
             The n-m+1 mean values
-        movstd: array-like
+        movstd : array-like
             The n-m+1 std values
     """
     if isinstance(ts, pd.Series):
@@ -267,7 +267,7 @@ def _sliding_mean_std(ts, m):
     return [movmean, movstd]
 
 
-def compute_distances_full(ts, m):
+def compute_distances_full(ts, m, exclude_trivial_match=True):
     """Compute the full Distance Matrix between all pairs of subsequences.
 
     Computes pairwise distances between n-m+1 subsequences, of length, extracted from
@@ -279,19 +279,21 @@ def compute_distances_full(ts, m):
 
     Parameters
     ----------
-    ts: array-like
+    ts : array-like
         The time series
-    m: int
+    m : int
         The window length
 
     Returns
     -------
-    D: 2d array-like
+    D : 2d array-like
         The O(n^2) z-normed ED distances between all pairs of subsequences
 
     """
     n = len(ts) - m + 1
-    halve_m = int(m * slack)
+    halve_m = 0
+    if exclude_trivial_match:
+        halve_m = int(m * slack)
 
     D = np.zeros((n, n), dtype=np.float32)
     dot_prev = None
@@ -334,14 +336,14 @@ def get_radius(D_full, motifset_pos):
     
     Parameters
     ----------
-    D_full: 2d array-like
+    D_full : 2d array-like
         The distance matrix
-    motifset_pos: array-like
+    motifset_pos : array-like
         The motif set start-offsets
 
     Returns
     -------
-    motiflet_radius: float
+    motiflet_radius : float
         The radius of the motif set
     """
     motiflet_radius = np.inf
@@ -364,18 +366,18 @@ def get_pairwise_extent(D_full, motifset_pos, upperbound=np.inf):
 
     Parameters
     ----------
-    D_full: 2d array-like
+    D_full : 2d array-like
         The distance matrix
-    motifset_pos: array-like
+    motifset_pos : array-like
         The motif set start-offsets
-    upperbound: float, default: np.inf
+    upperbound : float, default: np.inf
         Upper bound on the distances. If passed, will apply admissible pruning
         on distance computations, and only return the actual extent, if it is lower
         than `upperbound`
 
     Returns
     -------
-    motifset_extent: float
+    motifset_extent : float
         The extent of the motif set, if smaller than `upperbound`, else np.inf
     """
 
@@ -399,9 +401,9 @@ def _get_top_k_non_trivial_matches_inner(
 
     Parameters
     ----------
-    dist: array-like
+    dist : array-like
         the distances
-    k: int
+    k : int
         The k in k-NN
     candidates:
         The list of k'>k potential candidate subsequences, must be non-overlapping
@@ -411,10 +413,10 @@ def _get_top_k_non_trivial_matches_inner(
 
     Returns
     -------
-    idx: the <= k subsequences within `lowest_dist`
+    idx : the <= k subsequences within `lowest_dist`
 
     """
-    # admissible pruning: are there enough offsets within range?    
+    # admissible pruning: are there enough offsets within range?
     if (len(candidates) < k):
         return candidates
 
@@ -438,20 +440,20 @@ def _get_top_k_non_trivial_matches(
 
     Parameters
     ----------
-    dist: array-like
+    dist : array-like
         the distances
-    k: int
+    k : int
         The k in k-NN
-    m: int
+    m : int
         The window-length
-    n: int
+    n : int
         time series length
-    lowest_dist: float
+    lowest_dist : float
         Used for admissible pruning
 
     Returns
     -------
-    idx: the <= k subsequences within `lowest_dist`
+    idx : the <= k subsequences within `lowest_dist`
 
     """
     dist_idx = np.argwhere(dist <= lowest_dist).flatten().astype(np.int32)
@@ -484,30 +486,30 @@ def get_approximate_k_motiflet(
 
     Parameters
     ----------
-    ts: array-like
+    ts : array-like
         The raw time seres
-    m: int
+    m : int
         The motif length
-    k: int
+    k : int
         The k in k-Motiflets
-    D: 2d array-like
+    D : 2d array-like
         The distance matrix
-    upper_bound: float
+    upper_bound : float
         Used for admissible pruning
-    incremental: bool, default: False
+    incremental : bool, default: False
         When set to True, must also provide `all_candidates`
-    all_candidates: 2d array-like
+    all_candidates : 2d array-like
         We can reduce a set of k'-Motiflets, with k'>k, to a k-Motiflet. Used for
         efficient computation of elbows from large to small.
 
     Returns
     -------
     Tuple
-        motiflet_candidate: np.array
+        motiflet_candidate : np.array
             The (approximate) best motiflet found
         motiflet_dist:
             The extent of the motiflet found
-        motiflet_all_candidates: 2d array-like
+        motiflet_all_candidates : 2d array-like
             For each subsequence, a motifset, with minimal extent, found containing it.
             Used for refinement in incremental computation `incremental=True`.
     """
@@ -550,11 +552,11 @@ def _check_unique(motifset_1, motifset_2, motif_length):
 
     Parameters
     ----------
-    motifset_1: array-like
+    motifset_1 : array-like
         Positions of the smaller motif set.
-    motifset_2: array-like
+    motifset_2 : array-like
         Positions of the larger motif set.
-    motif_length: int
+    motif_length : int
         The length of the motif. Overlap exists, if 25% of two subsequences overlap.
 
     Returns
@@ -562,8 +564,8 @@ def _check_unique(motifset_1, motifset_2, motif_length):
     True, if there are at least m/2 subsequences with an overlap of 25%, else False.
     """
     count = 0
-    for a in motifset_1:  # smaller motiflet
-        for b in motifset_2:  # larger motiflet
+    for a in motifset_1 :  # smaller motiflet
+        for b in motifset_2 :  # larger motiflet
             if abs(a - b) < (motif_length / 4):
                 count = count + 1
                 break
@@ -583,16 +585,16 @@ def _filter_unique(elbow_points, candidates, motif_length):
 
     Parameters
     ----------
-    elbow_points: array-like
+    elbow_points : array-like
         List of possible k's for elbow-points.
-    candidates: 2d array-like
+    candidates : 2d array-like
         List of motif sets for each k
-    motif_length: int
+    motif_length : int
         Length of the motifs, needed for checking overlaps.
 
     Returns
     -------
-    filtered_ebp: array-like
+    filtered_ebp : array-like
         The set of non-overlapping elbow points.
 
     """
@@ -612,22 +614,27 @@ def _filter_unique(elbow_points, candidates, motif_length):
 
 
 @njit(fastmath=True, cache=True)
-def find_elbow_points(dists, alpha=2):
+def find_elbow_points(dists, alpha=2, elbow_deviation=1.05):
     """Finds elbow-points in the elbow-plot (extent over each k).
 
     Parameters
     ----------
-    dists: array-like
+    dists : array-like
         The extends for each k.
-    alpha: float
-        The threshold used to detect an elbow-point in the distances.
+    alpha : float
+        A threshold used to detect an elbow-point in the distances.
+        It measures the relative change in deviation from k-1 to k to k+1.
+    elbow_deviation : float, default=1.05
+        The minimal absolute deviation needed to detect an elbow.
+        It measures the absolute change in deviation from k to k+1.
+        1.05 corresponds to 5% increase in deviation.
 
     Returns
     -------
-    elbow_points: the elbow-points in the extent-function
+    elbow_points : the elbow-points in the extent-function
     """
     elbow_points = set()
-    elbow_points.add(2)
+    elbow_points.add(2)  # required for numba to have a type
     elbow_points.clear()
 
     peaks = np.zeros(len(dists))
@@ -635,11 +642,15 @@ def find_elbow_points(dists, alpha=2):
         if (dists[i] != np.inf and
                 dists[i + 1] != np.inf and
                 dists[i - 1] != np.inf):
+
             m1 = (dists[i + 1] - dists[i]) + 0.00001
             m2 = (dists[i] - dists[i - 1]) + 0.00001
-            peaks[i] = m1 / m2
 
-    # elbow_points = [2]
+            # avoid detecting elbows in near constant data
+            # TODO need to test this?
+            if (dists[i] > 0) and (dists[i + 1] / dists[i] > elbow_deviation):
+                peaks[i] = (m1 / m2)
+
     elbow_points = []
 
     while True:
@@ -650,6 +661,9 @@ def find_elbow_points(dists, alpha=2):
         else:
             break
 
+    if len(elbow_points) == 0:
+        elbow_points.append(2)
+
     return np.sort(np.array(list(set(elbow_points))))
 
 
@@ -658,25 +672,25 @@ def _inner_au_ef(data, k_max, m, upper_bound):
 
     Parameters
     ----------
-    data: array-like
+    data : array-like
         The raw time series data.
-    k_max: int
+    k_max : int
         Largest k. All k's within [2...k_max] are computed.
-    m: int
+    m : int
         Motif length
-    upper_bound: float
+    upper_bound : float
         Distance used for admissible pruning
 
     Returns
     -------
     Tuple
-        au_efs: float
+        au_efs : float
             Area under the EF
-        elbows: array-like
+        elbows : array-like
             Elbows found
         top_motiflet:
             Largest motiflet found (largest k), given the elbows.
-        dists: array-like
+        dists : array-like
             Distances for each k in the given interval
 
     """
@@ -707,23 +721,23 @@ def find_au_ef_motif_length(data, k_max, motif_length_range):
 
     Parameters
     ----------
-    data: array-like
+    data : array-like
         The time series.
-    k_max: int
+    k_max : int
         The interval of k's to compute the area of a single AU_EF.
-    motif_length_range:
+    motif_length_range : array-like
         The range of lengths to compute the AU-EF.
 
     Returns
     -------
     Tuple
-        length: array-like
+        length : array-like
             The range of lengths searched.
-        au_efs: array-like
+        au_efs : array-like
             For each length in the interval, the AU_EF.
-        elbows:
+        elbows :
             The largest k found for each length.
-        top_motiflets:
+        top_motiflets :
             The motiflet for the largest k for each length.
 
     """
@@ -764,7 +778,8 @@ def search_k_motiflets_elbow(
         motif_length='auto',
         motif_length_range=None,
         exclusion=None,
-        upper_bound=np.inf):
+        upper_bound=np.inf,
+        elbow_deviation=1.05):
     """Computes the elbow-function.
 
     This is the method to find the characteristic k-Motiflets within range
@@ -774,39 +789,40 @@ def search_k_motiflets_elbow(
 
     Parameters
     ----------
-    k_max: int
+    k_max : int
         use [2...k_max] to compute the elbow plot (user parameter).
-    data: array-like
+    data : array-like
         the TS
-    motif_length: int
+    motif_length : int
         the length of the motif (user parameter) or
         `motif_length == 'AU_EF'` or `motif_length == 'auto'`.
-    motif_length_range: array-like
+    motif_length_range : array-like
         Can be used to determine to length of the motif set automatically.
         If a range is passed and `motif_length == 'auto'`, the best window length
         is first determined, prior to computing the elbow-plot.
-    exclusion: 2d-array
+    exclusion : 2d-array
         exclusion zone - use when searching for the TOP-2 motiflets
-    upper_bound: float
+    upper_bound : float
         Admissible pruning on distance computations.
+    elbow_deviation : float, default=1.05
+        The minimal absolute deviation needed to detect an elbow.
+        It measures the absolute change in deviation from k to k+1.
+        1.05 corresponds to 5% increase in deviation.
 
     Returns
     -------
     Tuple
-        dists:
+        dists :
             distances for each k in [2...k_max]
-        candidates:
+        candidates :
             motifset-candidates for each k
-        elbow_points:
+        elbow_points :
             elbow-points
-        m: int
+        m : int
             best motif length
     """
     # convert to numpy array
     _, data_raw = pd_series_to_numpy(data)
-
-    # non-overlapping motifs only
-    k_max_ = min(int(len(data) / (motif_length * slack)), k_max)
 
     # auto motif size selection
     if motif_length == 'AU_EF' or motif_length == 'auto':
@@ -814,7 +830,7 @@ def search_k_motiflets_elbow(
             print("Warning: no valid motiflet range set")
             assert False
         m, _, _, _ = find_au_ef_motif_length(
-            data, k_max_, motif_length_range)
+            data, k_max, motif_length_range)
     elif isinstance(motif_length, int) or \
             isinstance(motif_length, np.int32) or \
             isinstance(motif_length, np.int64):
@@ -822,6 +838,9 @@ def search_k_motiflets_elbow(
     else:
         print("Warning: no valid motif_length set - use 'auto' for automatic selection")
         assert False
+
+    # non-overlapping motifs only
+    k_max_ = min(int(len(data) / (m * slack)), k_max)
 
     k_motiflet_distances = np.zeros(k_max_)
     k_motiflet_candidates = np.empty(k_max_, dtype=object)
@@ -869,7 +888,7 @@ def search_k_motiflets_elbow(
         k_motiflet_distances[i - 1] = min(k_motiflet_distances[i],
                                           k_motiflet_distances[i - 1])
 
-    elbow_points = find_elbow_points(k_motiflet_distances)
+    elbow_points = find_elbow_points(k_motiflet_distances, elbow_deviation=elbow_deviation)
     return k_motiflet_distances, k_motiflet_candidates, elbow_points, m
 
 
@@ -898,15 +917,15 @@ def find_k_motiflets(ts, D_full, m, k, upperbound=None):
 
     Parameters
     ----------
-    ts: array-like
+    ts : array-like
         The time series
-    D_full: 2d array-like
+    D_full : 2d array-like
         The pairwise distance matrix
-    m: int
+    m : int
         Length of the motif
-    k: int
+    k : int
         k-Motiflet size
-    upperbound: float
+    upperbound : float
         Admissible pruning on distance computations.
 
     Returns
