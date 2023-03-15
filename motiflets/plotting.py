@@ -123,7 +123,8 @@ def plot_motifset(
             _ = sns.lineplot(ax=axes[0],
                              x=data_index[np.arange(pos, pos + motif_length)],
                              y=data_raw[pos:pos + motif_length], linewidth=5,
-                             color=sns.color_palette()[len(ground_truth) + 2],
+                             color=sns.color_palette("tab10")[
+                                 (len(ground_truth) + 2) % 10],
                              # alpha=0.5,
                              ci=None, estimator=None)
 
@@ -134,14 +135,14 @@ def plot_motifset(
                     sns.lineplot(x=data_index[offset[0]: offset[1]],
                                  y=data_raw[offset[0]:offset[1]],
                                  label=column,
-                                 color=sns.color_palette()[aaa + 1],
+                                 color=sns.color_palette("tab10")[(aaa + 1) % 10],
                                  ax=axes[0],
                                  ci=None, estimator=None
                                  )
                 else:
                     sns.lineplot(x=data_index[offset[0]: offset[1]],
                                  y=data_raw[offset[0]:offset[1]],
-                                 color=sns.color_palette()[aaa + 1],
+                                 color=sns.color_palette("tab10")[(aaa + 1) % 10],
                                  ax=axes[0],
                                  ci=None, estimator=None
                                  )
@@ -222,7 +223,7 @@ def _plot_elbow_points(
             df_melt = pd.melt(df, id_vars="time")
 
             _ = sns.lineplot(ax=axins, data=df_melt, x="time", y="value", ci=99,
-                             n_boot=10, color=sns.color_palette()[i])
+                             n_boot=10, color=sns.color_palette("tab10")[i % 10])
             axins.set_xlabel("")
             axins.set_ylabel("")
             axins.xaxis.set_major_formatter(plt.NullFormatter())
@@ -378,7 +379,7 @@ def plot_grid_motiflets(
         method_name=None,
         method_names=None,
         show_elbows=False,
-        color_palette=sns.color_palette(),
+        color_palette=sns.color_palette("tab10"),
         grid_dim=None,
         plot_index=None):
     """Plots the characteristic motifs for each method along the time series.
@@ -461,13 +462,13 @@ def plot_grid_motiflets(
                     sns.lineplot(x=data_index[offset[0]: offset[1]],
                                  y=data_raw[offset[0]:offset[1]],
                                  label=column,
-                                 color=sns.color_palette()[aaa + 1],
+                                 color=color_palette[aaa + 1],
                                  ci=None, estimator=None
                                  )
                 else:
                     sns.lineplot(x=data_index[offset[0]: offset[1]],
                                  y=data_raw[offset[0]:offset[1]],
-                                 color=sns.color_palette()[aaa + 1],
+                                 color=color_palette[aaa + 1],
                                  ci=None, estimator=None
                                  )
 
@@ -633,7 +634,7 @@ def plot_all_competitors(
         method_names=None,
         ground_truth=None,
         plot_index=None,
-        color_palette=sns.color_palette()):
+        color_palette=sns.color_palette("tab10")):
     """Plots the found motif sets of multiple competitor methods
 
     Parameters
