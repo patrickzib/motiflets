@@ -39,7 +39,7 @@ def plot_dataset(
     plain=False
 
     """
-    plot_motifset(ds_name, data, ground_truth=ground_truth)
+    return plot_motifset(ds_name, data, ground_truth=ground_truth)
 
 
 def append_all_motif_sets(df, motif_sets, method_name, D_full):
@@ -80,7 +80,8 @@ def plot_motifset(
         motifset=None,
         dist=None,
         motif_length=None,
-        ground_truth=None):
+        ground_truth=None,
+        show=True):
     """Plots the data and the found motif sets.
 
     Parameters
@@ -97,6 +98,8 @@ def plot_motifset(
         The length of the motif
     ground_truth: pd.Series
         Ground-truth information as pd.Series.
+    show: boolean
+        Outputs the plot
 
     """
 
@@ -168,7 +171,10 @@ def plot_motifset(
         motifset = []
 
     fig.tight_layout()
-    plt.show()
+    if show:
+        plt.show()
+
+    return fig, axes
 
 
 def _plot_elbow_points(
