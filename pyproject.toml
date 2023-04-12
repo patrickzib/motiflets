@@ -1,7 +1,7 @@
 [project]
 name = "motiflets"
 
-version = "0.2.4"
+version = "0.2.5"
 
 description = "Motiflets - Simple and Accurate Detection of Motifs in Time Series"
 readme = "README.md"
