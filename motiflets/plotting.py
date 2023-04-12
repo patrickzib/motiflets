@@ -246,7 +246,8 @@ def plot_elbow(k_max,
                plot_elbows=False,
                ground_truth=None,
                filter=True,
-               method_name=None):
+               method_name=None,
+               slack=0.5):
     """Plots the elbow-plot for k-Motiflets.
 
     This is the method to find and plot the characteristic k-Motiflets within range
@@ -291,7 +292,8 @@ def plot_elbow(k_max,
         k_max,
         raw_data,
         motif_length,
-        exclusion=exclusion)
+        exclusion=exclusion,
+        slack=slack)
     endTime = (time.perf_counter() - startTime)
 
     print("Chosen window-size:", m, "in", np.round(endTime, 1), "s")
@@ -640,7 +642,8 @@ def plot_all_competitors(
         method_names=None,
         ground_truth=None,
         plot_index=None,
-        color_palette=sns.color_palette("tab10")):
+        color_palette=sns.color_palette("tab10"),
+        slack=0.5):
     """Plots the found motif sets of multiple competitor methods
 
     Parameters
@@ -665,7 +668,7 @@ def plot_all_competitors(
 
     # convert to numpy array
     _, data_raw = ml.pd_series_to_numpy(data)
-    D_full = ml.compute_distances_full(data_raw, motif_length)
+    D_full = ml.compute_distances_full(data_raw, motif_length, slack=slack)
     indices = np.arange(len(motifsets))
 
     dists = [ml.get_pairwise_extent(D_full, motiflet_pos, upperbound=np.inf)
@@ -688,7 +691,8 @@ def plot_competitors(
         motif_length,
         prefix="",
         filter=True,
-        ground_truth=None):
+        ground_truth=None,
+        slack=0.5):
     """Plots motif sets of a single competitor method.
 
     Parameters
@@ -713,7 +717,7 @@ def plot_competitors(
     # convert to numpy array
     _, data_raw = ml.pd_series_to_numpy(data)
 
-    D_full = ml.compute_distances_full(data_raw, motif_length)
+    D_full = ml.compute_distances_full(data_raw, motif_length, slack=slack)
 
     last = -1
     motifsets_filtered = []

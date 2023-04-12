@@ -14,11 +14,9 @@ import numpy as np
 import numpy.fft as fft
 import pandas as pd
 from joblib import Parallel, delayed
-from numba import njit
+from numba import njit, prange, objmode
 from scipy.stats import zscore
 from tqdm.auto import tqdm
-
-slack = 0.6
 
 
 def as_series(data, index_range, index_name):
@@ -191,7 +189,8 @@ def read_dataset(dataset, sampling_factor=10000):
     return zscore(data)
 
 
-def _sliding_dot_product(query, ts):
+@njit(fastmath=True, cache=True)
+def _sliding_dot_product(query, time_series):
     """Compute a sliding dot-product using the Fourier-Transform
 
     Parameters
@@ -204,29 +203,33 @@ def _sliding_dot_product(query, ts):
     Returns
     -------
     dot_product : array-like
-        The result of the sliding dot-podouct
+        The result of the sliding dot-product
     """
 
     m = len(query)
-    n = len(ts)
+    n = len(time_series)
 
-    ts_add = 0
+    time_series_add = 0
     if n % 2 == 1:
-        ts = np.insert(ts, 0, 0)
-        ts_add = 1
+        time_series = np.concatenate((np.array([0]), time_series))
+        time_series_add = 1
 
     q_add = 0
     if m % 2 == 1:
-        query = np.insert(query, 0, 0)
+        query = np.concatenate((np.array([0]), query))
         q_add = 1
 
     query = query[::-1]
-    query = np.pad(query, (0, n - m + ts_add - q_add), 'constant')
-    trim = m - 1 + ts_add
-    dot_product = fft.irfft(fft.rfft(ts) * fft.rfft(query))
+
+    query = np.concatenate((query, np.zeros(n - m + time_series_add - q_add)))
+
+    trim = m - 1 + time_series_add
+    with objmode(dot_product="float64[:]"):
+        dot_product = fft.irfft(fft.rfft(time_series) * fft.rfft(query))
     return dot_product[trim:]
 
 
+@njit(fastmath=True, cache=True)
 def _sliding_mean_std(ts, m):
     """Computes the incremental mean, std, given a time series and windows of length m.
 
@@ -249,25 +252,100 @@ def _sliding_mean_std(ts, m):
         movstd : array-like
             The n-m+1 std values
     """
-    if isinstance(ts, pd.Series):
-        ts = ts.to_numpy()
-    s = np.insert(np.cumsum(ts), 0, 0)
-    sSq = np.insert(np.cumsum(ts ** 2), 0, 0)
+    # if isinstance(ts, pd.Series):
+    #     ts = ts.to_numpy()
+    s = np.concatenate((np.zeros(1, dtype=np.float64), np.cumsum(ts)))
+    sSq = np.concatenate((np.zeros(1, dtype=np.float64), np.cumsum(ts ** 2)))
     segSum = s[m:] - s[:-m]
     segSumSq = sSq[m:] - sSq[:-m]
 
     movmean = segSum / m
-    movstd_buf = segSumSq / m - (segSum / m) ** 2
-    movstd_buf[movstd_buf < 0] = 0
-    movstd = np.sqrt(movstd_buf)
 
     # avoid dividing by too small std, like 0
-    movstd = np.where(abs(movstd) < 0.1, 1, movstd)
+    movstd = np.sqrt(np.clip(segSumSq / m - (segSum / m) ** 2, 0, None))
+    movstd = np.where(np.abs(movstd) < 0.1, 1, movstd)
 
     return [movmean, movstd]
 
 
-def compute_distances_full(ts, m, exclude_trivial_match=True):
+@njit(fastmath=True, cache=True, parallel=True)
+def compute_distances_full(ts, m, exclude_trivial_match=True, n_jobs=4, slack=0.5):
+    """Compute the full Distance Matrix between all pairs of subsequences.
+
+        Computes pairwise distances between n-m+1 subsequences, of length, extracted from
+        the time series, of length n.
+
+        Z-normed ED is used for distances.
+
+        This implementation is in O(n^2) by using the sliding dot-product.
+
+        Parameters
+        ----------
+        ts : array-like
+            The time series
+        m : int
+            The window length
+        exclude_trivial_match : bool
+            Trivial matches will be excluded if this parameter is set
+        n_jobs : int
+            Number of jobs to used
+
+        Returns
+        -------
+        D : 2d array-like
+            The O(n^2) z-normed ED distances between all pairs of subsequences
+
+    """
+    n = np.int32(ts.shape[0] - m + 1)
+    halve_m = 0
+    if exclude_trivial_match:
+        halve_m = int(m * slack)
+
+    D = np.zeros((n, n), dtype=np.float32)
+    means, stds = _sliding_mean_std(ts, m)
+
+    dot_first = _sliding_dot_product(ts[:m], ts)
+    bin_size = ts.shape[0] // n_jobs
+    for idx in prange(n_jobs):
+        start = idx * bin_size
+        end = min((idx + 1) * bin_size, ts.shape[0] - m + 1)
+
+        dot_prev = None
+        for order in np.arange(start, end):
+            if order == start:
+                # O(n log n) operation
+                dot_rolled = _sliding_dot_product(ts[start:start + m], ts)
+            else:
+                # constant time O(1) operations
+                dot_rolled = np.roll(dot_prev, 1) \
+                                + ts[order + m - 1] * ts[m - 1:n + m] \
+                                - ts[order - 1] * np.roll(ts[:n], 1)
+                dot_rolled[0] = dot_first[order]
+
+            D[order, :] = distance(dot_rolled, n, m, means, stds, order, halve_m)
+            dot_prev = dot_rolled
+
+    return D
+
+@njit(fastmath=True, cache=True)
+def distance(dot_rolled, n, m, means, stds, order, halve_m):
+    # there is a numba bug, thus we have to repeat all codes:
+    # https: // github.com / numba / numba / issues / 7681
+    dist = 2 * m * (1 - (dot_rolled - m * means * means[order]) / (
+            m * stds * stds[order]))
+
+    # self-join: exclusion zone
+    trivialMatchRange = (max(0, order - halve_m),
+                         min(order + halve_m, n))
+    dist[trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
+
+    # allow subsequence itself to be in result
+    dist[order] = 0
+
+    return dist
+
+
+def compute_distances_full_seq(ts, m, exclude_trivial_match=True, slack=0.5):
     """Compute the full Distance Matrix between all pairs of subsequences.
 
     Computes pairwise distances between n-m+1 subsequences, of length, extracted from
@@ -283,6 +361,8 @@ def compute_distances_full(ts, m, exclude_trivial_match=True):
         The time series
     m : int
         The window length
+    exclude_trivial_match : bool
+        Trivial matches will be excluded if this parameter is set
 
     Returns
     -------
@@ -417,25 +497,17 @@ def _get_top_k_non_trivial_matches_inner(
 
     """
     # admissible pruning: are there enough offsets within range?
-    if (len(candidates) < k):
-        return candidates
-
-    dists = np.copy(dist)
-    idx = []  # there may be less than k, thus use a list
-    for i in range(len(candidates)):
-        pos = candidates[np.argmin(dists[candidates])]
-        if dists[pos] <= lowest_dist:
-            idx.append(pos)
-            dists[pos] = np.inf
-        else:
+    p = 0
+    for i in range(len(candidates), 0, -1):
+        if dist[candidates[i-1]] <= lowest_dist:
+            p = i
             break
-
-    return np.array(idx, dtype=np.int32)
+    return candidates[:p]
 
 
 @njit(fastmath=True, cache=True)
 def _get_top_k_non_trivial_matches(
-        dist, k, m, n, lowest_dist=np.inf):
+        dist, k, m, n, lowest_dist=np.inf, slack=0.5):
     """Finds the closest k-NN non-overlapping subsequences in candidates.
 
     Parameters
@@ -457,27 +529,81 @@ def _get_top_k_non_trivial_matches(
 
     """
     dist_idx = np.argwhere(dist <= lowest_dist).flatten().astype(np.int32)
-
     halve_m = int(m * slack)
 
     dists = np.copy(dist)
     idx = []  # there may be less than k, thus use a list
     for i in range(k):
         pos = dist_idx[np.argmin(dists[dist_idx])]
-        if (not np.isnan(dists[pos])) and (dists[pos] <= lowest_dist):
+        if (not np.isnan(dists[pos]))  \
+                and (not np.isinf(dists[pos])) \
+                and (dists[pos] <= lowest_dist):
             idx.append(pos)
 
             # exclude all trivial matches
-            dists[max(0, pos - halve_m):min(pos + halve_m, n)] = np.inf
+            dists[max(0, pos - halve_m) : min(pos + halve_m, n)] = np.inf
         else:
             break
     return np.array(idx, dtype=np.int32)
 
 
+@njit(fastmath=True, cache=True)
+def _get_top_k_non_trivial_matches_new(
+        dist, k, m, n, lowest_dist=np.inf, slack=0.5):
+    """Finds the closest k-NN non-overlapping subsequences in candidates.
+
+    Parameters
+    ----------
+    dist : array-like
+        the distances
+    k : int
+        The k in k-NN
+    m : int
+        The window-length
+    n : int
+        time series length
+    lowest_dist : float
+        Used for admissible pruning
+
+    Returns
+    -------
+    idx : the <= k subsequences within `lowest_dist`
+
+    """
+    dist_idx = np.argwhere(dist <= lowest_dist).flatten().astype(np.int32)
+    halve_m = int(m * slack)
+
+    idx = []  # there may be less than k, thus use a list
+    for i in range(k):
+        current_min = lowest_dist
+        current_pos = -1
+
+        for pos in dist_idx:
+            if dist[pos] <= current_min \
+                    and (not np.isnan(dist[pos])) \
+                    and (not np.isinf(dist[pos])):
+                overlap = False
+                for ks in idx:
+                    # exclude all trivial matches
+                    if max(-1, ks - halve_m) < pos < min(ks + halve_m, n):
+                        overlap = True
+                        break
+
+                if not overlap:
+                    current_min = dist[pos]
+                    current_pos = pos
+
+        if current_pos >= 0:
+            idx.append(current_pos)
+        else: # nothing left
+            break
+
+    return np.array(idx, dtype=np.int32)
+
 # @njit
 def get_approximate_k_motiflet(
         ts, m, k, D,
-        upper_bound=np.inf, incremental=False, all_candidates=None
+        upper_bound=np.inf, incremental=False, all_candidates=None, slack=0.5
 ):
     """Compute the approximate k-Motiflets.
 
@@ -529,7 +655,8 @@ def get_approximate_k_motiflet(
             idx = _get_top_k_non_trivial_matches_inner(
                 dist, k, all_candidates[order], motiflet_dist)
         else:
-            idx = _get_top_k_non_trivial_matches(dist, k, m, n, motiflet_dist)
+            # idx = _get_top_k_non_trivial_matches_new(dist, k, m, n, motiflet_dist, slack)
+            idx = _get_top_k_non_trivial_matches(dist, k, m, n, motiflet_dist, slack)
 
         motiflet_all_candidates[i] = idx
 
@@ -666,7 +793,7 @@ def find_elbow_points(dists, alpha=2, elbow_deviation=1.05):
     return np.sort(np.array(list(set(elbow_points))))
 
 
-def _inner_au_ef(data, k_max, m, upper_bound):
+def _inner_au_ef(data, k_max, m, upper_bound, slack=0.5):
     """Computes the Area under the Elbow-Function within an interval [2...k_max].
 
     Parameters
@@ -697,7 +824,8 @@ def _inner_au_ef(data, k_max, m, upper_bound):
         k_max,
         data,
         m,
-        upper_bound=upper_bound)
+        upper_bound=upper_bound,
+        slack=slack)
 
     dists = dists[(~np.isinf(dists)) & (~np.isnan(dists))]
     au_efs = ((dists - dists.min()) / (dists.max() - dists.min())).sum() / len(dists)
@@ -778,7 +906,9 @@ def search_k_motiflets_elbow(
         motif_length_range=None,
         exclusion=None,
         upper_bound=np.inf,
-        elbow_deviation=1.05):
+        elbow_deviation=1.05,
+        slack=0.5
+    ):
     """Computes the elbow-function.
 
     This is the method to find the characteristic k-Motiflets within range
@@ -844,11 +974,12 @@ def search_k_motiflets_elbow(
     k_motiflet_distances = np.zeros(k_max_)
     k_motiflet_candidates = np.empty(k_max_, dtype=object)
 
-    D_full = compute_distances_full(data_raw, m)
+    D_full = compute_distances_full(data_raw, m, slack)
 
     exclusion_m = int(m * slack)
     motiflet_candidates = []
 
+    incremental = False
     for test_k in tqdm(range(k_max_ - 1, 1, -1), desc='Compute ks (' + str(k_max_) + ")",
                        position=0, leave=False):
         # Top-N retrieval
@@ -859,13 +990,14 @@ def search_k_motiflets_elbow(
                                          min(pos + exclusion_m, len(D_full)))
                     D_full[:, trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
 
-        incremental = (test_k < k_max_ - 1)
         candidate, candidate_dist, all_candidates = get_approximate_k_motiflet(
             data_raw, m, test_k, D_full,
             upper_bound=upper_bound,
             incremental=incremental,  # we use an incremental computation
-            all_candidates=motiflet_candidates
+            all_candidates=motiflet_candidates,
+            slack=slack
         )
+        incremental = True
 
         if len(motiflet_candidates) == 0:
             motiflet_candidates = all_candidates
@@ -892,7 +1024,7 @@ def search_k_motiflets_elbow(
 
 
 @njit(fastmath=True, cache=True)
-def candidate_dist(D_full, pool, upperbound, m):
+def candidate_dist(D_full, pool, upperbound, m, slack=0.5):
     motiflet_candidate_dist = 0
     m_half = int(m * slack)
     for i in pool:
@@ -909,7 +1041,7 @@ def candidate_dist(D_full, pool, upperbound, m):
 
 
 @njit
-def find_k_motiflets(ts, D_full, m, k, upperbound=None):
+def find_k_motiflets(ts, D_full, m, k, upperbound=None, slack=0.5):
     """Exact algorithm to compute k-Motiflets
 
     Warning: The algorithm has exponential runtime complexity.
@@ -936,7 +1068,7 @@ def find_k_motiflets(ts, D_full, m, k, upperbound=None):
     motiflet_dist = upperbound
     if upperbound is None:
         motiflet_candidate, motiflet_dist, _ = get_approximate_k_motiflet(
-            ts, m, k, D_full, upper_bound=np.inf)
+            ts, m, k, D_full, upper_bound=np.inf, slack=slack)
 
         motiflet_pos = motiflet_candidate
 
@@ -954,7 +1086,7 @@ def find_k_motiflets(ts, D_full, m, k, upperbound=None):
                 # exhaustive search over all subsets
                 for permutation in itertools.combinations(D_candidates, k):
                     if np.ptp(permutation) > k_halve_m:
-                        dist = candidate_dist(D_full, permutation, motiflet_dist, m)
+                        dist = candidate_dist(D_full, permutation, motiflet_dist, m, slack)
                         if dist < motiflet_dist:
                             motiflet_dist = dist
                             motiflet_pos = np.copy(permutation)
