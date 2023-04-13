@@ -114,7 +114,7 @@ repetitions perfectly match the ECG waves (green).
 
 # Use Cases
 
-Data Sets: We collected five challenging real-life data sets to assess the quality and scalability of MD algorithms. For three out of these, the literature describes the existence of motifs though without actually annotating them. An overview can be found in Table 2. The five data sets are the following:
+Data Sets: We collected challenging real-life data sets to assess the quality and scalability of MD algorithms. An overview of datasets can be found in Table 2 of our paper. 
 
 - Jupyter-Notebook <a href="notebooks/use_cases_paper.ipynb">Use Cases for k-Motiflets</a>: highlights all use cases used in the paper and shows the unique ability of k-Motiflets to learn its parameters from the data and find itneresting motif sets.
 
