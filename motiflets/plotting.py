@@ -247,7 +247,7 @@ def plot_elbow(k_max,
                ground_truth=None,
                filter=True,
                method_name=None,
-               elbow_deviation=1.05,
+               elbow_deviation=1.00,
                slack=0.5):
     """Plots the elbow-plot for k-Motiflets.
 
@@ -276,7 +276,7 @@ def plot_elbow(k_max,
         filters overlapping motiflets from the result,
     method_name:  String
         used for display only.
-    elbow_deviation : float, default=1.05
+    elbow_deviation : float, default=1.00
         The minimal absolute deviation needed to detect an elbow.
         It measures the absolute change in deviation from k to k+1.
         1.05 corresponds to 5% increase in deviation.
@@ -298,7 +298,7 @@ def plot_elbow(k_max,
         raw_data,
         motif_length,
         exclusion=exclusion,
-        elbow_deviation=elbow_deviation,
+        elbow_deviation = elbow_deviation,
         slack=slack)
     endTime = (time.perf_counter() - startTime)
 
@@ -325,7 +325,7 @@ def plot_elbow(k_max,
 
 def plot_motif_length_selection(
         k_max, data, motif_length_range, ds_name,
-        elbow_deviation=1.05, slack=0.5):
+        elbow_deviation=1.00, slack=0.5):
     """Computes the AU_EF plot to extract the best motif lengths
 
     This is the method to find and plot the characteristic motif-lengths, for k in
@@ -343,7 +343,7 @@ def plot_motif_length_selection(
         the interval of lengths
     ds_name: String
         Name of the time series for displaying
-    elbow_deviation : float, default=1.05
+    elbow_deviation : float, default=1.00
         The minimal absolute deviation needed to detect an elbow.
         It measures the absolute change in deviation from k to k+1.
         1.05 corresponds to 5% increase in deviation.

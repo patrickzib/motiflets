@@ -664,6 +664,7 @@ def get_approximate_k_motiflet(
             idx = _get_top_k_non_trivial_matches_inner(
                 dist, k, all_candidates[order], motiflet_dist)
         else:
+            # idx = _get_top_k_non_trivial_matches_new(dist, k, m, n, motiflet_dist, slack)
             idx = _get_top_k_non_trivial_matches(dist, k, m, n, motiflet_dist, slack)
 
         motiflet_all_candidates[i, :len(idx)] = idx
@@ -749,7 +750,7 @@ def _filter_unique(elbow_points, candidates, motif_length):
 
 
 @njit(fastmath=True, cache=True)
-def find_elbow_points(dists, alpha=2, elbow_deviation=1.05):
+def find_elbow_points(dists, alpha=2, elbow_deviation=1.00):
     """Finds elbow-points in the elbow-plot (extent over each k).
 
     Parameters
@@ -759,7 +760,7 @@ def find_elbow_points(dists, alpha=2, elbow_deviation=1.05):
     alpha : float
         A threshold used to detect an elbow-point in the distances.
         It measures the relative change in deviation from k-1 to k to k+1.
-    elbow_deviation : float, default=1.05
+    elbow_deviation : float, default=1.00
         The minimal absolute deviation needed to detect an elbow.
         It measures the absolute change in deviation from k to k+1.
         1.05 corresponds to 5% increase in deviation.
@@ -803,7 +804,7 @@ def find_elbow_points(dists, alpha=2, elbow_deviation=1.05):
 
 
 def _inner_au_ef(data, k_max, m, upper_bound,
-                 elbow_deviation=1.05,
+                 elbow_deviation=1.00,
                  slack=0.5):
     """Computes the Area under the Elbow-Function within an interval [2...k_max].
 
@@ -817,7 +818,7 @@ def _inner_au_ef(data, k_max, m, upper_bound,
         Motif length
     upper_bound : float
         Distance used for admissible pruning
-    elbow_deviation : float, default=1.05
+    elbow_deviation : float, default=1.00
         The minimal absolute deviation needed to detect an elbow.
         It measures the absolute change in deviation from k to k+1.
         1.05 corresponds to 5% increase in deviation.
@@ -860,7 +861,7 @@ def _inner_au_ef(data, k_max, m, upper_bound,
 
 
 def find_au_ef_motif_length(data, k_max, motif_length_range,
-                            elbow_deviation=1.05,
+                            elbow_deviation=1.00,
                             slack=0.5):
     """Computes the Area under the Elbow-Function within an of motif lengths.
 
@@ -872,7 +873,7 @@ def find_au_ef_motif_length(data, k_max, motif_length_range,
         The interval of k's to compute the area of a single AU_EF.
     motif_length_range : array-like
         The range of lengths to compute the AU-EF.
-    elbow_deviation : float, default=1.05
+    elbow_deviation : float, default=1.00
         The minimal absolute deviation needed to detect an elbow.
         It measures the absolute change in deviation from k to k+1.
         1.05 corresponds to 5% increase in deviation.
@@ -930,7 +931,7 @@ def search_k_motiflets_elbow(
         motif_length_range=None,
         exclusion=None,
         upper_bound=np.inf,
-        elbow_deviation=1.05,
+        elbow_deviation=1.00,
         slack=0.5
     ):
     """Computes the elbow-function.
@@ -957,7 +958,7 @@ def search_k_motiflets_elbow(
         exclusion zone - use when searching for the TOP-2 motiflets
     upper_bound : float
         Admissible pruning on distance computations.
-    elbow_deviation : float, default=1.05
+    elbow_deviation : float, default=1.00
         The minimal absolute deviation needed to detect an elbow.
         It measures the absolute change in deviation from k to k+1.
         1.05 corresponds to 5% increase in deviation.
