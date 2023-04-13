@@ -14,7 +14,7 @@ import numpy as np
 import numpy.fft as fft
 import pandas as pd
 from joblib import Parallel, delayed
-from numba import njit, prange, objmode
+from numba import njit, prange, objmode, typed
 from scipy.stats import zscore
 from tqdm.auto import tqdm
 
@@ -158,7 +158,7 @@ def pd_series_to_numpy(data):
     else:
         data_raw = data
         data_index = np.arange(len(data))
-    return data_index, data_raw
+    return data_index, data_raw.astype(np.float64, copy=False)
 
 
 def read_dataset(dataset, sampling_factor=10000):
@@ -224,8 +224,10 @@ def _sliding_dot_product(query, time_series):
     query = np.concatenate((query, np.zeros(n - m + time_series_add - q_add)))
 
     trim = m - 1 + time_series_add
+
     with objmode(dot_product="float64[:]"):
         dot_product = fft.irfft(fft.rfft(time_series) * fft.rfft(query))
+
     return dot_product[trim:]
 
 
@@ -413,7 +415,7 @@ def compute_distances_full_seq(ts, m, exclude_trivial_match=True, slack=0.5):
 @njit(fastmath=True, cache=True)
 def get_radius(D_full, motifset_pos):
     """Computes the radius of the passed motif set (motiflet).
-    
+
     Parameters
     ----------
     D_full : 2d array-like
@@ -461,9 +463,13 @@ def get_pairwise_extent(D_full, motifset_pos, upperbound=np.inf):
         The extent of the motif set, if smaller than `upperbound`, else np.inf
     """
 
+    if -1 in motifset_pos:
+        return np.inf
+
     motifset_extent = np.float64(0.0)
     for ii in range(len(motifset_pos) - 1):
         i = motifset_pos[ii]
+
         for jj in range(ii + 1, len(motifset_pos)):
             j = motifset_pos[jj]
 
@@ -502,7 +508,7 @@ def _get_top_k_non_trivial_matches_inner(
         if dist[candidates[i-1]] <= lowest_dist:
             p = i
             break
-    return candidates[:p]
+    return candidates[:min(k, p)]
 
 
 @njit(fastmath=True, cache=True)
@@ -600,10 +606,13 @@ def _get_top_k_non_trivial_matches_new(
 
     return np.array(idx, dtype=np.int32)
 
-# @njit
+@njit(fastmath=True, cache=True)
 def get_approximate_k_motiflet(
         ts, m, k, D,
-        upper_bound=np.inf, incremental=False, all_candidates=None, slack=0.5
+        upper_bound=np.inf,
+        incremental=False,
+        all_candidates=np.zeros((1, 1), dtype=np.int32),   # Empty type to fool numba
+        slack=0.5
 ):
     """Compute the approximate k-Motiflets.
 
@@ -642,7 +651,7 @@ def get_approximate_k_motiflet(
     motiflet_dist = upper_bound
     motiflet_candidate = None
 
-    motiflet_all_candidates = np.zeros(n, dtype=object)
+    motiflet_all_candidates = np.zeros((n, k), dtype=np.int32)
 
     # allow subsequence itself
     np.fill_diagonal(D, 0)
@@ -655,13 +664,13 @@ def get_approximate_k_motiflet(
             idx = _get_top_k_non_trivial_matches_inner(
                 dist, k, all_candidates[order], motiflet_dist)
         else:
-            # idx = _get_top_k_non_trivial_matches_new(dist, k, m, n, motiflet_dist, slack)
             idx = _get_top_k_non_trivial_matches(dist, k, m, n, motiflet_dist, slack)
 
-        motiflet_all_candidates[i] = idx
+        motiflet_all_candidates[i, :len(idx)] = idx
+        motiflet_all_candidates[i, len(idx):] = -1
 
         if len(idx) >= k and dist[idx[-1]] <= motiflet_dist:
-            # get_pairwise_extent requires the full matrix 
+            # get_pairwise_extent requires the full matrix
             motiflet_extent = get_pairwise_extent(D, idx[:k], motiflet_dist)
             if motiflet_extent <= motiflet_dist:
                 motiflet_dist = motiflet_extent
@@ -793,7 +802,9 @@ def find_elbow_points(dists, alpha=2, elbow_deviation=1.05):
     return np.sort(np.array(list(set(elbow_points))))
 
 
-def _inner_au_ef(data, k_max, m, upper_bound, slack=0.5):
+def _inner_au_ef(data, k_max, m, upper_bound,
+                 elbow_deviation=1.05,
+                 slack=0.5):
     """Computes the Area under the Elbow-Function within an interval [2...k_max].
 
     Parameters
@@ -806,6 +817,10 @@ def _inner_au_ef(data, k_max, m, upper_bound, slack=0.5):
         Motif length
     upper_bound : float
         Distance used for admissible pruning
+    elbow_deviation : float, default=1.05
+        The minimal absolute deviation needed to detect an elbow.
+        It measures the absolute change in deviation from k to k+1.
+        1.05 corresponds to 5% increase in deviation.
 
     Returns
     -------
@@ -825,6 +840,7 @@ def _inner_au_ef(data, k_max, m, upper_bound, slack=0.5):
         data,
         m,
         upper_bound=upper_bound,
+        elbow_deviation=elbow_deviation,
         slack=slack)
 
     dists = dists[(~np.isinf(dists)) & (~np.isnan(dists))]
@@ -843,7 +859,9 @@ def _inner_au_ef(data, k_max, m, upper_bound, slack=0.5):
     return au_efs, elbows, top_motiflet, dists
 
 
-def find_au_ef_motif_length(data, k_max, motif_length_range):
+def find_au_ef_motif_length(data, k_max, motif_length_range,
+                            elbow_deviation=1.05,
+                            slack=0.5):
     """Computes the Area under the Elbow-Function within an of motif lengths.
 
     Parameters
@@ -854,6 +872,10 @@ def find_au_ef_motif_length(data, k_max, motif_length_range):
         The interval of k's to compute the area of a single AU_EF.
     motif_length_range : array-like
         The range of lengths to compute the AU-EF.
+    elbow_deviation : float, default=1.05
+        The minimal absolute deviation needed to detect an elbow.
+        It measures the absolute change in deviation from k to k+1.
+        1.05 corresponds to 5% increase in deviation.
 
     Returns
     -------
@@ -884,7 +906,9 @@ def find_au_ef_motif_length(data, k_max, motif_length_range):
     for i, m in enumerate(motif_length_range[::-1]):
         au_efs[i], elbows[i], top_motiflets[i], dist = _inner_au_ef(
             data, k_max, int(m / subsample),
-            upper_bound=upper_bound)
+            upper_bound=upper_bound,
+            elbow_deviation=elbow_deviation,
+            slack=slack)
         if dist is not None:
             upper_bound = min(dist[-1], upper_bound)
 
@@ -959,7 +983,9 @@ def search_k_motiflets_elbow(
             print("Warning: no valid motiflet range set")
             assert False
         m, _, _, _ = find_au_ef_motif_length(
-            data, k_max, motif_length_range)
+            data, k_max, motif_length_range,
+            elbow_deviation=elbow_deviation,
+            slack=slack)
     elif isinstance(motif_length, int) or \
             isinstance(motif_length, np.int32) or \
             isinstance(motif_length, np.int64):
@@ -969,7 +995,7 @@ def search_k_motiflets_elbow(
         assert False
 
     # non-overlapping motifs only
-    k_max_ = min(int(len(data) / (m * slack)), k_max)
+    k_max_ = max(2, min(int(len(data) / (m * slack)) - 5, k_max))
 
     k_motiflet_distances = np.zeros(k_max_)
     k_motiflet_candidates = np.empty(k_max_, dtype=object)
@@ -977,7 +1003,7 @@ def search_k_motiflets_elbow(
     D_full = compute_distances_full(data_raw, m, slack)
 
     exclusion_m = int(m * slack)
-    motiflet_candidates = []
+    motiflet_candidates = np.zeros((D_full.shape[0], 1), dtype=np.int32)
 
     incremental = False
     for test_k in tqdm(range(k_max_ - 1, 1, -1), desc='Compute ks (' + str(k_max_) + ")",
@@ -997,10 +1023,11 @@ def search_k_motiflets_elbow(
             all_candidates=motiflet_candidates,
             slack=slack
         )
-        incremental = True
 
-        if len(motiflet_candidates) == 0:
+        if not incremental:
             motiflet_candidates = all_candidates
+
+        incremental = True
 
         if candidate is None and \
             len(k_motiflet_candidates) > test_k+1 and \
@@ -1019,7 +1046,8 @@ def search_k_motiflets_elbow(
         k_motiflet_distances[i - 1] = min(k_motiflet_distances[i],
                                           k_motiflet_distances[i - 1])
 
-    elbow_points = find_elbow_points(k_motiflet_distances, elbow_deviation=elbow_deviation)
+    elbow_points = find_elbow_points(k_motiflet_distances,
+                                     elbow_deviation=elbow_deviation)
     return k_motiflet_distances, k_motiflet_candidates, elbow_points, m
 
 
@@ -1040,7 +1068,7 @@ def candidate_dist(D_full, pool, upperbound, m, slack=0.5):
     return motiflet_candidate_dist
 
 
-@njit
+@njit(fastmath=True, cache=True)
 def find_k_motiflets(ts, D_full, m, k, upperbound=None, slack=0.5):
     """Exact algorithm to compute k-Motiflets
 

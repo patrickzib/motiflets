@@ -247,6 +247,7 @@ def plot_elbow(k_max,
                ground_truth=None,
                filter=True,
                method_name=None,
+               elbow_deviation=1.05,
                slack=0.5):
     """Plots the elbow-plot for k-Motiflets.
 
@@ -275,6 +276,10 @@ def plot_elbow(k_max,
         filters overlapping motiflets from the result,
     method_name:  String
         used for display only.
+    elbow_deviation : float, default=1.05
+        The minimal absolute deviation needed to detect an elbow.
+        It measures the absolute change in deviation from k to k+1.
+        1.05 corresponds to 5% increase in deviation.
 
     Returns
     -------
@@ -293,6 +298,7 @@ def plot_elbow(k_max,
         raw_data,
         motif_length,
         exclusion=exclusion,
+        elbow_deviation=elbow_deviation,
         slack=slack)
     endTime = (time.perf_counter() - startTime)
 
@@ -317,7 +323,9 @@ def plot_elbow(k_max,
     return dists, candidates, elbow_points
 
 
-def plot_motif_length_selection(k_max, data, motif_length_range, ds_name):
+def plot_motif_length_selection(
+        k_max, data, motif_length_range, ds_name,
+        elbow_deviation=1.05, slack=0.5):
     """Computes the AU_EF plot to extract the best motif lengths
 
     This is the method to find and plot the characteristic motif-lengths, for k in
@@ -335,6 +343,10 @@ def plot_motif_length_selection(k_max, data, motif_length_range, ds_name):
         the interval of lengths
     ds_name: String
         Name of the time series for displaying
+    elbow_deviation : float, default=1.05
+        The minimal absolute deviation needed to detect an elbow.
+        It measures the absolute change in deviation from k to k+1.
+        1.05 corresponds to 5% increase in deviation.
 
     Returns
     -------
@@ -352,7 +364,10 @@ def plot_motif_length_selection(k_max, data, motif_length_range, ds_name):
     startTime = time.perf_counter()
     best_motif_length, au_ef, elbow, top_motiflets = \
         ml.find_au_ef_motif_length(
-            data, k_max, motif_length_range=motif_length_range)
+            data, k_max,
+            motif_length_range=motif_length_range,
+            elbow_deviation=elbow_deviation,
+            slack=slack)
     endTime = (time.perf_counter() - startTime)
     print("\tTime", np.round(endTime, 1), "s")
 
@@ -372,7 +387,7 @@ def plot_motif_length_selection(k_max, data, motif_length_range, ds_name):
                  ax.get_xticklabels() + ax.get_yticklabels()):
         item.set_fontsize(16)
 
-    # plt.legend(loc="best")      
+    # plt.legend(loc="best")
     fig.set_figheight(5)
     fig.set_figwidth(5)
     plt.show()
