@@ -11,7 +11,7 @@ Supporting Material
 
 # k-Motiflets
 
-Intuitively speaking, k-Motiflets are the largest set of exactly k similar subsequences.
+Intuitively speaking, k-Motiflets are the set of the exactly k most similar subsequences.
 
 $k$-Motiflets are a novel definition for MD that turns the problem upside-down. $k$-Motiflets take the desired motif set size $k$ as parameter and maximize the similarity of the motif set. This $k$ is an integer with an easily understood interpretation, and in many use cases the expected size of the motif set is known prior to the analysis. Consider for example the possible copyright fraud in the pop song Ice “Ice Baby” by Vanilla Ice compared to “Under pressure” by Queen / David Bowie. Listening to these songs it is easy to obtain an initial guess of the number of repetitions (parameter $k$) of the problematic sections. On the other hand, it is impossible for humans to guess a good value for the numerical, real-valued distance between the different repetitions (parameter r). 
 
