@@ -320,14 +320,15 @@ def compute_distances_full(ts, m, exclude_trivial_match=True, n_jobs=4, slack=0.
             else:
                 # constant time O(1) operations
                 dot_rolled = np.roll(dot_prev, 1) \
-                                + ts[order + m - 1] * ts[m - 1:n + m] \
-                                - ts[order - 1] * np.roll(ts[:n], 1)
+                             + ts[order + m - 1] * ts[m - 1:n + m] \
+                             - ts[order - 1] * np.roll(ts[:n], 1)
                 dot_rolled[0] = dot_first[order]
 
             D[order, :] = distance(dot_rolled, n, m, means, stds, order, halve_m)
             dot_prev = dot_rolled
 
     return D
+
 
 @njit(fastmath=True, cache=True)
 def distance(dot_rolled, n, m, means, stds, order, halve_m):
@@ -505,7 +506,7 @@ def _get_top_k_non_trivial_matches_inner(
     # admissible pruning: are there enough offsets within range?
     p = 0
     for i in range(len(candidates), 0, -1):
-        if dist[candidates[i-1]] <= lowest_dist:
+        if dist[candidates[i - 1]] <= lowest_dist:
             p = i
             break
     return candidates[:min(k, p)]
@@ -541,13 +542,13 @@ def _get_top_k_non_trivial_matches(
     idx = []  # there may be less than k, thus use a list
     for i in range(k):
         pos = dist_idx[np.argmin(dists[dist_idx])]
-        if (not np.isnan(dists[pos]))  \
+        if (not np.isnan(dists[pos])) \
                 and (not np.isinf(dists[pos])) \
                 and (dists[pos] <= lowest_dist):
             idx.append(pos)
 
             # exclude all trivial matches
-            dists[max(0, pos - halve_m) : min(pos + halve_m, n)] = np.inf
+            dists[max(0, pos - halve_m): min(pos + halve_m, n)] = np.inf
         else:
             break
     return np.array(idx, dtype=np.int32)
@@ -601,17 +602,18 @@ def _get_top_k_non_trivial_matches_new(
 
         if current_pos >= 0:
             idx.append(current_pos)
-        else: # nothing left
+        else:  # nothing left
             break
 
     return np.array(idx, dtype=np.int32)
+
 
 @njit(fastmath=True, cache=True)
 def get_approximate_k_motiflet(
         ts, m, k, D,
         upper_bound=np.inf,
         incremental=False,
-        all_candidates=np.zeros((1, 1), dtype=np.int32),   # Empty type to fool numba
+        all_candidates=np.zeros((1, 1), dtype=np.int32),  # Empty type to fool numba
         slack=0.5
 ):
     """Compute the approximate k-Motiflets.
@@ -664,7 +666,6 @@ def get_approximate_k_motiflet(
             idx = _get_top_k_non_trivial_matches_inner(
                 dist, k, all_candidates[order], motiflet_dist)
         else:
-            # idx = _get_top_k_non_trivial_matches_new(dist, k, m, n, motiflet_dist, slack)
             idx = _get_top_k_non_trivial_matches(dist, k, m, n, motiflet_dist, slack)
 
         motiflet_all_candidates[i, :len(idx)] = idx
@@ -700,8 +701,8 @@ def _check_unique(motifset_1, motifset_2, motif_length):
     True, if there are at least m/2 subsequences with an overlap of 25%, else False.
     """
     count = 0
-    for a in motifset_1 :  # smaller motiflet
-        for b in motifset_2 :  # larger motiflet
+    for a in motifset_1:  # smaller motiflet
+        for b in motifset_2:  # larger motiflet
             if abs(a - b) < (motif_length / 4):
                 count = count + 1
                 break
@@ -803,7 +804,8 @@ def find_elbow_points(dists, alpha=2, elbow_deviation=1.00):
     return np.sort(np.array(list(set(elbow_points))))
 
 
-def _inner_au_ef(data, k_max, m, upper_bound,
+def _inner_au_ef(data, k_max, m,
+                 approximate_motiflet_pos=None,
                  elbow_deviation=1.00,
                  slack=0.5):
     """Computes the Area under the Elbow-Function within an interval [2...k_max].
@@ -816,8 +818,9 @@ def _inner_au_ef(data, k_max, m, upper_bound,
         Largest k. All k's within [2...k_max] are computed.
     m : int
         Motif length
-    upper_bound : float
-        Distance used for admissible pruning
+    approximate_motiflet_pos : array-like
+        An initial estimate of the positions of the k-Motiflets for each k in the
+        given range [2...k_max]. Will be used for bounding distance computations.
     elbow_deviation : float, default=1.00
         The minimal absolute deviation needed to detect an elbow.
         It measures the absolute change in deviation from k to k+1.
@@ -840,7 +843,7 @@ def _inner_au_ef(data, k_max, m, upper_bound,
         k_max,
         data,
         m,
-        upper_bound=upper_bound,
+        approximate_motiflet_pos=approximate_motiflet_pos,
         elbow_deviation=elbow_deviation,
         slack=slack)
 
@@ -857,12 +860,15 @@ def _inner_au_ef(data, k_max, m, upper_bound,
         elbows = 1
         top_motiflet = candidates[0]
 
-    return au_efs, elbows, top_motiflet, dists
+    return au_efs, elbows, top_motiflet, dists, candidates
 
 
-def find_au_ef_motif_length(data, k_max, motif_length_range,
-                            elbow_deviation=1.00,
-                            slack=0.5):
+def find_au_ef_motif_length(
+        data,
+        k_max,
+        motif_length_range,
+        elbow_deviation=1.00,
+        slack=0.5):
     """Computes the Area under the Elbow-Function within an of motif lengths.
 
     Parameters
@@ -900,18 +906,22 @@ def find_au_ef_motif_length(data, k_max, motif_length_range,
 
     # in reverse order
     au_efs = np.zeros(len(motif_length_range), dtype=object)
+    au_efs.fill(np.inf)
     elbows = np.zeros(len(motif_length_range), dtype=object)
     top_motiflets = np.zeros(len(motif_length_range), dtype=object)
 
-    upper_bound = np.inf
+    # stores the position of the l+1 motif set as an approximate pos for l
+    approximate_pos = None
+
+    # TODO parallelize?
     for i, m in enumerate(motif_length_range[::-1]):
-        au_efs[i], elbows[i], top_motiflets[i], dist = _inner_au_ef(
-            data, k_max, int(m / subsample),
-            upper_bound=upper_bound,
-            elbow_deviation=elbow_deviation,
-            slack=slack)
-        if dist is not None:
-            upper_bound = min(dist[-1], upper_bound)
+        if m < data.shape[0]:
+            au_efs[i], elbows[i], top_motiflets[i], _, approximate_pos \
+                = _inner_au_ef(
+                        data, k_max, int(m / subsample),
+                        approximate_motiflet_pos=approximate_pos,
+                        elbow_deviation=elbow_deviation,
+                        slack=slack)
 
     au_efs = np.array(au_efs, dtype=np.float64)[::-1]
     elbows = elbows[::-1]
@@ -930,10 +940,10 @@ def search_k_motiflets_elbow(
         motif_length='auto',
         motif_length_range=None,
         exclusion=None,
-        upper_bound=np.inf,
+        approximate_motiflet_pos=None,
         elbow_deviation=1.00,
         slack=0.5
-    ):
+):
     """Computes the elbow-function.
 
     This is the method to find the characteristic k-Motiflets within range
@@ -956,8 +966,9 @@ def search_k_motiflets_elbow(
         is first determined, prior to computing the elbow-plot.
     exclusion : 2d-array
         exclusion zone - use when searching for the TOP-2 motiflets
-    upper_bound : float
-        Admissible pruning on distance computations.
+    approximate_motiflet_pos : array-like
+        An initial estimate of the positions of the k-Motiflets for each k in the
+        given range [2...k_max]. Will be used for bounding distance computations.
     elbow_deviation : float, default=1.00
         The minimal absolute deviation needed to detect an elbow.
         It measures the absolute change in deviation from k to k+1.
@@ -996,7 +1007,7 @@ def search_k_motiflets_elbow(
         assert False
 
     # non-overlapping motifs only
-    k_max_ = max(2, min(int(len(data) / (m * slack)) - 5, k_max))
+    k_max_ = max(3, min(int(len(data) / (m * slack)), k_max))
 
     k_motiflet_distances = np.zeros(k_max_)
     k_motiflet_candidates = np.empty(k_max_, dtype=object)
@@ -1006,8 +1017,10 @@ def search_k_motiflets_elbow(
     exclusion_m = int(m * slack)
     motiflet_candidates = np.zeros((D_full.shape[0], 1), dtype=np.int32)
 
+    upper_bound = np.inf
     incremental = False
-    for test_k in tqdm(range(k_max_ - 1, 1, -1), desc='Compute ks (' + str(k_max_) + ")",
+    for test_k in tqdm(range(k_max_ - 1, 1, -1),
+                       desc='Compute ks (' + str(k_max_) + ")",
                        position=0, leave=False):
         # Top-N retrieval
         if exclusion is not None and exclusion[test_k] is not None:
@@ -1016,6 +1029,13 @@ def search_k_motiflets_elbow(
                     trivialMatchRange = (max(0, pos - exclusion_m),
                                          min(pos + exclusion_m, len(D_full)))
                     D_full[:, trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
+
+        # use an approximate position as an initial estimate, if available
+        if approximate_motiflet_pos is not None \
+                and len(approximate_motiflet_pos) > test_k \
+                and approximate_motiflet_pos[test_k] is not None:
+            dd = get_pairwise_extent(D_full, approximate_motiflet_pos[test_k])
+            upper_bound = min(dd, upper_bound)
 
         candidate, candidate_dist, all_candidates = get_approximate_k_motiflet(
             data_raw, m, test_k, D_full,
@@ -1031,15 +1051,15 @@ def search_k_motiflets_elbow(
         incremental = True
 
         if candidate is None and \
-            len(k_motiflet_candidates) > test_k+1 and \
-            k_motiflet_candidates[test_k+1] is not None:
+                len(k_motiflet_candidates) > test_k + 1 and \
+                k_motiflet_candidates[test_k + 1] is not None:
             # This should not happen, but does?
-            candidate = k_motiflet_candidates[test_k+1][:test_k]
+            candidate = k_motiflet_candidates[test_k + 1][:test_k]
             candidate_dist = get_pairwise_extent(D_full, candidate)
 
         k_motiflet_distances[test_k] = candidate_dist
         k_motiflet_candidates[test_k] = candidate
-        upper_bound = candidate_dist
+        upper_bound = min(candidate_dist, upper_bound)
 
     # smoothen the line to make it monotonically increasing
     k_motiflet_distances[0:2] = k_motiflet_distances[2]
@@ -1115,7 +1135,8 @@ def find_k_motiflets(ts, D_full, m, k, upperbound=None, slack=0.5):
                 # exhaustive search over all subsets
                 for permutation in itertools.combinations(D_candidates, k):
                     if np.ptp(permutation) > k_halve_m:
-                        dist = candidate_dist(D_full, permutation, motiflet_dist, m, slack)
+                        dist = candidate_dist(D_full, permutation, motiflet_dist, m,
+                                              slack)
                         if dist < motiflet_dist:
                             motiflet_dist = dist
                             motiflet_pos = np.copy(permutation)

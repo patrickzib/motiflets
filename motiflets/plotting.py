@@ -298,7 +298,7 @@ def plot_elbow(k_max,
         raw_data,
         motif_length,
         exclusion=exclusion,
-        elbow_deviation = elbow_deviation,
+        elbow_deviation=elbow_deviation,
         slack=slack)
     endTime = (time.perf_counter() - startTime)
 
