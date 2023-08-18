@@ -925,7 +925,7 @@ def find_au_ef_motif_length(
 
     au_efs = np.array(au_efs, dtype=np.float64)[::-1]
     elbows = elbows[::-1]
-    top_motiflets = top_motiflets[::-1]
+    top_motiflets = top_motiflets[::-1] * subsample 
 
     # if no elbow can be found, ignore this part
     condition = np.argwhere(elbows == 0).flatten()
