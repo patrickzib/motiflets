@@ -362,7 +362,7 @@ def plot_motif_length_selection(
     motif_length_range = np.int32(motif_length_range)
 
     startTime = time.perf_counter()
-    best_motif_length, au_ef, elbow, top_motiflets = \
+    best_motif_length, _, au_ef, elbow, top_motiflets, _ = \
         ml.find_au_ef_motif_length(
             data, k_max,
             motif_length_range=motif_length_range,
@@ -370,7 +370,6 @@ def plot_motif_length_selection(
             slack=slack)
     endTime = (time.perf_counter() - startTime)
     print("\tTime", np.round(endTime, 1), "s")
-
     indices = ~np.isinf(au_ef)
     fig, ax = plt.subplots(figsize=(5, 2))
     ax = sns.lineplot(
