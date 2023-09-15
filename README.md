@@ -79,7 +79,6 @@ ml = Motiflets(
 k_max = 20
 length_range = np.arange(25,200,25) 
 motif_length = ml.fit_motif_length(ks, length_range)
-
 ```
 <img src="https://github.com/patrickzib/motiflets/raw/main/images/plot_au_ef.png" width="300">
 
@@ -91,7 +90,6 @@ to roughly a heartbeat rate of 60-80 bpm.
 To extract meaningful **motif sizes (k)** from this use case, we run 
 
 ```
-
 dists, candidates, elbow_points = ml.fit_k_elbow(
     ks,
     motif_length    
