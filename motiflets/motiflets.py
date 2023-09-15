@@ -531,7 +531,7 @@ def get_approximate_k_motiflet(
         dist = D[order]
         idx = knns[order]
 
-        motiflet_all_candidates[i, :min(k,len(idx))] = idx[:k]
+        motiflet_all_candidates[i, :min(k, len(idx))] = idx[:k]
         motiflet_all_candidates[i, len(idx):] = -1
 
         if len(idx) >= k and idx[k - 1] >= 0:
@@ -1055,34 +1055,9 @@ def compute_distances_full(ts,
             The k-nns for each subsequence
 
     """
-    n = np.int32(ts.shape[0] - m + 1)
-    halve_m = 0
-    if exclude_trivial_match:
-        halve_m = int(m * slack)
 
-    D = np.zeros((n, n), dtype=np.float32)
-
-    means, stds = _sliding_mean_std(ts, m)
-
-    dot_first = _sliding_dot_product(ts[:m], ts)
-    bin_size = ts.shape[0] // n_jobs
-    for idx in prange(n_jobs):
-        start = idx * bin_size
-        end = min((idx + 1) * bin_size, ts.shape[0] - m + 1)
-
-        dot_prev = None
-        for order in np.arange(start, end):
-            if order == start:
-                # O(n log n) operation
-                dot_rolled = _sliding_dot_product(ts[start:start + m], ts)
-            else:
-                # constant time O(1) operations
-                dot_rolled = np.roll(dot_prev, 1) \
-                             + ts[order + m - 1] * ts[m - 1:n + m] \
-                             - ts[order - 1] * np.roll(ts[:n], 1)
-                dot_rolled[0] = dot_first[order]
-
-            D[order, :] = distance(dot_rolled, n, m, means, stds, order, halve_m)
-            dot_prev = dot_rolled
-
+    D, _ = compute_distances_with_knns(ts, m, k=1,
+                                       exclude_trivial_match=exclude_trivial_match,
+                                       n_jobs=n_jobs,
+                                       slack=slack)
     return D
