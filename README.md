@@ -69,14 +69,17 @@ and to find the largest set of the same motif, i.e. all repetitions.
 We first extract meaningful **motif lengths (l)** from this use case:
 
 ```
+# The motiflet-class
+ml = Motiflets(
+    ds_name,     # the name of the series
+    series,      # the data
+    df_gt        # ground truth, if available
+)
+
 k_max = 20
 length_range = np.arange(25,200,25) 
-motif_length = plot_motif_length_selection(
-    k_max, 
-    series, 
-    length_range, 
-    ds_name             # The name of the series
-    )
+motif_length = ml.fit_motif_length(ks, length_range)
+
 ```
 <img src="https://github.com/patrickzib/motiflets/raw/main/images/plot_au_ef.png" width="300">
 
@@ -88,15 +91,11 @@ to roughly a heartbeat rate of 60-80 bpm.
 To extract meaningful **motif sizes (k)** from this use case, we run 
 
 ```
-dists, motiflets, elbow_points = plot_elbow(
-    k_max, 
-    series, 
-    ds_name,            # The name of the series
-    motif_length, 
-    plot_elbows=True,   # Shows an elbow-plot, too
-    method_name="K-Motiflets", # String to display the name
-    ground_truth=df_gt  # Ground-Truth, if known or None
-    )
+
+dists, candidates, elbow_points = ml.fit_k_elbow(
+    ks,
+    motif_length    
+)
 ```
 
 The variable `elbow_points` holds characteristic motif sizes found.  
