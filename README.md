@@ -78,7 +78,7 @@ ml = Motiflets(
 
 k_max = 20
 length_range = np.arange(25,200,25) 
-motif_length = ml.fit_motif_length(ks, length_range)
+motif_length = ml.fit_motif_length(k_max, length_range)
 ```
 <img src="https://github.com/patrickzib/motiflets/raw/main/images/plot_au_ef.png" width="300">
 
@@ -91,7 +91,7 @@ To extract meaningful **motif sizes (k)** from this use case, we run
 
 ```
 dists, candidates, elbow_points = ml.fit_k_elbow(
-    ks,
+    k_max,
     motif_length    
 )
 ```
