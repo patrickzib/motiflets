@@ -4,7 +4,7 @@ from audio.lyrics import *
 
 mpl.rcParams['figure.dpi'] = 300
 
-path = "../../motiflets_use_cases/birds/"
+path = "../datasets/birds/"
 
 datasets = {
     "Common-Starling": {

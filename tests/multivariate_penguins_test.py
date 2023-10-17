@@ -13,7 +13,7 @@ import matplotlib as mpl
 
 mpl.rcParams['figure.dpi'] = 300
 
-path = "../../motiflets_use_cases/chains/"
+path = "../datasets/experiments/"
 
 
 def read_penguin_data():
