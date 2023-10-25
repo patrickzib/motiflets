@@ -5,7 +5,7 @@ path = "../datasets/experiments/"
 
 import matplotlib as mpl
 
-mpl.rcParams['figure.dpi'] = 150
+mpl.rcParams['figure.dpi'] = 300
 
 
 def read_penguin_data():
@@ -50,10 +50,10 @@ def test_motiflets_sparse():
 
 def test_sparse_matrix():
     ds_name, T = read_penguin_data()
-    n = 60_000
+    n = 50_001
     series = T.iloc[497699:497699 + n, 0].T.to_numpy()
 
-    m = 1000
+    m = 22
     k = 10
     D_sparse, knns = ml.compute_distances_with_knns_sparse(series, m=m, k=k)
 

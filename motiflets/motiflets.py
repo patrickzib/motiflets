@@ -414,6 +414,9 @@ def compute_distances_with_knns_sparse(ts,
     dot_first = _sliding_dot_product(ts[:m], ts)
     bin_size = ts.shape[0] // n_jobs
 
+    # best_knn_dists = np.zeros(k, dtype=np.float32)
+    # best_knn_dists[:] = np.inf
+
     # first pass, computing the k-nns
     for idx in prange(n_jobs):
         start = idx * bin_size
@@ -438,10 +441,17 @@ def compute_distances_with_knns_sparse(ts,
             D_knn[order] = dist[knn]
             knns[order] = knn
 
+            # take overall minimal k-nn distances
+            # best_knn_dists = np.minimum(best_knn_dists, D_knn[order])
+
+    # maximal extent: 2*r
+    # lower_bounds = (2 * np.sort(best_knn_dists)) ** 2
+
     # FIXME: Parallelizm does not work, as Dict is not thread safe :(
     for order in np.arange(0, n):
         # memorize which pairs are needed
-        for ks in knns[order]:
+        for ks, dist in zip(knns[order], D_knn[order]):
+            # if np.any(dist <= lower_bounds):
             D_bool[order][ks] = True
             for ks2 in knns[order]:
                 D_bool[ks][ks2] = True
@@ -587,21 +597,19 @@ def _argknn(
     halve_m = int(m * slack)
 
     dists = np.copy(dist)
-    idx = np.zeros(k, dtype=np.int32)  # there may be less than k, thus use a list
-    idx[:] = -1
+    idx = []  # there may be less than k, thus use a list
     for i in range(k):
         pos = np.int32(np.argmin(dists))
         if (not np.isnan(dists[pos])) \
                 and (not np.isinf(dists[pos])) \
                 and (dists[pos] <= lowest_dist):
-            # idx.append(pos)
-            idx[i] = pos
+            idx.append(pos)
 
             # exclude all trivial matches
             dists[max(0, pos - halve_m): min(pos + halve_m, n)] = np.inf
         else:
             break
-    return idx  # np.array(idx, dtype=np.int32)
+    return np.array(idx, dtype=np.int32)
 
 
 @njit(fastmath=True, cache=True)
