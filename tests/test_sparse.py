@@ -1,8 +1,11 @@
 import scipy.io as sio
-from motiflets.motiflets import *
 from motiflets.plotting import *
 
 path = "../datasets/experiments/"
+
+import matplotlib as mpl
+
+mpl.rcParams['figure.dpi'] = 150
 
 
 def read_penguin_data():
@@ -12,7 +15,6 @@ def read_penguin_data():
                                  "7", "Pressure", "9"]),
                          delimiter="\t", header=None)
     ds_name = "Penguins (Longer Snippet)"
-
     return ds_name, series
 
 
