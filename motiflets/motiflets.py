@@ -414,9 +414,6 @@ def compute_distances_with_knns_sparse(ts,
     dot_first = _sliding_dot_product(ts[:m], ts)
     bin_size = ts.shape[0] // n_jobs
 
-    # best_knn_dists = np.zeros(k, dtype=np.float32)
-    # best_knn_dists[:] = np.inf
-
     # first pass, computing the k-nns
     for idx in prange(n_jobs):
         start = idx * bin_size
@@ -441,17 +438,10 @@ def compute_distances_with_knns_sparse(ts,
             D_knn[order] = dist[knn]
             knns[order] = knn
 
-            # take overall minimal k-nn distances
-            # best_knn_dists = np.minimum(best_knn_dists, D_knn[order])
-
-    # maximal extent: 2*r
-    # lower_bounds = (2 * np.sort(best_knn_dists)) ** 2
-
     # FIXME: Parallelizm does not work, as Dict is not thread safe :(
     for order in np.arange(0, n):
         # memorize which pairs are needed
         for ks, dist in zip(knns[order], D_knn[order]):
-            # if np.any(dist <= lower_bounds):
             D_bool[order][ks] = True
             for ks2 in knns[order]:
                 D_bool[ks][ks2] = True
@@ -1003,8 +993,8 @@ def search_k_motiflets_elbow(
 
     # switch to sparse matrix representation when length is above 30_000
     # sparse matrix is 2x slower but needs less memory
-    sparse = True
-    if n <= 30000:
+    sparse = n >= 30000
+    if not sparse:
         D_full, knns = compute_distances_with_knns(data_raw, m, k_max_, slack=slack)
     else:
         D_full, knns = compute_distances_with_knns_sparse(data_raw, m, k_max_, slack=slack)
