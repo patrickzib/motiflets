@@ -406,6 +406,9 @@ def compute_distances_with_knns_sparse(ts,
     D_bool = [Dict.empty(key_type=types.int32, value_type=types.bool_) for _ in
               range(n)]
 
+    # lowest_distance = np.zeros(k, dtype=np.float32)
+    # lowest_distance[:] = np.inf
+
     D_sparse = List()
     for i in range(n):
         D_sparse.append(Dict.empty(key_type=types.int32, value_type=types.float32))
@@ -438,10 +441,17 @@ def compute_distances_with_knns_sparse(ts,
             D_knn[order] = dist[knn]
             knns[order] = knn
 
+    # compute a lower bound for the distance
+    #for order, dist in enumerate(D_knn):
+    #    dist[order] = np.inf
+    #    lowest_distance = np.minimum(lowest_distance, dist)
+    #lowest_distance = np.sqrt(2*(lowest_distance**2))
+
     # FIXME: Parallelizm does not work, as Dict is not thread safe :(
     for order in np.arange(0, n):
         # memorize which pairs are needed
-        for ks, dist in zip(knns[order], D_knn[order]):
+        #if np.any(D_knn[order, 1:] <= lowest_distance[1:]):
+        for ks in knns[order]:
             D_bool[order][ks] = True
             for ks2 in knns[order]:
                 D_bool[ks][ks2] = True

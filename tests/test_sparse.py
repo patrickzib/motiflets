@@ -39,7 +39,7 @@ def test_motiflets():
 
 def test_motiflets_sparse():
     ds_name, T = read_penguin_data()
-    n = 100_000
+    n = 100_001
     series = T.iloc[497699:497699 + n, 0].T.to_numpy()
 
     ml = Motiflets(ds_name, series)
@@ -50,11 +50,11 @@ def test_motiflets_sparse():
 
 def test_sparse_matrix():
     ds_name, T = read_penguin_data()
-    n = 50_001
+    n = 100_001
     series = T.iloc[497699:497699 + n, 0].T.to_numpy()
 
-    m = 22
-    k = 10
+    m = 100
+    k = 20
     D_sparse, knns = ml.compute_distances_with_knns_sparse(series, m=m, k=k)
 
     elements = 0
