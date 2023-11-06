@@ -442,16 +442,16 @@ def compute_distances_with_knns_sparse(ts,
             knns[order] = knn
 
     # compute a lower bound for the distance
-    # for dist_knn in D_knn:
-    #     # np.minimum does not work with numba
-    #     for i in range(len(dist_knn)):
-    #         lowest_distance[i] = min(lowest_distance[i], dist_knn[i])
-    # lowest_distance = np.sqrt(2) * lowest_distance
+    for dist_knn in D_knn:
+        # np.minimum does not work with numba
+        for i in range(len(dist_knn)):
+            lowest_distance[i] = min(lowest_distance[i], dist_knn[i])
+    lowest_distance = 4 * lowest_distance
 
     # FIXME: Parallelizm does not work, as Dict is not thread safe :(
     for order in range(0, n):
         # memorize which pairs are needed
-        # if np.any(D_knn[order, 1:] <= lowest_distance[1:]):
+        # FIXME !!! if np.any(D_knn[order, 1:] <= lowest_distance[1:]):
         for ks in knns[order]:
             D_bool[order][ks] = True
             for ks2 in knns[order]:
