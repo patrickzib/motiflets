@@ -32,9 +32,9 @@ def test_motiflets():
 
     ml = Motiflets(ds_name, series)
 
-    ks = 20
-    motif_length = 22
-    _ = ml.fit_k_elbow(ks, motif_length)
+    k = 20
+    m = 22
+    _ = ml.fit_k_elbow(k, m)
 
 
 def test_motiflets_sparse():
@@ -43,9 +43,9 @@ def test_motiflets_sparse():
     series = T.iloc[497699:497699 + n, 0].T.to_numpy()
 
     ml = Motiflets(ds_name, series)
-    ks = 20
-    motif_length = 100
-    _ = ml.fit_k_elbow(ks, motif_length)
+    m = 100
+    k = 20
+    _ = ml.fit_k_elbow(k, m)
 
 
 def test_sparse_matrix():
@@ -62,7 +62,13 @@ def test_sparse_matrix():
         elements += len(A)
 
     n = (series.shape[0] - m + 1)
-    print(elements, n ** 2, str(elements * 100 / n ** 2) + "%")
+    print("Total:", elements, n ** 2, str(elements * 100 / n ** 2) + "%")
+
+    non_empty = 0
+    for A in D_sparse:
+        non_empty += len(A) > k
+
+    print("Non-Empty:", non_empty, str(non_empty/len(D_sparse)*100) + "%")
 
 
 def test_full_matrix():
