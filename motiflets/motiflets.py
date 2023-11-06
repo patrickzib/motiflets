@@ -442,19 +442,20 @@ def compute_distances_with_knns_sparse(ts,
             knns[order] = knn
 
     # compute a lower bound for the distance
-    for order, dist_knn in enumerate(D_knn):
-       lowest_distance = np.minimum(lowest_distance, dist_knn)
+    for dist_knn in D_knn:
+        # np.minimum does not work with numba
+        for i in range(len(dist_knn)):
+            lowest_distance[i] = min(lowest_distance[i], dist_knn[i])
     lowest_distance = np.sqrt(2) * lowest_distance
 
     # FIXME: Parallelizm does not work, as Dict is not thread safe :(
     for order in range(0, n):
         # memorize which pairs are needed
-        # FIXME????
-        # if np.any(D_knn[order] <= lowest_distance):
-        for ks in knns[order]:
-            D_bool[order][ks] = True
-            for ks2 in knns[order]:
-                D_bool[ks][ks2] = True
+        if np.any(D_knn[order, 1:] <= lowest_distance[1:]):
+            for ks in knns[order]:
+                D_bool[order][ks] = True
+                for ks2 in knns[order]:
+                    D_bool[ks][ks2] = True
 
     # second pass, filling only the pairs needed
     for idx in prange(n_jobs):
@@ -1007,7 +1008,8 @@ def search_k_motiflets_elbow(
     if not sparse:
         D_full, knns = compute_distances_with_knns(data_raw, m, k_max_, slack=slack)
     else:
-        D_full, knns = compute_distances_with_knns_sparse(data_raw, m, k_max_, slack=slack)
+        D_full, knns = compute_distances_with_knns_sparse(data_raw, m, k_max_,
+                                                          slack=slack)
 
     exclusion_m = int(m * slack)
 
