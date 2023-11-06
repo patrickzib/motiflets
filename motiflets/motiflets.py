@@ -451,11 +451,14 @@ def compute_distances_with_knns_sparse(ts,
     # FIXME: Parallelizm does not work, as Dict is not thread safe :(
     for order in range(0, n):
         # memorize which pairs are needed
-        # FIXME !!! if np.any(D_knn[order, 1:] <= lowest_distance[1:]):
-        for ks in knns[order]:
+        for ks in knns[order]:  # needed to compute the k-nn distances
             D_bool[order][ks] = True
-            for ks2 in knns[order]:
-                D_bool[ks][ks2] = True
+
+        # all pairs only needed when lower bound is given
+        if np.any(D_knn[order, 1:] <= lowest_distance[1:]):
+            for ks in knns[order]:
+                for ks2 in knns[order]:
+                    D_bool[ks][ks2] = True
 
     # second pass, filling only the pairs needed
     for idx in prange(n_jobs):
@@ -1038,8 +1041,6 @@ def search_k_motiflets_elbow(
         #     dd = get_pairwise_extent(D_full, approximate_motiflet_pos[test_k])
         #     upper_bound = min(dd, upper_bound)
         #     bound_set = True
-
-        print(test_k)
 
         candidate, candidate_dist, _ = get_approximate_k_motiflet(
             data_raw, m, test_k, D_full, knns,
