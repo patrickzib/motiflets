@@ -527,17 +527,15 @@ def get_approximate_k_motiflet(
     best_order = np.argsort(knn_distances)
 
     # TODO: parallelize??
-    for i, order in enumerate(best_order):
-        dist = D[order]
-        idx = knns[order]
-
-        if len(idx) >= k and idx[k - 1] >= 0:
-            if dist[idx[k - 1]] <= motiflet_dist:
+    for order in best_order:
+        knn_idx = knns[order]
+        if len(knn_idx) >= k and knn_idx[k - 1] >= 0:
+            if D[order, knn_idx[k - 1]] <= motiflet_dist:
                 # get_pairwise_extent() requires the full distance matrix
-                motiflet_extent = get_pairwise_extent(D, idx[:k], motiflet_dist)
+                motiflet_extent = get_pairwise_extent(D, knn_idx[:k], motiflet_dist)
                 if motiflet_extent <= motiflet_dist:
                     motiflet_dist = motiflet_extent
-                    motiflet_candidate = idx[:k]
+                    motiflet_candidate = knn_idx[:k]
             else:
                 break
 
@@ -863,7 +861,7 @@ def search_k_motiflets_elbow(
     # this has the drawback, that each pair of subsequences may
     # have different smallest dimensions
     D_index = np.argsort(D_full, axis=0)[:use_dim]
-    D_full, knns = mStamp(D_full, D_index, k_max_, knns, m, n, slack, use_dim)
+    D_full, knns = mStamp(D_full, D_index, k_max_, m, n, slack)
 
     upper_bound = np.inf
     for test_k in tqdm(range(k_max_, 1, -1),
@@ -905,8 +903,8 @@ def search_k_motiflets_elbow(
             elbow_points, m)
 
 
-@njit(fastmath=True, cache=True, parallel=True)
-def mStamp(D_full, D_index, k_max_, knns, m, n, slack, use_dim):
+@njit(fastmath=True, cache=True)
+def mStamp(D_full, D_index, k_max_, m, n, slack):
     # select distances
     D_ = np.take_along_axis(D_full, D_index, axis=0)
 
@@ -915,7 +913,7 @@ def mStamp(D_full, D_index, k_max_, knns, m, n, slack, use_dim):
 
     # compute knns from new distance matrix
     knns = np.zeros((n, k_max_), dtype=np.int32)
-    for order in prange(0, D_full.shape[0]):
+    for order in range(0, D_full.shape[0]):
         knn = _argknn(D_full[order], k_max_, m, n, slack=slack)
         knns[order, :len(knn)] = knn
         knns[order, len(knn):] = -1
