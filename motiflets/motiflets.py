@@ -860,8 +860,8 @@ def search_k_motiflets_elbow(
     # FIXME:
     # this has the drawback, that each pair of subsequences may
     # have different smallest dimensions
-    D_index = np.argsort(D_full, axis=0)[:use_dim]
-    D_full, knns = mStamp(D_full, D_index, k_max_, m, n, slack)
+    D_full = np.sort(D_full, axis=0)[:use_dim].sum(axis=0, dtype=np.float32)
+    knns = mStamp(D_full, k_max_, m, n, slack)
 
     upper_bound = np.inf
     for test_k in tqdm(range(k_max_, 1, -1),
@@ -904,13 +904,7 @@ def search_k_motiflets_elbow(
 
 
 @njit(fastmath=True, cache=True)
-def mStamp(D_full, D_index, k_max_, m, n, slack):
-    # select distances
-    D_ = np.take_along_axis(D_full, D_index, axis=0)
-
-    # sum over dimensions
-    D_full = D_.sum(axis=0, dtype=np.float32)
-
+def mStamp(D_full, k_max_, m, n, slack):
     # compute knns from new distance matrix
     knns = np.zeros((n, k_max_), dtype=np.int32)
     for order in range(0, D_full.shape[0]):
@@ -918,7 +912,7 @@ def mStamp(D_full, D_index, k_max_, m, n, slack):
         knns[order, :len(knn)] = knn
         knns[order, len(knn):] = -1
 
-    return D_full, knns
+    return knns
 
 
 @njit(fastmath=True, cache=True)
