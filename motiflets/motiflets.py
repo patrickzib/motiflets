@@ -653,8 +653,8 @@ def get_approximate_k_motiflet(
 
     # allow subsequence itself
     # Fill diagonal with 0
-    for i in range(len(D)):
-        D[i][i] = 0
+    # for i in range(len(D)):
+    #    D[i][i] = 0
 
     # order by increasing k-nn distance
     knn_distances = np.zeros(n, dtype=np.float32)
