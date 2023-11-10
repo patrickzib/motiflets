@@ -877,7 +877,7 @@ def search_k_motiflets_elbow(
         k_motiflet_candidates[test_k] = candidate
 
         # FIXME: what were the actual best dimensions used?
-        k_motiflet_dims[test_k] = D_index[:, candidate[0], candidate[-1]]
+        k_motiflet_dims[test_k] = np.arange(use_dim)
 
         upper_bound = min(candidate_dist, upper_bound)
 
