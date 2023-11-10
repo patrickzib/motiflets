@@ -17,27 +17,6 @@ datasets = [(A_dataset, A_ds_name), (B_dataset, B_ds_name)]
 k_max = 25
 length_in_seconds = 3.4  # in seconds
 
-
-def test_dendrogram():
-    for dataset, ds_name in datasets:
-        audio_file_url = path + dataset + ".mp3"
-        audio_length_seconds, df, index_range = read_mp3(audio_file_url)
-        df = df.iloc[:10]
-
-        motif_length = 200
-
-        length_in_seconds = index_range[motif_length]
-        print("Best length", motif_length, length_in_seconds, "s")
-
-        ml = Motiflets(ds_name, df,
-                       elbow_deviation=1.25,
-                       slack=1.0,
-                       dimension_labels=df.index
-                       )
-
-        ml.fit_dendrogram(k_max, motif_length, n_clusters=4)
-
-
 def test_audio():
     for dataset, ds_name in datasets:
         audio_file_url = path + dataset + ".mp3"
@@ -50,8 +29,9 @@ def test_audio():
 
         ml = Motiflets(ds_name, df,
                        # elbow_deviation=1.25,
-                       slack=0.9,
-                       dimension_labels=df.index
+                       # slack=0.9,
+                       dimension_labels=df.index,
+                       n_dims=2
                        )
 
         _, all_minima = ml.fit_motif_length(

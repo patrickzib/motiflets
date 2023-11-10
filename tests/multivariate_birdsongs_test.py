@@ -1,23 +1,23 @@
 import matplotlib as mpl
+mpl.rcParams['figure.dpi'] = 150
 
 from audio.lyrics import *
 
-mpl.rcParams['figure.dpi'] = 300
 
-path = "../datasets/birds/"
+path = "../../motiflets_use_cases/birds/"
 
 datasets = {
     "Common-Starling": {
         "ks": 5,
         "channels": 10,
-        "length_range": np.arange(25, 100, 1),
+        "length_range": np.arange(25, 100, 5),
         "ds_name": "Common-Starling",
         "audio_file_url": path + "xc27154---common-starling---sturnus-vulgaris.mp3",
     },
     "House-Sparrow": {
         "ks": 20,
         "channels": 10,
-        "length_range": np.arange(25, 50, 1),
+        "length_range": np.arange(25, 50, 5),
         "ds_name": "House-Sparrow",
         "audio_file_url": path + "house-sparrow-passer-domesticus-audio.mp3"
     }
@@ -32,25 +32,17 @@ audio_file_url = dataset["audio_file_url"]
 
 
 def test_audio():
-    # channels = ['MFCC 1', 'MFCC 2']
-    # channels = ['MFCC 3', 'MFCC 4', 'MFCC 5', 'MFCC 6', 'MFCC 7', 'MFCC 8', 'MFCC 9']
-
-    # channels = ['MFCC 3', 'MFCC 5']
-    # channels = ['MFCC 1', 'MFCC 4', 'MFCC 0', 'MFCC 9', 'MFCC 6']
-
-    channels = ['MFCC 0', 'MFCC 1']
-
     seconds, df, index_range = read_mp3(audio_file_url)
-    df = df.loc[channels]
 
     ml = Motiflets(ds_name, df,
                    slack=1.0,
-                   dimension_labels=df.index
+                   dimension_labels=df.index,
+                   n_dims=2,
                    )
 
     motif_length, all_minima = ml.fit_motif_length(
         k_max, length_range,
-        plot_motifs_as_grid=False
+        plot_motifsets=False
     )
     length_in_seconds = index_range[motif_length]
     print("Best length", motif_length, length_in_seconds, "s")
@@ -84,27 +76,3 @@ def test_audio():
     extract_audio_segment(
         df, ds_name, audio_file_url, "bird_songs",
         length_in_seconds, index_range, motif_length, motiflet)
-
-
-def test_dendrogram():
-    seconds, df, index_range = read_mp3(audio_file_url)
-    df = df.iloc[0:channels]
-
-    # motif_length, _, _, _, all_minima = plot_motif_length_selection(
-    #     k_max,
-    #     df,
-    #     length_range,
-    #     ds_name,
-    #     slack=1.0
-    # )
-
-    motif_length = 27
-    length_in_seconds = index_range[motif_length]
-    print("Best length", motif_length, length_in_seconds, "s")
-
-    ml = Motiflets(ds_name, df,
-                   slack=1.0,
-                   dimension_labels=df.index
-                   )
-
-    ml.fit_dendrogram(k_max, motif_length, n_clusters=2)

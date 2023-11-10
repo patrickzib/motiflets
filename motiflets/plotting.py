@@ -34,6 +34,7 @@ class Motiflets:
             ground_truth=None,
             dimension_labels=None,
             elbow_deviation=1.00,
+            n_dims=None,
             slack=0.5,
     ):
         self.ds_name = ds_name
@@ -50,12 +51,14 @@ class Motiflets:
         self.all_top_motiflets = []
         self.all_dists = []
 
-
+        self.n_dims = n_dims
         self.motif_length = 0
         self.k_max = 0
         self.dists = []
         self.motiflets = []
         self.elbow_points = []
+        self.motiflets_dims = []
+        self.all_dimensions = []
 
     def fit_motif_length(
             self,
@@ -66,7 +69,7 @@ class Motiflets:
             subsample=1,
             plot=True,
             plot_elbows=False,
-            plot_motifs_as_grid=True,
+            plot_motifsets=True,
             plot_best_only=True
     ):
 
@@ -79,10 +82,12 @@ class Motiflets:
         (self.motif_length,
          self.dists,
          self.motiflets,
+         self.motiflets_dims,
          self.elbow_points,
          self.all_elbows,
          self.all_top_motiflets,
          self.all_dists,
+         self.all_dimensions,
          self.all_extrema) = plot_motif_length_selection(
             k_max,
             self.series,
@@ -90,11 +95,12 @@ class Motiflets:
             self.ds_name,
             exclusion=exclusion,
             exclusion_length=exclusion_length,
+            n_dims=self.n_dims,
             elbow_deviation=self.elbow_deviation,
             slack=self.slack,
             subsample=subsample,
             plot_elbows=plot_elbows,
-            plot_grid=plot_motifs_as_grid,
+            plot_motifs=plot_motifsets,
             plot=plot,
             plot_best_only=plot_best_only)
 
@@ -115,9 +121,10 @@ class Motiflets:
         else:
             self.motif_length = motif_length
 
-        self.dists, self.motiflets, self.elbow_points = plot_elbow(
+        self.dists, self.motiflets, self.motiflets_dims, self.elbow_points = plot_elbow(
             k_max,
             self.series,
+            n_dims=self.n_dims,
             ds_name=self.ds_name,
             motif_length=motif_length,
             plot_elbows=plot_elbows,
@@ -130,56 +137,6 @@ class Motiflets:
         )
 
         return self.dists, self.motiflets, self.elbow_points
-
-    def fit_dendrogram(
-            self,
-            k_max,
-            motif_length,
-            n_clusters
-    ):
-
-        dists, motiflets = plot_elbow_by_dimension(
-            k_max, self.series,
-            dimension_labels=self.dimension_labels,
-            ds_name=self.ds_name,
-            motif_length=motif_length,
-            elbow_deviation=self.elbow_deviation,
-            slack=self.slack,
-            filter=False
-        )
-
-        intervals = []
-        for i in range(self.series.shape[0]):
-            intervals.append([])
-            for pos in np.sort(motiflets[i]):
-                intervals[i].append(pos)
-                intervals[i].append(pos + motif_length)
-        X = intervals
-
-        dists = [intersection_dist(a, b) for a, b in combinations(X, r=2)]
-        distance_matrix = squareform(dists)
-        Z = sch.linkage(distance_matrix, method='single')
-
-        # creating the dendrogram
-        fig, ax = plt.subplots(1, 1, figsize=(12, 8))
-        _ = sch.dendrogram(Z, labels=self.dimension_labels, ax=ax)
-
-        ax.set_title('Dendrogram')
-        ax.set_xlabel('Dimensions')
-        ax.set_ylabel('Intersection distance')
-        plt.tight_layout()
-        plt.show()
-
-        cluster_k = n_clusters
-        y_dimensions = sch.fcluster(Z, cluster_k, criterion='maxclust')
-        mapping = list(zip(y_dimensions, self.dimension_labels))
-
-        joint_clusters = {}
-        for i in range(1, cluster_k + 1):
-            print("Cluster", i)
-            joint_clusters[i] = [x[1] for x in mapping if x[0] == i]
-            print(joint_clusters[i])
-            print("----")
 
     def plot_dataset(self, path=None):
         fig, ax = plot_dataset(
@@ -199,14 +156,16 @@ class Motiflets:
         if self.dists is None or self.motiflets is None or self.elbow_points is None:
             raise Exception("Please call fit_k_elbow first.")
 
-        if elbow_point is None:
-            elbow_point = self.elbow_points[-1]
+        # TODO
+        # if elbow_point is None:
+        #    elbow_point = self.elbow_points[-1]
 
-        fig, ax = plot_motifset(
+        fig, ax = plot_motifsets(
             self.ds_name,
             self.series,
-            motifset=self.motiflets[elbow_point],
-            dist=self.dists[elbow_point],
+            motifsets=self.motiflets[self.elbow_points],
+            motiflet_dims=self.motiflets_dims[self.elbow_points],
+            dist=self.dists[self.elbow_points],
             motif_length=self.motif_length,
             show=path is None)
 
@@ -281,7 +240,7 @@ def plot_dataset(
         Outputs the plot
 
     """
-    return plot_motifset(ds_name, data, ground_truth=ground_truth, show=show)
+    return plot_motifsets(ds_name, data, ground_truth=ground_truth, show=show)
 
 
 def append_all_motif_sets(df, motif_sets, method_name, D_full):
@@ -316,11 +275,12 @@ def append_all_motif_sets(df, motif_sets, method_name, D_full):
     return df
 
 
-def plot_motifset(
+def plot_motifsets(
         ds_name,
         data,
-        motifset=None,
+        motifsets=None,
         dist=None,
+        motiflet_dims=None,
         motif_length=None,
         ground_truth=None,
         show=True):
@@ -332,8 +292,8 @@ def plot_motifset(
         The name of the time series
     data: array-like
         The time series data
-    motifset: array like
-        One found motif set
+    motifsets: array like
+        Found motif sets
     dist: array like
         The distances (extents) for each motif set
     motif_length: int
@@ -348,14 +308,22 @@ def plot_motifset(
     if data.ndim != 2:
         raise ValueError('The input dimension must be 2d.')
 
-    if motifset is not None:
-        fig, axes = plt.subplots(1, 2, sharey=False,
+    if motifsets is not None:
+        git_ratio = [4]
+        for _ in range(len(motifsets)):
+            git_ratio.append(1)
+
+        fig, axes = plt.subplots(2, 1 + len(motifsets),
+                                 sharey="row",
                                  sharex=False,
-                                 figsize=(15, 3 + data.shape[0]),
-                                 gridspec_kw={'width_ratios': [4, 1]})
+                                 figsize=(
+                                     10 + 5 * len(motifsets), 5 + data.shape[0] // 3),
+                                 squeeze=False,
+                                 gridspec_kw={
+                                     'width_ratios': git_ratio,
+                                     'height_ratios': [10, 1]})
     else:
-        fig, axes = plt.subplots(1, 1, figsize=(20, 3))
-        axes = [axes]
+        fig, axes = plt.subplots(1, 1, squeeze=False, figsize=(20, 3))
 
     if ground_truth is None:
         ground_truth = []
@@ -364,15 +332,16 @@ def plot_motifset(
 
     offset = 0
     tick_offsets = []
-    axes[0].set_title(ds_name, fontsize=20)
+    axes[0, 0].set_title(ds_name, fontsize=20)
+
     for dim in range(data_raw.shape[0]):
         dim_data_raw = zscore(data_raw[dim])
-        offset -= (np.max(dim_data_raw) - np.min(dim_data_raw))
+        offset -= 1.2 * (np.max(dim_data_raw) - np.min(dim_data_raw))
         tick_offsets.append(offset)
 
         _ = sns.lineplot(x=data_index,
                          y=dim_data_raw + offset,
-                         ax=axes[0],
+                         ax=axes[0, 0],
                          linewidth=1,
                          color=sns.color_palette("tab10")[0],
                          ci=None,
@@ -380,18 +349,44 @@ def plot_motifset(
                          )
         sns.despine()
 
-        if motifset is not None:
-            for a, pos in enumerate(motifset):
-                _ = sns.lineplot(ax=axes[0],
-                                 x=data_index[np.arange(pos, pos + motif_length)],
-                                 y=dim_data_raw[pos:pos + motif_length] + offset,
-                                 linewidth=1,
-                                 color=sns.color_palette("tab10")[
-                                     # (1+a) % len(sns.color_palette("tab10"))
-                                     1],
-                                 # alpha=0.5,
-                                 ci=None,
-                                 estimator=None)
+        if motifsets is not None:
+            for i, motifset in enumerate(motifsets):
+                if motiflet_dims is None or dim in motiflet_dims[i]:
+                    if motifset is not None:
+                        for a, pos in enumerate(motifset):
+                            _ = sns.lineplot(ax=axes[0, 0],
+                                             x=data_index[
+                                                 np.arange(pos, pos + motif_length)],
+                                             y=dim_data_raw[
+                                               pos:pos + motif_length] + offset,
+                                             linewidth=2,
+                                             color=sns.color_palette("tab10")[1 + i],
+                                             ci=None,
+                                             estimator=None)
+
+                            axes[0, 1 + i].set_title(
+                                "Motif Set " + str(i + 1) + "\n" +
+                                "k=" + str(len(motifset)) +
+                                ", d=" + str(np.round(dist[i], 2)) +
+                                ", m=" + str(motif_length),
+                                fontsize=20)
+
+                            df = pd.DataFrame()
+                            df["time"] = range(0, motif_length)
+
+                            for aa, pos in enumerate(motifset):
+                                df[str(aa)] = zscore(
+                                    dim_data_raw[pos:pos + motif_length]) + offset
+
+                            df_melt = pd.melt(df, id_vars="time")
+                            _ = sns.lineplot(ax=axes[0, 1 + i],
+                                             data=df_melt,
+                                             ci=99,
+                                             n_boot=10,
+                                             lw=1,
+                                             color=sns.color_palette("tab10")[1 + i],
+                                             x="time",
+                                             y="value")
 
         for aaa, column in enumerate(ground_truth):
             for offsets in ground_truth[column]:
@@ -401,45 +396,52 @@ def plot_motifset(
                                      y=dim_data_raw[off[0]:off[1]] + offset,
                                      label=column,
                                      color=sns.color_palette("tab10")[(aaa + 1) % 10],
-                                     ax=axes[0],
+                                     ax=axes[0, 0],
                                      ci=None, estimator=None
                                      )
                     else:
                         sns.lineplot(x=data_index[off[0]: off[1]],
                                      y=dim_data_raw[off[0]:off[1]] + offset,
                                      color=sns.color_palette("tab10")[(aaa + 1) % 10],
-                                     ax=axes[0],
+                                     ax=axes[0, 0],
                                      ci=None, estimator=None
                                      )
 
-        if motifset is not None:
-            axes[1].set_title(
-                "Motif Set, k=" + str(len(motifset)) + ", d=" + str(np.round(dist, 2)),
-                fontsize=20)
+    if motifsets is not None:
+        y_labels = []
+        for i, motiflet in enumerate(motifsets):
+            if motiflet is not None:
+                for aa, pos in enumerate(motiflet):
+                    ratio = 0.8
+                    rect = Rectangle(
+                        (data_index[pos], -i),
+                        data_index[pos + motif_length - 1] - data_index[pos],
+                        ratio,
+                        facecolor=sns.color_palette("tab10")[1 + i],
+                        alpha=0.7
+                    )
+                    axes[1, 0].add_patch(rect)
 
-            df = pd.DataFrame()
-            df["time"] = data_index[range(0, motif_length)]
+                y_labels.append("Motif Set" + str(i))
 
-            for aa, pos in enumerate(motifset):
-                df[str(aa)] = zscore(dim_data_raw[pos:pos + motif_length]) + offset
+        axes[1, 0].set_yticks(-np.arange(len(motifsets)) + 1.5)
+        axes[1, 0].set_yticklabels([], fontsize=12)
+        axes[1, 0].set_ylim([-abs(len(motifsets)) + 1, 1])
+        axes[1, 0].set_xlim(axes[0, 0].get_xlim())
+        axes[1, 0].set_title("Position of Motifsets", fontsize=20)
 
-            df_melt = pd.melt(df, id_vars="time")
-            _ = sns.lineplot(ax=axes[1],
-                             data=df_melt,
-                             ci=99, n_boot=10,
-                             x="time",
-                             y="value")
+        for i in range(1, axes.shape[-1]):
+            axes[1, i].remove()
 
     if isinstance(data, pd.DataFrame):
-        axes[0].set_yticks(tick_offsets)
-        axes[0].set_yticklabels(data.index, fontsize=12)
+        axes[0, 0].set_yticks(tick_offsets)
+        axes[0, 0].set_yticklabels(data.index, fontsize=12)
 
-        if motifset is not None:
-            axes[1].set_yticks(tick_offsets)
-            axes[1].set_yticklabels(data.index, fontsize=12)
+        if motifsets is not None:
+            axes[0, 1].set_yticks(tick_offsets)
+            axes[0, 1].set_yticklabels(data.index, fontsize=12)
 
     sns.despine()
-
     fig.tight_layout()
     if show:
         plt.show()
@@ -451,7 +453,8 @@ def _plot_elbow_points(
         ds_name, data, motif_length,
         elbow_points,
         motifset_candidates,
-        dists):
+        dists,
+        motifset_candidates_dims=None):
     """Plots the elbow points found.
 
     Parameters
@@ -504,15 +507,17 @@ def _plot_elbow_points(
             scale = max(dists) - min(dists)
             # y_pos = (dists[elbow_points[i]] - min(dists) + scale * 0.15) / scale
             axins = ax.inset_axes(
-                [x_pos, 0.1, 0.1, 0.15])
+                [x_pos, 0.1, 0.2, 0.15])
 
             df = pd.DataFrame()
             df["time"] = data_index[range(0, motif_length)]
 
             for dim in range(data_raw.shape[0]):
-                pos = motiflet[0]
-                normed_data = zscore(data_raw[dim, pos:pos + motif_length])
-                df["dim_" + str(dim)] = normed_data
+                if (motifset_candidates_dims is None or
+                        dim == motifset_candidates_dims[elbow_points][0][1]):
+                    pos = motiflet[0]
+                    normed_data = zscore(data_raw[dim, pos:pos + motif_length])
+                    df["dim_" + str(dim)] = normed_data
 
             df_melt = pd.melt(df, id_vars="time")
             _ = sns.lineplot(ax=axins, data=df_melt,
@@ -521,7 +526,7 @@ def _plot_elbow_points(
                              style="variable",
                              ci=99,
                              # alpha=0.8,
-                             n_boot=10, color=sns.color_palette("tab10")[i % 10])
+                             n_boot=10, color=sns.color_palette("tab10")[(i + 1) % 10])
             axins.set_xlabel("")
             axins.patch.set_alpha(0)
             axins.set_ylabel("")
@@ -537,8 +542,7 @@ def plot_elbow(k_max,
                data,
                ds_name,
                motif_length,
-               exclusion=None,
-               exclusion_length=None,
+               n_dims=2,
                plot_elbows=False,
                plot_grid=True,
                ground_truth=None,
@@ -563,8 +567,8 @@ def plot_elbow(k_max,
         the name of the dataset
     motif_length: int
         the length of the motif (user parameter)
-    exclusion : 2d-array
-        exclusion zone - use when searching for the TOP-2 motiflets
+    n_dims : int
+        the number of dimensions to use for subdimensional motif discovery
     plot_elbows: bool, default=False
         plots the elbow ploints into the plot
     plot_grid: bool, default=True
@@ -597,12 +601,11 @@ def plot_elbow(k_max,
         raw_data = raw_data.reshape((1, -1))
 
     startTime = time.perf_counter()
-    dists, candidates, elbow_points, m = ml.search_k_motiflets_elbow(
+    dists, candidates, candidate_dims, elbow_points, m = ml.search_k_motiflets_elbow(
         k_max,
         raw_data,
         motif_length,
-        exclusion=exclusion,
-        exclusion_length=exclusion_length,
+        n_dims=n_dims,
         elbow_deviation=elbow_deviation,
         filter=filter,
         slack=slack)
@@ -612,85 +615,20 @@ def plot_elbow(k_max,
     print("Elbow Points", elbow_points)
 
     if plot_elbows:
-        _plot_elbow_points(ds_name, data, motif_length, elbow_points, candidates, dists)
+        _plot_elbow_points(
+            ds_name, data, motif_length, elbow_points,
+            candidates, dists, motifset_candidates_dims=candidate_dims)
 
     if plot_grid:
         plot_grid_motiflets(
             ds_name, data, candidates, elbow_points,
             dists, motif_length, show_elbows=False,
+            candidates_dims=candidate_dims,
             font_size=24,
             ground_truth=ground_truth,
             dimension_labels=dimension_labels)
 
-    return dists, candidates, elbow_points
-
-
-def plot_elbow_by_dimension(k_max,
-                            data,
-                            ds_name,
-                            motif_length,
-                            ground_truth=None,
-                            dimension_labels=None,
-                            filter=True,
-                            elbow_deviation=1.00,
-                            slack=0.5):
-    """Searches and plots elbows of the k-Motiflets by dimension.
-
-    This is the method to find and plot the characteristic k-Motiflets within range
-    [2...k_max] for given a `motif_length` using elbow-plots.
-
-    Details are given within the paper Section 5.1 Learning meaningful k.
-
-    Parameters
-    ----------
-    k_max: int
-        use [2...k_max] to compute the elbow plot (user parameter).
-    data: array-like
-        the TS
-    ds_name: String
-        the name of the dataset
-    motif_length: int
-        the length of the motif (user parameter)
-    ground_truth: pd.Series
-        Ground-truth information as pd.Series.
-    dimension_labels: list
-        List of labels for each dimension
-    filter: bool, default=True
-        filters overlapping motiflets from the result,
-    elbow_deviation : float, default=1.00
-        The minimal absolute deviation needed to detect an elbow.
-        It measures the absolute change in deviation from k to k+1.
-        1.05 corresponds to 5% increase in deviation.
-
-    Returns
-    -------
-    Tuple
-        dists:          distances for each k in [2...k_max] and dimension
-        candidates:     motifset-candidates for each k and dimension
-        elbow_points:   elbow-points for each dimension
-
-    """
-    _, raw_data = ml.pd_series_to_numpy(data)
-    print("Data", raw_data.shape)
-
-    startTime = time.perf_counter()
-    dists, candidates = ml.search_multidim_k_motiflets(
-        k_max,
-        raw_data,
-        motif_length,
-        slack=slack)
-    endTime = (time.perf_counter() - startTime)
-
-    print("Compute elbows in", np.round(endTime, 1), "s")
-
-    plot_motiflets_by_dimension(
-        ds_name, data, candidates, [0],
-        dists, motif_length,
-        dimension_labels=dimension_labels,
-        font_size=24,
-        ground_truth=ground_truth)
-
-    return dists, candidates
+    return dists, candidates, candidate_dims, elbow_points
 
 
 def plot_motif_length_selection(
@@ -698,12 +636,12 @@ def plot_motif_length_selection(
         elbow_deviation=1.00, slack=0.5, subsample=2,
         exclusion=None,
         exclusion_length=None,
+        n_dims=2,
         ground_truth=None,
-        dimension_labels=None,
         plot=True,
         plot_best_only=True,
         plot_elbows=True,
-        plot_grid=True,
+        plot_motifs=True,
 ):
     """Computes the AU_EF plot to extract the best motif lengths
 
@@ -730,8 +668,6 @@ def plot_motif_length_selection(
         exclusion zone - use when searching for the TOP-2 motiflets
     ground_truth: pd.Series
         Ground-truth information as pd.Series.
-    dimension_labels: list
-        List of labels for each dimension
 
     Returns
     -------
@@ -757,71 +693,75 @@ def plot_motif_length_selection(
     startTime = time.perf_counter()
     (best_motif_length,
      all_minima, au_ef,
-     elbow, top_motiflets, dists) = \
+     elbow, top_motiflets,
+     top_motiflets_dims, dists) = \
         ml.find_au_ef_motif_length(
             data_raw, k_max,
+            n_dims=n_dims,
             motif_length_range=motif_length_range,
-            exclusion=exclusion,
-            exclusion_length=exclusion_length,
             elbow_deviation=elbow_deviation,
             slack=slack,
             subsample=subsample)
     endTime = (time.perf_counter() - startTime)
     print("\tTime", np.round(endTime, 1), "s")
 
-    # Find unique motif lengths (filters neigboring minima)
-    # TODO best_motif_length may be missing?
-    # best = ml._filter_unique(
-    #    np.arange(len(top_motiflets[all_minima])),
-    #    top_motiflets[all_minima],
-    #    np.max(motif_length_range[all_minima])
-    # )
-    # all_minima = [all_minima[0][best]]
     all_minima = _filter_duplicate_window_sizes(au_ef, all_minima)
 
     if plot:
         _plot_window_lengths(
             all_minima, au_ef, data_raw, ds_name, elbow, header, index,
-            motif_length_range, top_motiflets)
+            motif_length_range, top_motiflets,
+            top_motiflets_dims=top_motiflets_dims)
 
-        if plot_elbows or plot_grid:
+        if plot_elbows or plot_motifs:
             to_plot = all_minima[0]
             if plot_best_only:
                 to_plot = [np.argmin(au_ef)]
 
             for a in to_plot:
                 motif_length = motif_length_range[a]
-                candidates = np.zeros(len(dists[a]), dtype=np.object)
+                candidates = np.zeros(len(dists[a]), dtype=object)
                 candidates[elbow[a]] = top_motiflets[a]  # need to unpack
+
+                candidate_dims = np.zeros(len(dists[a]), dtype=object)
+                candidate_dims[elbow[a]] = top_motiflets_dims[a]  # need to unpack
+
                 elbow_points = elbow[a]
 
                 if plot_elbows:
                     _plot_elbow_points(
-                        ds_name, data, motif_length, elbow_points, candidates, dists[a])
+                        ds_name, data, motif_length,
+                        elbow_points, candidates, dists[a],
+                        motifset_candidates_dims=candidate_dims)
 
-                if plot_grid:
-                    plot_grid_motiflets(
-                        ds_name, data, candidates, elbow_points,
-                        dists, motif_length, show_elbows=False,
-                        font_size=24,
-                        ground_truth=ground_truth,
-                        dimension_labels=dimension_labels)
+                if plot_motifs:
+                    plot_motifsets(
+                        ds_name,
+                        data,
+                        motifsets=top_motiflets[a],
+                        motiflet_dims=top_motiflets_dims[a],
+                        dist=dists[a][elbow_points],
+                        motif_length=motif_length,
+                        show=True)
 
     best_pos = np.argmin(au_ef)
     best_elbows = elbow[best_pos]
     best_dist = dists[best_pos]
-    best_motiflets = np.zeros(len(dists[best_pos]), dtype=np.object)
+    best_motiflets = np.zeros(len(dists[best_pos]), dtype=object)
     best_motiflets[elbow[best_pos]] = top_motiflets[best_pos]  # need to unpack
+    best_motiflets_dims = np.zeros(len(dists[best_pos]), dtype=object)
+    best_motiflets_dims[elbow[best_pos]] = top_motiflets_dims[
+        best_pos]  # need to unpack
 
     return (best_motif_length,
             best_dist,
             best_motiflets,
+            best_motiflets_dims,
             best_elbows,
-
             elbow,
             top_motiflets,
             dists,
-
+            top_motiflets_dims,
             all_minima[0])
 
 
@@ -844,7 +784,9 @@ def _filter_duplicate_window_sizes(au_ef, minima):
 def _plot_window_lengths(
         all_minima, au_ef, data_raw, ds_name,
         elbow, header, index,
-        motif_length_range, top_motiflets,
+        motif_length_range,
+        top_motiflets,
+        top_motiflets_dims=None,
         font_size=20):
     set_sns_style(font_size)
 
@@ -862,12 +804,10 @@ def _plot_window_lengths(
     sns.despine()
     ax.set_title("Best lengths on " + ds_name, size=20)
     ax.set(xlabel='Motif Length' + header, ylabel='Area under EF\n(lower is better)')
-    # ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     ax.scatter(  # index[motif_length_range[all_minima]],   # TODO!!!
         motif_length_range[all_minima],
         au_ef[all_minima], color="red",
         label="Minima")
-    # print("Minima", index[motif_length_range[all_minima]], "Elbows", elbow[all_minima])
     for item in ([ax.xaxis.label, ax.yaxis.label] +
                  ax.get_xticklabels() + ax.get_yticklabels()):
         item.set_fontsize(16)
@@ -881,16 +821,18 @@ def _plot_window_lengths(
             x_pos = minimum / len(motif_length_range)
             scale = max(au_ef) - min(au_ef)
             y_pos = (au_ef[minimum] - min(au_ef) + (1.5 * a + 1) * scale * 0.15) / scale
-            axins = ax.inset_axes([x_pos, y_pos, 0.10, 0.15])
+            axins = ax.inset_axes([x_pos, y_pos, 0.20, 0.15])
 
             motif_length = motif_length_range[minimum]
             df = pd.DataFrame()
             df["time"] = index[range(0, motif_length)]
 
-            for j, dim in enumerate(range(data_raw.shape[0])):
-                pos = motiflet_pos[0]
-                normed_data = zscore(data_raw[dim, pos:pos + motif_length])
-                df["dim_" + str(dim)] = normed_data  # - 2 * j
+            for dim in range(data_raw.shape[0]):
+                if top_motiflets_dims is None or dim == top_motiflets_dims[minimum][0][
+                    0]:
+                    pos = motiflet_pos[0]
+                    normed_data = zscore(data_raw[dim, pos:pos + motif_length])
+                    df["dim_" + str(dim)] = normed_data
 
             df_melt = pd.melt(df, id_vars="time")
             _ = sns.lineplot(ax=axins, data=df_melt,
@@ -898,8 +840,9 @@ def _plot_window_lengths(
                              hue="variable",
                              style="variable",
                              ci=99,
-                             # alpha=0.8,
-                             n_boot=10, color=sns.color_palette("tab10")[i % 10])
+                             n_boot=10,
+                             lw=1,
+                             color=sns.color_palette("tab10")[(i + 1) % 10])
             axins.set_xlabel("")
             axins.patch.set_alpha(0)
             axins.set_ylabel("")
@@ -1032,6 +975,7 @@ def plot_motiflets_by_dimension(
 def plot_grid_motiflets(
         ds_name, data, candidates, elbow_points, dist,
         motif_length, font_size=20,
+        candidates_dims=None,
         ground_truth=None,
         show_elbows=False,
         dimension_labels=None,
@@ -1075,7 +1019,7 @@ def plot_grid_motiflets(
 
     label_cols = 2
 
-    count_plots = 4 if len(candidates[elbow_points]) > 6 else 3
+    count_plots = 5 if len(candidates[elbow_points]) > 6 else 4
     if show_elbows:
         count_plots = count_plots + 1
 
@@ -1092,10 +1036,10 @@ def plot_grid_motiflets(
     dims = int(np.ceil(len(elbow_points) / grid_dim)) + count_plots
 
     fig = plt.figure(constrained_layout=True,
-                     figsize=(15, dims * 3))
+                     figsize=(15, dims * 4))
     gs = fig.add_gridspec(dims, grid_dim)
 
-    ax_ts = fig.add_subplot(gs[0:2, :])
+    ax_ts = fig.add_subplot(gs[0:3, :])
     ax_ts.set_title("(a) Dataset: " + ds_name + "")
 
     data_index, data_raw = ml.pd_series_to_numpy(data)
@@ -1104,12 +1048,18 @@ def plot_grid_motiflets(
     if data_raw.ndim == 1:
         data_raw = data_raw.reshape((1, -1))
 
+    max_offset = 0
+    for dim in range(data_raw.shape[0]):
+        dim_data_raw = zscore(data_raw[dim, :])
+        max_offset = max(np.max(dim_data_raw) - np.min(dim_data_raw), max_offset)
+
     offset = 0
     tick_offsets = []
     motiflets = candidates[elbow_points]
+
     for dim in range(data_raw.shape[0]):
         dim_data_raw = zscore(data_raw[dim, :])
-        offset -= (np.max(dim_data_raw) - np.min(dim_data_raw))
+        offset -= max_offset
         tick_offsets.append(offset)
 
         #  Plot the raw data
@@ -1118,25 +1068,28 @@ def plot_grid_motiflets(
                          ax=ax_ts,
                          linewidth=1,
                          color=color_palette[0])
-        ax_ts.set_yticklabels([], fontsize=12)
+        ax_ts.set_yticklabels([], fontsize=10)
         sns.despine()
 
-        #  Plot the motiflet
         for i, motiflet in enumerate(motiflets):
-            if motiflet is not None:
-                for aa, pos in enumerate(motiflet):
-                    _ = sns.lineplot(x=data_index[pos: pos + motif_length],
-                                     y=dim_data_raw[pos: pos + motif_length] + offset,
-                                     ax=ax_ts,
-                                     linewidth=1,
-                                     color=color_palette[1 + i])
+            #  Plot the motiflet
+            if (candidates_dims is None or
+                    dim in candidates_dims[elbow_points][i]):
+                if motiflet is not None:
+                    for aa, pos in enumerate(motiflet):
+                        _ = sns.lineplot(x=data_index[pos: pos + motif_length],
+                                         y=dim_data_raw[
+                                           pos: pos + motif_length] + offset,
+                                         ax=ax_ts,
+                                         linewidth=2,
+                                         color=color_palette[1 + i])
 
     if len(candidates[elbow_points]) > 6:
-        ax_bars = fig.add_subplot(gs[2:4, :], sharex=ax_ts)
-        next_id = 4
+        ax_bars = fig.add_subplot(gs[3:5, :], sharex=ax_ts)
+        next_id = 5
     else:
-        ax_bars = fig.add_subplot(gs[2, :], sharex=ax_ts)
-        next_id = 3
+        ax_bars = fig.add_subplot(gs[3, :], sharex=ax_ts)
+        next_id = 4
 
     ax_bars.set_title("(b) Position of Top Motif Sets")
 
@@ -1198,8 +1151,7 @@ def plot_grid_motiflets(
                     (data_index[pos], -i),
                     data_index[pos + motif_length - 1] - data_index[pos],
                     ratio,
-                    facecolor=color_palette[
-                        (len(ground_truth) + ii % grid_dim) % len(color_palette)],
+                    facecolor=color_palette[1 + i],
                     alpha=0.7
                 )
                 ax_bars.add_patch(rect)
@@ -1209,11 +1161,8 @@ def plot_grid_motiflets(
                 _ = sns.lineplot(ax=ax_motiflet,
                                  data=df_melt,
                                  x="time", y="value",
-                                 # style="variable",
-                                 # hue="variable",
                                  ci=99, n_boot=10,
-                                 # ci=None, estimator=None,
-                                 color=color_palette[0],
+                                 color=color_palette[1 + i],
                                  )
                 ax_motiflet.set_ylabel("")
 
