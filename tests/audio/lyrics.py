@@ -23,7 +23,9 @@ def read_mp3(audio_file_url):
 
 def extract_audio_segment(
         df, ds_name, audio_file_url, export_file_url,
-        length_in_seconds, index_range, motif_length, motiflet):
+        length_in_seconds, index_range, motif_length,
+        motiflet,
+        id = None):
     file_type = audio_file_url.split(".")[-1]
     if file_type == "wav":
         song = AudioSegment.from_wav(audio_file_url)
@@ -35,9 +37,12 @@ def extract_audio_segment(
         end = start + length_in_seconds * 1000  # ms
         motif_audio = song[start:end]
         motif_audio.export('audio/' + export_file_url + '/' + ds_name +
-                           "_Channels_" + str(len(df.index)) +
+                           "_Dims_" + str(len(df.index)) +
                            "_Length_" + str(motif_length) +
-                           "_Motif_" + str(a) + '.wav', format="wav")
+                           "_Motif" +
+                           ("" if id is None else "_" + str(id)) +
+                           "_" +  str(a) +
+                           '.wav', format="wav")
 
 
 def plot_motiflet(series, motiflet, motif_length, title=None):
