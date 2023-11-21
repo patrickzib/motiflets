@@ -651,11 +651,6 @@ def get_approximate_k_motiflet(
 
     motiflet_all_candidates = np.zeros((n, k), dtype=np.int32)
 
-    # allow subsequence itself
-    # Fill diagonal with 0
-    # for i in range(len(D)):
-    #    D[i][i] = 0
-
     # order by increasing k-nn distance
     knn_distances = np.zeros(n, dtype=np.float32)
     for i in np.arange(n):
@@ -1032,25 +1027,10 @@ def search_k_motiflets_elbow(
             else:
                 raise Exception('Top-k is not supported for sparse matrices.')
 
-        # Does not work
-        # use an approximate position as an initial estimate, if available
-        # bound_set = False
-        # if approximate_motiflet_pos is not None \
-        #         and len(approximate_motiflet_pos) > test_k \
-        #         and approximate_motiflet_pos[test_k] is not None:
-        #     dd = get_pairwise_extent(D_full, approximate_motiflet_pos[test_k])
-        #     upper_bound = min(dd, upper_bound)
-        #     bound_set = True
-
         candidate, candidate_dist, _ = get_approximate_k_motiflet(
             data_raw, m, test_k, D_full, knns,
             upper_bound=upper_bound,
         )
-
-        # if candidate is None and bound_set:
-        #     # If we already found the best motif in length l+1
-        #     candidate = approximate_motiflet_pos[test_k]
-        #     candidate_dist = dd
 
         k_motiflet_distances[test_k] = candidate_dist
         k_motiflet_candidates[test_k] = candidate
