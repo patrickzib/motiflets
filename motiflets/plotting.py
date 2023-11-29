@@ -30,6 +30,7 @@ class Motiflets:
             ground_truth=None,
             elbow_deviation=1.00,
             slack=0.5,
+            n_jobs=4
     ):
         """Computes the AU_EF plot to extract the best motif lengths
 
@@ -53,6 +54,8 @@ class Motiflets:
             slack: float
                 Defines an exclusion zone around each subsequence to avoid trivial matches.
                 Defined as percentage of m. E.g. 0.5 is equal to half the window length.
+            n_jobs : int
+                Number of jobs to be used.
 
             Returns
             -------
@@ -65,6 +68,7 @@ class Motiflets:
         self.elbow_deviation = elbow_deviation
         self.slack = slack
         self.ground_truth = ground_truth
+        self.n_jobs = n_jobs
 
         self.motif_length_range = None
         self.motif_length = 0
@@ -121,6 +125,7 @@ class Motiflets:
             elbow_deviation=self.elbow_deviation,
             slack=self.slack,
             subsample=subsample,
+            n_jobs=self.n_jobs,
             # plot_elbows=plot_elbows,
             # plot_grid=plot_motifs_as_grid,
             # plot=plot,
@@ -183,6 +188,7 @@ class Motiflets:
             plot_grid=plot_motifs_as_grid,
             ground_truth=self.ground_truth,
             filter=filter,
+            n_jobs=self.n_jobs,
             elbow_deviation=self.elbow_deviation,
             slack=self.slack
         )
@@ -477,7 +483,7 @@ def plot_elbow(k_max,
                plot_grid=True,
                ground_truth=None,
                filter=True,
-               method_name=None,
+               n_jobs=4,
                elbow_deviation=1.00,
                slack=0.5):
     """Plots the elbow-plot for k-Motiflets.
@@ -505,8 +511,8 @@ def plot_elbow(k_max,
         Ground-truth information as pd.Series.
     filter: bool, default=True
         filters overlapping motiflets from the result,
-    method_name:  String
-        used for display only.
+    n_jobs : int
+        Number of jobs to be used.
     elbow_deviation : float, default=1.00
         The minimal absolute deviation needed to detect an elbow.
         It measures the absolute change in deviation from k to k+1.
@@ -528,6 +534,7 @@ def plot_elbow(k_max,
         k_max,
         raw_data,
         motif_length,
+        n_jobs=n_jobs,
         exclusion=exclusion,
         elbow_deviation=elbow_deviation,
         slack=slack)
@@ -556,7 +563,9 @@ def plot_elbow(k_max,
 
 def plot_motif_length_selection(
         k_max, data, motif_length_range, ds_name,
-        elbow_deviation=1.00, slack=0.5,
+        n_jobs=4,
+        elbow_deviation=1.00,
+        slack=0.5,
         subsample=2):
     """Computes the AU_EF plot to extract the best motif lengths
 
@@ -582,6 +591,8 @@ def plot_motif_length_selection(
     slack: float
         Defines an exclusion zone around each subsequence to avoid trivial matches.
         Defined as percentage of m. E.g. 0.5 is equal to half the window length.
+    n_jobs : int
+        Number of jobs to be used.
 
     Returns
     -------
@@ -601,6 +612,7 @@ def plot_motif_length_selection(
         ml.find_au_ef_motif_length(
             data, k_max,
             motif_length_range=motif_length_range,
+            n_jobs=n_jobs,
             elbow_deviation=elbow_deviation,
             slack=slack,
             subsample=subsample)

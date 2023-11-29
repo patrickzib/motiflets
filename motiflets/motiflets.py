@@ -585,7 +585,7 @@ def _argknn(
     halve_m = int(m * slack)
     dists = np.copy(dist)
 
-    dist_pos = np.argpartition(dist, 2*k)[:2*k]
+    dist_pos = np.argpartition(dist, 2 * k)[:2 * k]
     dist_sort = dist[dist_pos]
 
     idx = []  # there may be less than k, thus use a list
@@ -606,7 +606,6 @@ def _argknn(
 
         if len(idx) == k:
             break
-
 
     # if not enough elements found, go through the rest
     for i in range(len(idx), k):
@@ -821,6 +820,7 @@ def find_au_ef_motif_length(
         k_max,
         motif_length_range,
         exclusion=None,
+        n_jobs=4,
         elbow_deviation=1.00,
         slack=0.5,
         subsample=2):
@@ -836,6 +836,8 @@ def find_au_ef_motif_length(
         The range of lengths to compute the AU-EF.
     exclusion : 2d-array
         exclusion zone - use when searching for the TOP-2 motiflets
+    n_jobs : int
+        Number of jobs to be used.
     elbow_deviation : float, default=1.00
         The minimal absolute deviation needed to detect an elbow.
         It measures the absolute change in deviation from k to k+1.
@@ -870,9 +872,6 @@ def find_au_ef_motif_length(
     top_motiflets = np.zeros(len(motif_length_range), dtype=object)
     dists = np.zeros(len(motif_length_range), dtype=object)
 
-    # stores the position of the l+1 motif set as an approximate pos for l
-    approximate_pos = None
-
     # TODO parallelize?
     for i, m in enumerate(motif_length_range[::-1]):
         if m // subsample < data.shape[0]:
@@ -880,9 +879,8 @@ def find_au_ef_motif_length(
                 k_max,
                 data,
                 m // subsample,
+                n_jobs=n_jobs,
                 exclusion=exclusion,
-                # TODO this can cause an error with SLACK set?
-                approximate_motiflet_pos=approximate_pos,
                 elbow_deviation=elbow_deviation,
                 slack=slack)
 
@@ -896,7 +894,6 @@ def find_au_ef_motif_length(
 
             elbow_points = _filter_unique(elbow_points, candidates, m // subsample)
 
-            top_motiflet = None
             if len(elbow_points > 0):
                 elbows[i] = elbow_points
                 top_motiflets[i] = candidates[elbow_points]
@@ -909,7 +906,6 @@ def find_au_ef_motif_length(
                 au_efs[i] = 1.0
 
             dists[i] = dist
-            approximate_pos = candidates
 
     # reverse order
     au_efs = np.array(au_efs, dtype=np.float64)[::-1]
@@ -932,10 +928,10 @@ def search_k_motiflets_elbow(
         motif_length='auto',
         motif_length_range=None,
         exclusion=None,
-        approximate_motiflet_pos=None,
         elbow_deviation=1.00,
         filter=True,
-        slack=0.5
+        slack=0.5,
+        n_jobs=4
 ):
     """Computes the elbow-function.
 
@@ -971,6 +967,8 @@ def search_k_motiflets_elbow(
     slack: float
         Defines an exclusion zone around each subsequence to avoid trivial matches.
         Defined as percentage of m. E.g. 0.5 is equal to half the window length.
+    n_jobs : int
+        Number of jobs to be used.
 
 
     Returns
@@ -995,6 +993,7 @@ def search_k_motiflets_elbow(
             assert False
         m, _, _, _ = find_au_ef_motif_length(
             data, k_max, motif_length_range,
+            n_jobs=n_jobs,
             elbow_deviation=elbow_deviation,
             slack=slack)
     elif isinstance(motif_length, int) or \
@@ -1017,9 +1016,11 @@ def search_k_motiflets_elbow(
     # sparse matrix is 2x slower but needs less memory
     sparse = n >= 30000
     if not sparse:
-        D_full, knns = compute_distances_with_knns(data_raw, m, k_max_, slack=slack)
+        D_full, knns = compute_distances_with_knns(data_raw, m, k_max_,
+                                                   n_jobs=n_jobs, slack=slack)
     else:
-        D_full, knns = compute_distances_with_knns_sparse(data_raw, m, k_max_, slack=slack)
+        D_full, knns = compute_distances_with_knns_sparse(data_raw, m, k_max_,
+                                                          n_jobs=n_jobs, slack=slack)
 
     exclusion_m = int(m * slack)
 
@@ -1039,34 +1040,14 @@ def search_k_motiflets_elbow(
             else:
                 raise Exception('Top-k is not supported for sparse matrices.')
 
-        # Does not work
-        # use an approximate position as an initial estimate, if available
-        # bound_set = False
-        # if approximate_motiflet_pos is not None \
-        #         and len(approximate_motiflet_pos) > test_k \
-        #         and approximate_motiflet_pos[test_k] is not None:
-        #     dd = get_pairwise_extent(D_full, approximate_motiflet_pos[test_k])
-        #     upper_bound = min(dd, upper_bound)
-        #     bound_set = True
-
         candidate, candidate_dist, _ = get_approximate_k_motiflet(
             data_raw, m, test_k, D_full, knns,
             upper_bound=upper_bound,
         )
 
-        # if candidate is None and bound_set:
-        #     # If we already found the best motif in length l+1
-        #     candidate = approximate_motiflet_pos[test_k]
-        #     candidate_dist = dd
-
         k_motiflet_distances[test_k] = candidate_dist
         k_motiflet_candidates[test_k] = candidate
         upper_bound = min(candidate_dist, upper_bound)
-
-        # compute a new upper bound
-        if candidate is not None:
-            dist_new = get_pairwise_extent(D_full, candidate[:test_k])
-            upper_bound = min(upper_bound, dist_new)
 
     # smoothen the line to make it monotonically increasing
     k_motiflet_distances[0:2] = k_motiflet_distances[2]
