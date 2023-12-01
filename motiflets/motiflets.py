@@ -347,7 +347,7 @@ def compute_distance_matrix(time_series,
         # over dimensions, first
         for d in prange(D_all.shape[0]):
             for order in np.arange(start, end):
-                knn = _argknn(D_all[d, order], k, m, n, slack=slack)
+                knn = _argknn(D_all[d, order], k, m, slack=slack)
                 knns[d, order, :len(knn)] = knn
                 knns[d, order, len(knn):] = -1
 
@@ -441,7 +441,7 @@ def get_pairwise_extent(D_full, motifset_pos, upperbound=np.inf):
 
 @njit(fastmath=True, cache=True)
 def _argknn(
-        dist, k, m, n, lowest_dist=np.inf, slack=0.5):
+        dist, k, m, lowest_dist=np.inf, slack=0.5):
     """Finds the closest k-NN non-overlapping subsequences in candidates.
 
     Parameters
@@ -452,8 +452,6 @@ def _argknn(
         The k in k-NN
     m : int
         The window-length
-    n : int
-        time series length
     lowest_dist : float
         Used for admissible pruning
     slack: float
@@ -465,12 +463,33 @@ def _argknn(
     idx : the <= k subsequences within `lowest_dist`
 
     """
-    # dist_idx = np.argwhere(dist <= lowest_dist).flatten().astype(np.int32)
     halve_m = int(m * slack)
-
     dists = np.copy(dist)
+
+    dist_pos = np.argpartition(dist, 2 * k)[:2 * k]
+    dist_sort = dist[dist_pos]
+
     idx = []  # there may be less than k, thus use a list
-    for i in range(k):
+
+    # go through the partitioned list
+    for i in range(len(dist_sort)):
+        p = np.argmin(dist_sort)
+        pos = dist_pos[p]
+        dist_sort[p] = np.inf
+
+        if (not np.isnan(dists[pos])) \
+                and (not np.isinf(dists[pos])) \
+                and (dists[pos] <= lowest_dist):
+            idx.append(pos)
+
+            # exclude all trivial matches and itself
+            dists[max(0, pos - halve_m): min(pos + halve_m, len(dists))] = np.inf
+
+        if len(idx) == k:
+            break
+
+    # if not enough elements found, go through the rest
+    for i in range(len(idx), k):
         pos = np.argmin(dists)
         if (not np.isnan(dists[pos])) \
                 and (not np.isinf(dists[pos])) \
@@ -478,9 +497,10 @@ def _argknn(
             idx.append(pos)
 
             # exclude all trivial matches
-            dists[max(0, pos - halve_m): min(pos + halve_m, n)] = np.inf
+            dists[max(0, pos - halve_m): min(pos + halve_m, len(dists))] = np.inf
         else:
             break
+
     return np.array(idx, dtype=np.int32)
 
 
@@ -521,23 +541,16 @@ def get_approximate_k_motiflet(
     np.fill_diagonal(D, 0)
 
     # order by increasing k-nn distance
-    knn_distances = np.zeros(n, dtype=np.float32)
-    for i in np.arange(n):
-        knn_distances[i] = D[i, knns[i, k - 1]]
-    best_order = np.argsort(knn_distances)
-
-    # TODO: parallelize??
-    for order in best_order:
+    for order in np.arange(n):
         knn_idx = knns[order]
         if len(knn_idx) >= k and knn_idx[k - 1] >= 0:
             if D[order, knn_idx[k - 1]] <= motiflet_dist:
                 # get_pairwise_extent() requires the full distance matrix
                 motiflet_extent = get_pairwise_extent(D, knn_idx[:k], motiflet_dist)
+
                 if motiflet_extent <= motiflet_dist:
                     motiflet_dist = motiflet_extent
                     motiflet_candidate = knn_idx[:k]
-            else:
-                break
 
     return motiflet_candidate, motiflet_dist
 
@@ -908,7 +921,7 @@ def mStamp(D_full, k_max_, m, n, slack):
     # compute knns from new distance matrix
     knns = np.zeros((n, k_max_), dtype=np.int32)
     for order in range(0, D_full.shape[0]):
-        knn = _argknn(D_full[order], k_max_, m, n, slack=slack)
+        knn = _argknn(D_full[order], k_max_, m, slack=slack)
         knns[order, :len(knn)] = knn
         knns[order, len(knn):] = -1
 
