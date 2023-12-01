@@ -118,7 +118,7 @@ def read_dataset_with_index(dataset, sampling_factor=10000):
 
     """
     full_path = '../datasets/ground_truth/' + dataset
-    data = pd.read_csv(full_path, index_col=0, squeeze=True)
+    data = pd.read_csv(full_path, index_col=0).squeeze('columns') 
     print("Dataset Original Length n: ", len(data))
 
     data, factor = _resample(data, sampling_factor)
