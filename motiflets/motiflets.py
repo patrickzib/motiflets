@@ -991,11 +991,12 @@ def search_k_motiflets_elbow(
         if motif_length_range is None:
             print("Warning: no valid motiflet range set")
             assert False
-        m, _, _, _ = find_au_ef_motif_length(
+        m, _, _, _, _, _ = find_au_ef_motif_length(
             data, k_max, motif_length_range,
             n_jobs=n_jobs,
             elbow_deviation=elbow_deviation,
             slack=slack)
+        motif_length = np.int32(m)
     elif isinstance(motif_length, int) or \
             isinstance(motif_length, np.int32) or \
             isinstance(motif_length, np.int64):
@@ -1060,7 +1061,7 @@ def search_k_motiflets_elbow(
 
     if filter:
         elbow_points = _filter_unique(
-            elbow_points, k_motiflet_candidates, motif_length)
+            elbow_points, k_motiflet_candidates, m)
 
     return k_motiflet_distances, k_motiflet_candidates, elbow_points, m
 
