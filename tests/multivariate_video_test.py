@@ -40,9 +40,13 @@ def include_joints(df, include, add_xyz=True):
 
 def draw_frame(ax, motions, joints, i, joints_to_highlight=None):
     ax.cla()
-    ax.set_xlim3d(-50, 10)
-    ax.set_ylim3d(-20, 40)
-    ax.set_zlim3d(-20, 40)
+    ax.grid(False)
+    plt.grid(b=None)
+    ax.set_axis_off()
+
+    ax.set_xlim3d(-20, 10)
+    ax.set_ylim3d(-20, 10)
+    #ax.set_zlim3d(-20, 40)
 
     joints['root'].set_motion(motions[i])
 
@@ -177,7 +181,7 @@ def test_plotting():
     m, all_minima = ml.fit_motif_length(
         k_max, length_range,
         plot=True,
-        plot_best_only=False,
+        plot_best_only=True,
         plot_motifsets=True)
 
     for minimum in all_minima:
@@ -186,18 +190,11 @@ def test_plotting():
         elbow_points = ml.all_elbows[minimum]
 
         # motiflets = ml.all_top_motiflets[minimum]
-        motiflets = np.zeros(len(dists), dtype=np.object)
+        motiflets = np.zeros(len(dists), dtype=object)
         motiflets[elbow_points] = ml.all_top_motiflets[minimum]
 
-        dimensions = np.zeros(len(dists), dtype=np.object)
-        dimensions[elbow_points] = ml.all_dimensions[minimum] # need to unpack
-
-        #dists2, motiflets2, elbow_points2 = ml.fit_k_elbow(
-        #    k_max,
-        #    plot_elbows=False,
-        #    plot_motifs_as_grid=True,
-        #    motif_length=motif_length)
-
+        dimensions = np.zeros(len(dists), dtype=object)
+        dimensions[elbow_points] = ml.all_dimensions[minimum]  # need to unpack
 
         video = True
         if video:
@@ -210,14 +207,15 @@ def test_plotting():
                         fig = plt.figure()
                         ax = plt.axes(projection='3d')
 
-                        out_path = ('video/motiflet_' + amc_name + '_' + str(motif_length)
+                        out_path = ('video/motiflet_' + amc_name + '_' + str(
+                            motif_length)
                                     + '_' + str(eb) + '_' + str(i) + '.gif')
 
                         FuncAnimation(fig,
                                       lambda i: draw_frame(
-                                                ax, motions, joints, i,
-                                                joints_to_highlight=use_joints
-                                            ),
+                                          ax, motions, joints, i,
+                                          joints_to_highlight=use_joints
+                                      ),
                                       range(pos, pos + motif_length, 4)).save(
                             out_path,
                             bitrate=1000,
