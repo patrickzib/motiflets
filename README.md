@@ -73,7 +73,8 @@ We first extract meaningful **motif lengths (l)** from this use case:
 ml = Motiflets(
     ds_name,     # the name of the series
     series,      # the data
-    df_gt        # ground truth, if available
+    df_gt,       # ground truth, if available
+    n_jobs       # number of jobs (cores) to be used.
 )
 
 k_max = 20
