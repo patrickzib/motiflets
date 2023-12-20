@@ -396,7 +396,7 @@ def plot_motifset(
             df[str(aa)] = zscore(data_raw[pos:pos + motif_length])
 
         df_melt = pd.melt(df, id_vars="time")
-        _ = sns.lineplot(ax=axes[1], data=df_melt, ci=99, n_boot=10,
+        _ = sns.lineplot(ax=axes[1], data=df_melt, errorbar=('ci', 99), n_boot=10,
                          x="time", y="value")
 
     sns.despine()
@@ -464,7 +464,8 @@ def _plot_elbow_points(
 
             df_melt = pd.melt(df, id_vars="time")
 
-            _ = sns.lineplot(ax=axins, data=df_melt, x="time", y="value", ci=99,
+            _ = sns.lineplot(ax=axins, data=df_melt, x="time", y="value",
+                             errorbar=('ci', 99),
                              n_boot=10, color=sns.color_palette("tab10")[i % 10])
             axins.set_xlabel("")
             axins.set_ylabel("")
@@ -835,7 +836,7 @@ def plot_grid_motiflets(
                 df_melt = pd.melt(df, id_vars="time")
                 _ = sns.lineplot(ax=ax_motiflet, data=df_melt,
                                  x="time", y="value",
-                                 ci=99, n_boot=10,
+                                 errorbar=('ci', 99), n_boot=10,
                                  color=color_palette[
                                      (len(ground_truth) + ii % grid_dim) % len(
                                          color_palette)],
@@ -871,7 +872,7 @@ def plot_grid_motiflets(
                     [elbow_points[i] / len(candidates), 0.7, 0.1, 0.2])
 
                 _ = sns.lineplot(ax=axins, data=df_melt, x="time", y="value",
-                                 ci=0, n_boot=10,
+                                 errorbar=('ci', 0), n_boot=10,
                                  color=color_palette[
                                      (len(ground_truth) + ii % grid_dim) % len(
                                          color_palette)])

@@ -1023,7 +1023,7 @@ def search_k_motiflets_elbow(
 
         for m in m_iter:
             test_k = len(m.indices)
-            if test_k < k_motiflet_distances.shape:
+            if test_k < k_max_:
                 # TODO cross-check extent??
                 k_motiflet_distances[test_k] = m.extent
                 k_motiflet_candidates[test_k] = m.indices
