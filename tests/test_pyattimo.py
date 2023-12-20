@@ -19,13 +19,14 @@ def test_attimo():
         ts, w=1000, max_k=30
     )
 
+    for m in m_iter:
+        print(m.indices)
+        print(m.extent)
+        # np.sort(m.indices)
+
     end = time.time()
     print("Discovered motiflets in", end - start, "seconds")
 
-    for m in m_iter:
-        print(m)
-        print(m.extent)
-        # np.sort(m.indices)
 
 def test_motiflets():
     # load a dataset, any list of numpy array of floats works fine
@@ -34,6 +35,6 @@ def test_motiflets():
     ts = pyattimo.load_dataset('ecg', 100_000).flatten()
     print("Size of DS: ", ts.shape)
 
-    k=10
+    k = 10
     mot = Motiflets("ECG", ts)
     _ = mot.fit_k_elbow(k, 1000)

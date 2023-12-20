@@ -6,6 +6,7 @@
 
 __author__ = ["patrickzib"]
 
+import pyattimo
 import itertools
 from ast import literal_eval
 from os.path import exists
@@ -1013,42 +1014,58 @@ def search_k_motiflets_elbow(
     k_motiflet_distances = np.zeros(k_max_)
     k_motiflet_candidates = np.empty(k_max_, dtype=object)
 
-    # switch to sparse matrix representation when length is above 30_000
-    # sparse matrix is 2x slower but needs less memory
-    sparse = n >= 30000
-    if not sparse:
-        D_full, knns = compute_distances_with_knns(data_raw, m, k_max_,
-                                                   n_jobs=n_jobs, slack=slack)
-    else:
-        D_full, knns = compute_distances_with_knns_sparse(data_raw, m, k_max_,
-                                                          n_jobs=n_jobs, slack=slack)
-
-    exclusion_m = int(m * slack)
-
-    upper_bound = np.inf
-    for test_k in tqdm(range(k_max_ - 1, 1, -1),
-                       desc='Compute ks (' + str(k_max_) + ")",
-                       position=0, leave=False):
-
-        # Top-N retrieval
-        if exclusion is not None and exclusion[test_k] is not None:
-            if not sparse:
-                for pos in exclusion[test_k].flatten():
-                    if pos is not None:
-                        trivialMatchRange = (max(0, pos - exclusion_m),
-                                             min(pos + exclusion_m, len(D_full)))
-                    D_full[:, trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
-            else:
-                raise Exception('Top-k is not supported for sparse matrices.')
-
-        candidate, candidate_dist, _ = get_approximate_k_motiflet(
-            data_raw, m, test_k, D_full, knns,
-            upper_bound=upper_bound,
+    backend = "pyattimo"
+    if backend == "pyattimo":
+        # upper_bound = np.inf
+        m_iter = pyattimo.MotifletsIterator(
+            data_raw, w=m, max_k=k_max_
         )
 
-        k_motiflet_distances[test_k] = candidate_dist
-        k_motiflet_candidates[test_k] = candidate
-        upper_bound = min(candidate_dist, upper_bound)
+        for m in m_iter:
+            test_k = len(m.indices)
+            if test_k < k_motiflet_distances.shape:
+                # TODO cross-check extent??
+                k_motiflet_distances[test_k] = m.extent
+                k_motiflet_candidates[test_k] = m.indices
+            # upper_bound = min(m.extent, upper_bound)
+    else:
+        # switch to sparse matrix representation when length is above 30_000
+        # sparse matrix is 2x slower but needs less memory
+        sparse = n >= 30000
+        if not sparse:
+            D_full, knns = compute_distances_with_knns(data_raw, m, k_max_,
+                                                       n_jobs=n_jobs, slack=slack)
+        else:
+            D_full, knns = compute_distances_with_knns_sparse(data_raw, m, k_max_,
+                                                              n_jobs=n_jobs,
+                                                              slack=slack)
+
+        exclusion_m = int(m * slack)
+        upper_bound = np.inf
+
+        for test_k in tqdm(range(k_max_ - 1, 1, -1),
+                           desc='Compute ks (' + str(k_max_) + ")",
+                           position=0, leave=False):
+
+            # Top-N retrieval
+            if exclusion is not None and exclusion[test_k] is not None:
+                if not sparse:
+                    for pos in exclusion[test_k].flatten():
+                        if pos is not None:
+                            trivialMatchRange = (max(0, pos - exclusion_m),
+                                                 min(pos + exclusion_m, len(D_full)))
+                        D_full[:, trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
+                else:
+                    raise Exception('Top-k is not supported for sparse matrices.')
+
+            candidate, candidate_dist, _ = get_approximate_k_motiflet(
+                data_raw, m, test_k, D_full, knns,
+                upper_bound=upper_bound,
+            )
+
+            k_motiflet_distances[test_k] = candidate_dist
+            k_motiflet_candidates[test_k] = candidate
+            upper_bound = min(candidate_dist, upper_bound)
 
     # smoothen the line to make it monotonically increasing
     k_motiflet_distances[0:2] = k_motiflet_distances[2]
