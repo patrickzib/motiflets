@@ -1,5 +1,3 @@
-import numpy as np
-import pandas as pd
 from motiflets.plotting import *
 from scipy.stats import zscore
 
@@ -9,23 +7,27 @@ def generate_rectangular_wave(motif_length):
 
 
 def generate_sine_wave(motif_length):
-    sine_frequency = 0.05
-    sine_phase = np.pi / 2
-    sine_time = np.arange(motif_length)
+    sine_frequency = 5.0
+    duration = 1.0
+
+    # sine_time = np.arange(motif_length)
+    t = np.linspace(0, duration, int(motif_length), endpoint=False)
 
     # Generate sine wave
-    return np.sin(2 * np.pi * sine_frequency * sine_time + sine_phase).flatten()
+    return np.sin(2 * np.pi * sine_frequency * t).flatten()
 
 
 def test_random_walk():
     # Parameters
-    ts_length = 1e7
+    ts_length = 1e5
     motif_length = 1000
     motif_cardinality = 10
-    random_walk_step_size = 0.1
+
+    mean = 0
+    std_dev = 1
 
     # Generate random walk
-    time_series = np.random.normal(scale=random_walk_step_size, size=int(ts_length))
+    time_series = np.cumsum(np.random.normal(mean, std_dev, int(ts_length)))
     time_series = zscore(time_series)
 
     for i in np.arange(0, motif_cardinality):
@@ -35,9 +37,10 @@ def test_random_walk():
 
         # Choose the position to insert sine wave
         start = int(i / motif_cardinality * ts_length )
+        sine += time_series[start]
         time_series[start:start + motif_length] = sine  # + noise
 
     ds_name = "Random Walk"
     ml = Motiflets(ds_name=ds_name, series=time_series)
     ml.plot_dataset()
-    ml.fit_k_elbow(k_max=motif_cardinality, motif_length=1000)
+    ml.fit_k_elbow(k_max=motif_cardinality, motif_length=motif_length)
