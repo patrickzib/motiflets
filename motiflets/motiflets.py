@@ -6,7 +6,6 @@
 
 __author__ = ["patrickzib"]
 
-import pyattimo
 import itertools
 from ast import literal_eval
 from os.path import exists
@@ -14,6 +13,7 @@ from os.path import exists
 import numpy as np
 import numpy.fft as fft
 import pandas as pd
+import pyattimo
 from joblib import Parallel, delayed
 from numba import njit, prange, objmode, types
 from numba.typed import Dict, List
@@ -759,7 +759,7 @@ def _filter_unique(elbow_points, candidates, motif_length):
     return np.array(filtered_ebp)
 
 
-@njit(fastmath=True, cache=True)
+# @njit(fastmath=True, cache=True)
 def find_elbow_points(dists, alpha=2, elbow_deviation=1.00):
     """Finds elbow-points in the elbow-plot (extent over each k).
 

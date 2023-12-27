@@ -32,7 +32,7 @@ def test_motiflets():
     # load a dataset, any list of numpy array of floats works fine
     # The following call loads the first 100000 points of the ECG
     # dataset (which will be downloaded from the internet)
-    ts = pyattimo.load_dataset('ecg', 100_000).flatten()
+    ts = pyattimo.load_dataset('ecg').flatten()
     print("Size of DS: ", ts.shape)
 
     k = 10
