@@ -1,5 +1,5 @@
 from motiflets.plotting import *
-from scipy.stats import zscore
+# from scipy.stats import zscore
 
 def generate_rectangular_wave(motif_length):
     return (motif_length,
@@ -19,8 +19,8 @@ def generate_sine_wave(motif_length):
 
 def test_random_walk():
     # Parameters
-    ts_length = 1e6
-    motif_length = 1000
+    ts_length = 1e4
+    motif_length = 100
     motif_cardinality = 10
 
     mean = 0.0

@@ -203,7 +203,7 @@ def _sliding_dot_product(query, time_series):
     ----------
     query : array-like
         first time series, typically shorter than ts
-    ts : array-like
+    time_series : array-like
         second time series, typically longer than query.
 
     Returns
@@ -373,7 +373,7 @@ def compute_distances_with_knns_sparse(ts,
 
         Parameters
         ----------
-        time_series : array-like
+        ts : array-like
             The time series
         m : int
             The window length
