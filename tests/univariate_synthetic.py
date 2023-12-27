@@ -17,10 +17,10 @@ def generate_sine_wave(motif_length):
     return np.sin(2 * np.pi * sine_frequency * t).flatten()
 
 
-def test_random_walk():
+def random_walk():
     # Parameters
-    ts_length = 1e4
-    motif_length = 100
+    ts_length = 1e6
+    motif_length = 1000
     motif_cardinality = 10
 
     mean = 0.0
@@ -45,3 +45,6 @@ def test_random_walk():
     ml.plot_dataset()
     ml.fit_k_elbow(
         k_max=motif_cardinality+2, motif_length=motif_length)
+
+# TODO It is not possible to run pyattimo from a pytest :(
+random_walk()
