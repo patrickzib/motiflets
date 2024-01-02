@@ -1016,16 +1016,11 @@ def search_k_motiflets_elbow(
 
     backend = "pyattimo"
     if backend == "pyattimo":
-        import time
+        halve_m = int(m * slack)
         m_iter = pyattimo.MotifletsIterator(
-            data_raw, w=m, max_k=k_max_
+            data_raw, w=m, max_k=k_max_, exclusion_zone=halve_m,
         )
-        start_time = time.perf_counter()
         for mot in m_iter:
-            print(mot)
-            # print("Time:", time.perf_counter() - start_time)
-            start_time = time.perf_counter()
-
             test_k = len(mot.indices)
             if test_k < k_max_:
                 # TODO cross-check extent??

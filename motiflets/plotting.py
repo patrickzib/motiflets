@@ -87,7 +87,7 @@ class Motiflets:
             self,
             k_max,
             motif_length_range,
-            subsample=2,
+            subsample=1,
             # plot=True,
             # plot_elbows=False,
             # plot_motifs_as_grid=True,
@@ -567,7 +567,7 @@ def plot_motif_length_selection(
         n_jobs=4,
         elbow_deviation=1.00,
         slack=0.5,
-        subsample=2):
+        subsample=1):
     """Computes the AU_EF plot to extract the best motif lengths
 
     This is the method to find and plot the characteristic motif-lengths, for k in
