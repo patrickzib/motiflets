@@ -1021,12 +1021,13 @@ def search_k_motiflets_elbow(
             data_raw, w=m, max_k=k_max_
         )
 
-        for m in m_iter:
-            test_k = len(m.indices)
+        for mot in m_iter:
+            print(mot)
+            test_k = len(mot.indices)
             if test_k < k_max_:
                 # TODO cross-check extent??
-                k_motiflet_distances[test_k] = m.extent
-                k_motiflet_candidates[test_k] = m.indices
+                k_motiflet_distances[test_k] = mot.extent
+                k_motiflet_candidates[test_k] = np.array(mot.indices)
             # upper_bound = min(m.extent, upper_bound)
     else:
         # switch to sparse matrix representation when length is above 30_000
