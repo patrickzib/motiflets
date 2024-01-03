@@ -30,7 +30,8 @@ class Motiflets:
             ground_truth=None,
             elbow_deviation=1.00,
             slack=0.5,
-            n_jobs=4
+            n_jobs=4,
+            backend="pyattimo"
     ):
         """Computes the AU_EF plot to extract the best motif lengths
 
@@ -56,6 +57,10 @@ class Motiflets:
                 Defined as percentage of m. E.g. 0.5 is equal to half the window length.
             n_jobs : int
                 Number of jobs to be used.
+            backend : String, default="pyattimo"
+                The backend to use. As of now 'pyattimo' and 'default' are supported.
+                Use default for the original exact implementation, and pyattimo for a
+                fast, scalable but approximate implementation.
 
             Returns
             -------
@@ -69,6 +74,7 @@ class Motiflets:
         self.slack = slack
         self.ground_truth = ground_truth
         self.n_jobs = n_jobs
+        self.backend = backend
 
         self.motif_length_range = None
         self.motif_length = 0
@@ -126,6 +132,7 @@ class Motiflets:
             slack=self.slack,
             subsample=subsample,
             n_jobs=self.n_jobs,
+            backend=self.backend
             # plot_elbows=plot_elbows,
             # plot_grid=plot_motifs_as_grid,
             # plot=plot,
@@ -190,7 +197,8 @@ class Motiflets:
             filter=filter,
             n_jobs=self.n_jobs,
             elbow_deviation=self.elbow_deviation,
-            slack=self.slack
+            slack=self.slack,
+            backend=self.backend
         )
 
         return self.dists, self.motiflets, self.elbow_points
@@ -475,18 +483,21 @@ def _plot_elbow_points(
     plt.show()
 
 
-def plot_elbow(k_max,
-               data,
-               ds_name,
-               motif_length,
-               exclusion=None,
-               plot_elbows=False,
-               plot_grid=True,
-               ground_truth=None,
-               filter=True,
-               n_jobs=4,
-               elbow_deviation=1.00,
-               slack=0.5):
+def plot_elbow(
+        k_max,
+        data,
+        ds_name,
+        motif_length,
+        exclusion=None,
+        plot_elbows=False,
+        plot_grid=True,
+        ground_truth=None,
+        filter=True,
+        n_jobs=4,
+        elbow_deviation=1.00,
+        slack=0.5,
+        backend="pyattimo"
+    ):
     """Plots the elbow-plot for k-Motiflets.
 
     This is the method to find and plot the characteristic k-Motiflets within range
@@ -518,6 +529,10 @@ def plot_elbow(k_max,
         The minimal absolute deviation needed to detect an elbow.
         It measures the absolute change in deviation from k to k+1.
         1.05 corresponds to 5% increase in deviation.
+    backend : String, default="pyattimo"
+        The backend to use. As of now 'pyattimo' and 'default' are supported.
+        Use default for the original exact implementation, and pyattimo for a
+        fast, scalable but approximate implementation.
 
     Returns
     -------
@@ -538,7 +553,8 @@ def plot_elbow(k_max,
         n_jobs=n_jobs,
         exclusion=exclusion,
         elbow_deviation=elbow_deviation,
-        slack=slack)
+        slack=slack,
+        backend=backend)
     endTime = (time.perf_counter() - startTime)
 
     print("Chosen window-size:", m, "in", np.round(endTime, 1), "s")
@@ -567,7 +583,9 @@ def plot_motif_length_selection(
         n_jobs=4,
         elbow_deviation=1.00,
         slack=0.5,
-        subsample=1):
+        subsample=1,
+        backend="pyattimo"
+    ):
     """Computes the AU_EF plot to extract the best motif lengths
 
     This is the method to find and plot the characteristic motif-lengths, for k in
@@ -594,6 +612,10 @@ def plot_motif_length_selection(
         Defined as percentage of m. E.g. 0.5 is equal to half the window length.
     n_jobs : int
         Number of jobs to be used.
+    backend : String, default="pyattimo"
+        The backend to use. As of now 'pyattimo' and 'default' are supported.
+        Use default for the original exact implementation, and pyattimo for a
+        fast, scalable but approximate implementation.
 
     Returns
     -------
@@ -616,7 +638,8 @@ def plot_motif_length_selection(
             n_jobs=n_jobs,
             elbow_deviation=elbow_deviation,
             slack=slack,
-            subsample=subsample)
+            subsample=subsample,
+            backend=backend)
     endTime = (time.perf_counter() - startTime)
     print("\tTime", np.round(endTime, 1), "s")
     indices = ~np.isinf(au_ef)

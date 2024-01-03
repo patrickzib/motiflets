@@ -824,7 +824,8 @@ def find_au_ef_motif_length(
         n_jobs=4,
         elbow_deviation=1.00,
         slack=0.5,
-        subsample=2):
+        subsample=1,
+        backend="pyattimo"):
     """Computes the Area under the Elbow-Function within an of motif lengths.
 
     Parameters
@@ -846,6 +847,10 @@ def find_au_ef_motif_length(
     slack: float
         Defines an exclusion zone around each subsequence to avoid trivial matches.
         Defined as percentage of m. E.g. 0.5 is equal to half the window length.
+    backend : String, default="pyattimo"
+        The backend to use. As of now 'pyattimo' and 'default' are supported.
+        Use default for the original exact implementation, and pyattimo for a
+        fast, scalable but approximate implementation.
 
     Returns
     -------
@@ -883,7 +888,8 @@ def find_au_ef_motif_length(
                 n_jobs=n_jobs,
                 exclusion=exclusion,
                 elbow_deviation=elbow_deviation,
-                slack=slack)
+                slack=slack,
+                backend=backend)
 
             dists_ = dist[(~np.isinf(dist)) & (~np.isnan(dist))]
             if dists_.max() - dists_.min() == 0:
@@ -932,7 +938,8 @@ def search_k_motiflets_elbow(
         elbow_deviation=1.00,
         filter=True,
         slack=0.5,
-        n_jobs=4
+        n_jobs=4,
+        backend="pyattimo"
 ):
     """Computes the elbow-function.
 
@@ -970,7 +977,10 @@ def search_k_motiflets_elbow(
         Defined as percentage of m. E.g. 0.5 is equal to half the window length.
     n_jobs : int
         Number of jobs to be used.
-
+    backend : String, default="pyattimo"
+        The backend to use. As of now 'pyattimo' and 'default' are supported.
+        Use default for the original exact implementation, and pyattimo for a
+        fast, scalable but approximate implementation.
 
     Returns
     -------
@@ -996,8 +1006,9 @@ def search_k_motiflets_elbow(
             data, k_max, motif_length_range,
             n_jobs=n_jobs,
             elbow_deviation=elbow_deviation,
-            slack=slack)
-        motif_length = np.int32(m)
+            slack=slack,
+            backend=backend)
+        m = np.int32(m)
     elif isinstance(motif_length, int) or \
             isinstance(motif_length, np.int32) or \
             isinstance(motif_length, np.int64):
@@ -1014,7 +1025,7 @@ def search_k_motiflets_elbow(
     k_motiflet_distances = np.zeros(k_max_)
     k_motiflet_candidates = np.empty(k_max_, dtype=object)
 
-    backend = "pyattimo"
+    # backend = "pyattimo"
     if backend == "pyattimo":
         halve_m = int(m * slack)
         m_iter = pyattimo.MotifletsIterator(
@@ -1026,8 +1037,8 @@ def search_k_motiflets_elbow(
                 # TODO cross-check extent??
                 k_motiflet_distances[test_k] = mot.extent
                 k_motiflet_candidates[test_k] = np.array(mot.indices)
-            # upper_bound = min(m.extent, upper_bound)
-    else:
+
+    elif backend == "default":
         # switch to sparse matrix representation when length is above 30_000
         # sparse matrix is 2x slower but needs less memory
         sparse = n >= 30000
@@ -1065,6 +1076,8 @@ def search_k_motiflets_elbow(
             k_motiflet_distances[test_k] = candidate_dist
             k_motiflet_candidates[test_k] = candidate
             upper_bound = min(candidate_dist, upper_bound)
+    else:
+        raise Exception('Unknown backend: ' +backend+ '. Use "pyattimo" or "default".')
 
     # smoothen the line to make it monotonically increasing
     k_motiflet_distances[0:2] = k_motiflet_distances[2]
