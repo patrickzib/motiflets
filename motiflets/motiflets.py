@@ -1024,15 +1024,17 @@ def search_k_motiflets_elbow(
     # non-overlapping motifs only
     k_motiflet_distances = np.zeros(k_max_)
     k_motiflet_candidates = np.empty(k_max_, dtype=object)
+    exclusion_m = int(m * slack)
 
     # backend = "pyattimo"
     if backend == "pyattimo":
-        halve_m = int(m * slack)
         m_iter = pyattimo.MotifletsIterator(
-            data_raw, w=m, max_k=k_max_, exclusion_zone=halve_m,
+            data_raw, w=m, max_k=k_max_-1, exclusion_zone=exclusion_m,
         )
         for mot in m_iter:
-            test_k = len(mot.indices)
+            print(n, m, k_max_, mot.support, flush=True)
+            print(mot, flush=True)
+            test_k = mot.support
             if test_k < k_max_:
                 # TODO cross-check extent??
                 k_motiflet_distances[test_k] = mot.extent
@@ -1043,14 +1045,12 @@ def search_k_motiflets_elbow(
         # sparse matrix is 2x slower but needs less memory
         sparse = n >= 30000
         if not sparse:
-            D_full, knns = compute_distances_with_knns(data_raw, m, k_max_,
-                                                       n_jobs=n_jobs, slack=slack)
+            D_full, knns = compute_distances_with_knns(
+                data_raw, m, k_max_, n_jobs=n_jobs, slack=slack)
         else:
-            D_full, knns = compute_distances_with_knns_sparse(data_raw, m, k_max_,
-                                                              n_jobs=n_jobs,
-                                                              slack=slack)
+            D_full, knns = compute_distances_with_knns_sparse(
+                data_raw, m, k_max_, n_jobs=n_jobs, slack=slack)
 
-        exclusion_m = int(m * slack)
         upper_bound = np.inf
 
         for test_k in tqdm(range(k_max_ - 1, 1, -1),
@@ -1077,7 +1077,8 @@ def search_k_motiflets_elbow(
             k_motiflet_candidates[test_k] = candidate
             upper_bound = min(candidate_dist, upper_bound)
     else:
-        raise Exception('Unknown backend: ' +backend+ '. Use "pyattimo" or "default".')
+        raise Exception(
+            'Unknown backend: ' + backend + '. Use "pyattimo" or "default".')
 
     # smoothen the line to make it monotonically increasing
     k_motiflet_distances[0:2] = k_motiflet_distances[2]
