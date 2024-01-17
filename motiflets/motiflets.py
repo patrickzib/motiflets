@@ -21,8 +21,8 @@ from scipy.signal import argrelextrema
 from scipy.stats import zscore
 from tqdm.auto import tqdm
 
-import logging
-logging.basicConfig(level=logging.INFO)
+# import logging
+# logging.basicConfig(level=logging.INFO)
 
 def as_series(data, index_range, index_name):
     """Coverts a time series to a series with an index.
@@ -1033,18 +1033,18 @@ def search_k_motiflets_elbow(
         m_iter = pyattimo.MotifletsIterator(
             data_raw, w=m, max_k=k_max_-1, exclusion_zone=exclusion_m,
         )
-        # k_max_ = 20
-        # m = 145
-        # n = 10214
-        # exclusion_m =
-        for mot in m_iter:
-            print("n:", n, "m", m, "k", k_max_, "support", mot.support, flush=True)
-            print(mot, flush=True)
-            test_k = mot.support
-            if test_k < k_max_:
-                # TODO cross-check extent??
-                k_motiflet_distances[test_k] = mot.extent
-                k_motiflet_candidates[test_k] = np.array(mot.indices)
+        try:
+            for mot in m_iter:
+                print("n:", n, "m", m, "k", k_max_, "support", mot.support, flush=True)
+                print(mot, flush=True)
+
+                test_k = mot.support
+                if test_k < k_max_:
+                    # TODO cross-check extent??
+                    k_motiflet_distances[test_k] = mot.extent
+                    k_motiflet_candidates[test_k] = np.array(mot.indices)
+        except:
+            print("Caught exception in pyattimo", flush=True)
 
     elif backend == "default":
         # switch to sparse matrix representation when length is above 30_000
