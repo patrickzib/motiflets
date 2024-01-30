@@ -26,11 +26,12 @@ def read_penguin_data():
 
 
 def test_motiflets():
-    lengths = [#1_000, 5_000,
+    lengths = [1_000,
+               # 5_000,
                #10_000, 30_000,
                #50_000, 100_000,
-               150_000, 200_000,
-               250_000
+               #150_000, 200_000,
+               #250_000
                ]
 
     ds_name, B = read_penguin_data()
@@ -51,7 +52,7 @@ def test_motiflets():
             k_max,
             22,
             plot_elbows=False,
-            plot_motifs_as_grid=False
+            plot_motifs_as_grid=True
         )
         t_after = time.time()
         time_s[i] = t_after - t_before

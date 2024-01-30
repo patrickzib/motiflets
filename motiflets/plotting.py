@@ -771,9 +771,9 @@ def plot_grid_motiflets(
     ax_title = fig.add_subplot(gs[count_plots, :])
 
     if (show_elbows):
-        ax_title.set_title('(d) Shape of Top Motif Sets by Method', pad=30)
+        ax_title.set_title('(d) Shape of Top Motif Sets', pad=30)
     else:
-        ax_title.set_title('(c) Shape of Optimal Motif Sets by Method', pad=30)
+        ax_title.set_title('(c) Shape of Top Motif Sets', pad=30)
 
     # Turn off axis lines and ticks of the big subplot 
     ax_title.tick_params(labelcolor=(1., 1., 1., 0.0),
