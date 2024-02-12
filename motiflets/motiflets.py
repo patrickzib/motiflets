@@ -481,7 +481,7 @@ def distance(dot_rolled, n, m, means, stds, order, halve_m):
 
     # self-join: exclusion zone
     trivialMatchRange = (max(0, order - halve_m),
-                         min(order + halve_m, n))
+                         min(order + halve_m + 1, n))
     dist[trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
 
     # allow subsequence itself to be in result
