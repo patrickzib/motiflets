@@ -10,7 +10,7 @@ from pathlib import Path
 pyproject = toml.load("pyproject.toml")
 
 this_directory = Path(__file__).parent
-long_description = (this_directory / "README.md").read_text()
+long_description = (this_directory / "README.md").read_text("UTF-8")
     
 """Set up package."""
 setup(
