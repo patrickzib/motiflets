@@ -390,8 +390,8 @@ def plot_motifset(
     for aaa, column in enumerate(ground_truth):
         for offsets in ground_truth[column]:
             for pos, offset in enumerate(offsets):
-                start = offset[0] // factor
-                end = offset[1] // factor
+                start = np.int32(offset[0] // factor)
+                end = np.int32(offset[1] // factor)
                 if pos == 0:
                     sns.lineplot(x=data_index_sampled[start:end],
                                  y=data_raw_sampled[start:end],
