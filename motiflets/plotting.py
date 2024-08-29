@@ -7,7 +7,6 @@ __author__ = ["patrickzib"]
 import time
 
 import matplotlib
-import numpy as np
 import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
@@ -383,8 +382,10 @@ def plot_motifset(
         for pos in motifset_sampled:
             motif_length_sampled = np.int32(max(2, motif_length // factor))
             _ = sns.lineplot(ax=axes[0],
-                             x=data_index_sampled[np.arange(pos, pos + motif_length_sampled)],
-                             y=data_raw_sampled[pos:pos + motif_length_sampled], linewidth=5,
+                             x=data_index_sampled[
+                                 np.arange(pos, pos + motif_length_sampled)],
+                             y=data_raw_sampled[pos:pos + motif_length_sampled],
+                             linewidth=5,
                              color=sns.color_palette("tab10")[
                                  (len(ground_truth) + 2) % 10],
                              # alpha=0.5,
@@ -516,7 +517,7 @@ def plot_elbow(k_max,
                slack=0.5,
                distance=znormed_euclidean_distance,
                distance_preprocessing=sliding_mean_std
-            ):
+               ):
     """Plots the elbow-plot for k-Motiflets.
 
     This is the method to find and plot the characteristic k-Motiflets within range
@@ -608,7 +609,7 @@ def plot_motif_length_selection(
         subsample=2,
         distance=znormed_euclidean_distance,
         distance_preprocessing=sliding_mean_std
-    ):
+):
     """Computes the AU_EF plot to extract the best motif lengths
 
     This is the method to find and plot the characteristic motif-lengths, for k in
@@ -867,7 +868,8 @@ def plot_grid_motiflets(
                 ratio = 0.8
                 rect = Rectangle(
                     (data_index_sampled[pos], -i),
-                    data_index_sampled[pos + motif_length_sampled - 1] - data_index_sampled[pos],
+                    data_index_sampled[pos + motif_length_sampled - 1] -
+                    data_index_sampled[pos],
                     ratio,
                     facecolor=color_palette[
                         (len(ground_truth) + ii % grid_dim) % len(color_palette)],
@@ -878,7 +880,6 @@ def plot_grid_motiflets(
 
             for aa, pos in enumerate(motiflets[i]):
                 df[str(aa)] = zscore(data_raw[pos:pos + motif_length])
-
 
             if method_name is not None:
                 y_labels.append(method_name + "\nTop-" + str(i + 1))
