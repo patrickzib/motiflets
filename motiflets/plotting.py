@@ -14,7 +14,6 @@ from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
 from matplotlib.ticker import MaxNLocator
 from scipy.stats import zscore
-from torch.ao.pruning import module_to_fqn
 from tsdownsample import MinMaxLTTBDownsampler
 
 import motiflets.motiflets as ml
@@ -365,10 +364,12 @@ def plot_motifset(
         ground_truth = []
 
     data_index, data_raw = ml.pd_series_to_numpy(data)
+    data_raw_sampled, data_index_sampled = data_raw, data_index
 
-    data_index_sampled = MinMaxLTTBDownsampler().downsample(data_raw, n_out=1000)
-    data_raw_sampled = data_raw[data_index_sampled]
-    factor = len(data_raw) / len(data_raw_sampled)
+    if data_raw.shape[0] > 1000:
+        data_index_sampled = MinMaxLTTBDownsampler().downsample(data_raw, n_out=1000)
+        data_raw_sampled = data_raw[data_index_sampled]
+        factor = max(1, len(data_raw) / len(data_raw_sampled))
 
     axes[0].set_title(ds_name, fontsize=20)
     _ = sns.lineplot(x=data_index_sampled, y=data_raw_sampled, ax=axes[0], linewidth=1,
@@ -376,9 +377,11 @@ def plot_motifset(
     sns.despine()
 
     if motifset is not None:
-        motifset = np.array(motifset // factor, dtype=np.int32)
+        if factor > 1:
+            motifset = np.array(motifset // factor, dtype=np.int32)
+
         for pos in motifset:
-            motif_length_sampled = max(2, motif_length // factor)
+            motif_length_sampled = np.int32(max(2, motif_length // factor))
             _ = sns.lineplot(ax=axes[0],
                              x=data_index_sampled[np.arange(pos, pos + motif_length_sampled)],
                              y=data_raw_sampled[pos:pos + motif_length_sampled], linewidth=5,
@@ -767,13 +770,15 @@ def plot_grid_motiflets(
     ax_ts.set_title("(a) Dataset: " + ds_name + "")
 
     data_index, data_raw = ml.pd_series_to_numpy(data)
-    data_index_sampled = MinMaxLTTBDownsampler().downsample(data_raw, n_out=1000)
-    data_raw_sampled = data_raw[data_index_sampled]
-    factor = len(data_raw) / len(data_raw_sampled)
+    data_raw_sampled, data_index_sampled = data_raw, data_index
 
-    motifsets = np.array(
-        list(map(lambda x: (x // factor) if x is not None else x, motifsets)),
-        dtype=np.object_)
+    if data_raw.shape[0] > 1000:
+        data_index_sampled = MinMaxLTTBDownsampler().downsample(data_raw, n_out=1000)
+        data_raw_sampled = data_raw[data_index_sampled]
+        factor = max(1, len(data_raw) / len(data_raw_sampled))
+        motifsets = np.array(
+            list(map(lambda x: (x // factor) if x is not None else x, motifsets)),
+            dtype=np.object_)
 
     _ = sns.lineplot(x=data_index_sampled, y=data_raw_sampled, ax=ax_ts, linewidth=1)
     sns.despine()
@@ -781,8 +786,8 @@ def plot_grid_motiflets(
     for aaa, column in enumerate(ground_truth):
         for offsets in ground_truth[column]:
             for pos, offset in enumerate(offsets):
-                start = offset[0] // factor
-                end = offset[1] // factor
+                start = np.int32(offset[0] // factor)
+                end = np.int32(offset[1] // factor)
                 if pos == 0:
                     sns.lineplot(x=data_index_sampled[start:end],
                                  y=data_raw_sampled[start:end],
@@ -845,7 +850,7 @@ def plot_grid_motiflets(
     motiflets = motifsets[elbow_points]
     for i, motiflet in enumerate(motiflets):
         if motiflet is not None:
-            motif_length_sampled = max(2, motif_length // factor)
+            motif_length_sampled = np.int32(max(2, motif_length // factor))
 
             plot_minature = (plot_index == None) or (i in plot_index)
             if plot_minature:
