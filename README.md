@@ -73,6 +73,7 @@ We first extract meaningful **motif lengths (l)** from this use case:
 ml = Motiflets(
     ds_name,     # the name of the series
     series,      # the data
+    distance,    # Distance measure used, default: z-normed ED
     df_gt,       # ground truth, if available
     n_jobs       # number of jobs (cores) to be used.
 )
