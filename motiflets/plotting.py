@@ -16,6 +16,7 @@ from matplotlib.ticker import MaxNLocator
 from scipy.stats import zscore
 
 import motiflets.motiflets as ml
+from motiflets.distances import *
 
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
@@ -29,6 +30,7 @@ class Motiflets:
             series,
             ground_truth=None,
             elbow_deviation=1.00,
+            distance="znormed_ed",
             slack=0.5,
             n_jobs=4
     ):
@@ -51,6 +53,11 @@ class Motiflets:
                 The minimal absolute deviation needed to detect an elbow.
                 It measures the absolute change in deviation from k to k+1.
                 1.05 corresponds to 5% increase in deviation.
+            distance: str (default="znormed_ed")
+                The name of the distance function to be computed.
+                Available options are:
+                    - 'znormed_ed' or 'znormed_euclidean' for z-normalized ED
+                    - 'ed' or 'euclidean' for the "normal" ED.
             slack: float
                 Defines an exclusion zone around each subsequence to avoid trivial matches.
                 Defined as percentage of m. E.g. 0.5 is equal to half the window length.
@@ -69,6 +76,9 @@ class Motiflets:
         self.slack = slack
         self.ground_truth = ground_truth
         self.n_jobs = n_jobs
+
+        # distance function used
+        self.distance_preprocessing, self.distance = map_distances(distance)
 
         self.motif_length_range = None
         self.motif_length = 0
@@ -126,6 +136,8 @@ class Motiflets:
             slack=self.slack,
             subsample=subsample,
             n_jobs=self.n_jobs,
+            distance=self.distance,
+            distance_preprocessing=self.distance_preprocessing
             # plot_elbows=plot_elbows,
             # plot_grid=plot_motifs_as_grid,
             # plot=plot,
@@ -190,7 +202,9 @@ class Motiflets:
             filter=filter,
             n_jobs=self.n_jobs,
             elbow_deviation=self.elbow_deviation,
-            slack=self.slack
+            slack=self.slack,
+            distance=self.distance,
+            distance_preprocessing=self.distance_preprocessing
         )
 
         return self.dists, self.motiflets, self.elbow_points
@@ -482,10 +496,14 @@ def plot_elbow(k_max,
                plot_elbows=False,
                plot_grid=True,
                ground_truth=None,
+               method_name=None,
                filter=True,
                n_jobs=4,
                elbow_deviation=1.00,
-               slack=0.5):
+               slack=0.5,
+               distance=znormed_euclidean_distance,
+               distance_preprocessing=sliding_mean_std
+            ):
     """Plots the elbow-plot for k-Motiflets.
 
     This is the method to find and plot the characteristic k-Motiflets within range
@@ -517,6 +535,10 @@ def plot_elbow(k_max,
         The minimal absolute deviation needed to detect an elbow.
         It measures the absolute change in deviation from k to k+1.
         1.05 corresponds to 5% increase in deviation.
+    distance: callable
+        The distance function to be computed.
+    distance_preprocessing: callable
+        The distance preprocessing function to be computed.
 
     Returns
     -------
@@ -537,7 +559,10 @@ def plot_elbow(k_max,
         n_jobs=n_jobs,
         exclusion=exclusion,
         elbow_deviation=elbow_deviation,
-        slack=slack)
+        slack=slack,
+        distance=distance,
+        distance_preprocessing=distance_preprocessing
+    )
     endTime = (time.perf_counter() - startTime)
 
     print("Chosen window-size:", m, "in", np.round(endTime, 1), "s")
@@ -554,6 +579,7 @@ def plot_elbow(k_max,
         plot_grid_motiflets(
             ds_name, data, candidates, elbow_points,
             dists, motif_length,
+            method_name=method_name,
             show_elbows=False,
             font_size=24,
             ground_truth=ground_truth)
@@ -566,7 +592,10 @@ def plot_motif_length_selection(
         n_jobs=4,
         elbow_deviation=1.00,
         slack=0.5,
-        subsample=2):
+        subsample=2,
+        distance=znormed_euclidean_distance,
+        distance_preprocessing=sliding_mean_std
+    ):
     """Computes the AU_EF plot to extract the best motif lengths
 
     This is the method to find and plot the characteristic motif-lengths, for k in
@@ -584,6 +613,8 @@ def plot_motif_length_selection(
         the interval of lengths
     ds_name: String
         Name of the time series for displaying
+    n_jobs : int
+        Number of jobs to be used.
     elbow_deviation : float, default=1.00
         The minimal absolute deviation needed to detect an elbow.
         It measures the absolute change in deviation from k to k+1.
@@ -591,8 +622,10 @@ def plot_motif_length_selection(
     slack: float
         Defines an exclusion zone around each subsequence to avoid trivial matches.
         Defined as percentage of m. E.g. 0.5 is equal to half the window length.
-    n_jobs : int
-        Number of jobs to be used.
+    distance: callable
+        The distance function to be computed.
+    distance_preprocessing: callable
+        The distance preprocessing function to be computed.
 
     Returns
     -------
@@ -615,7 +648,10 @@ def plot_motif_length_selection(
             n_jobs=n_jobs,
             elbow_deviation=elbow_deviation,
             slack=slack,
-            subsample=subsample)
+            subsample=subsample,
+            distance=distance,
+            distance_preprocessing=distance_preprocessing
+        )
     endTime = (time.perf_counter() - startTime)
     print("\tTime", np.round(endTime, 1), "s")
     indices = ~np.isinf(au_ef)
