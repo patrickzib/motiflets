@@ -378,9 +378,9 @@ def plot_motifset(
 
     if motifset is not None:
         if factor > 1:
-            motifset = np.array(motifset // factor, dtype=np.int32)
+            motifset_sampled = np.array(motifset // factor, dtype=np.int32)
 
-        for pos in motifset:
+        for pos in motifset_sampled:
             motif_length_sampled = np.int32(max(2, motif_length // factor))
             _ = sns.lineplot(ax=axes[0],
                              x=data_index_sampled[np.arange(pos, pos + motif_length_sampled)],
