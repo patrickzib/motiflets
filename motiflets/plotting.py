@@ -776,7 +776,7 @@ def plot_grid_motiflets(
         data_index_sampled = MinMaxLTTBDownsampler().downsample(data_raw, n_out=1000)
         data_raw_sampled = data_raw[data_index_sampled]
         factor = max(1, len(data_raw) / len(data_raw_sampled))
-        motifsets = np.array(
+        motifsets_sampled = np.array(
             list(map(lambda x: (x // factor) if x is not None else x, motifsets)),
             dtype=np.object_)
 
@@ -847,8 +847,9 @@ def plot_grid_motiflets(
 
     y_labels = []
     ii = -1
+    motiflets_sampled = motifsets_sampled[elbow_points]
     motiflets = motifsets[elbow_points]
-    for i, motiflet in enumerate(motiflets):
+    for i, motiflet in enumerate(motiflets_sampled):
         if motiflet is not None:
             motif_length_sampled = np.int32(max(2, motif_length // factor))
 
@@ -863,7 +864,6 @@ def plot_grid_motiflets(
 
             for aa, pos in enumerate(motiflet):
                 pos = np.int32(pos)
-                df[str(aa)] = zscore(data_raw[pos:pos + motif_length])
                 ratio = 0.8
                 rect = Rectangle(
                     (data_index_sampled[pos], -i),
@@ -875,6 +875,10 @@ def plot_grid_motiflets(
                     alpha=0.7
                 )
                 ax_bars.add_patch(rect)
+
+            for aa, pos in enumerate(motiflets[i]):
+                df[str(aa)] = zscore(data_raw[pos:pos + motif_length])
+
 
             if method_name is not None:
                 y_labels.append(method_name + "\nTop-" + str(i + 1))
