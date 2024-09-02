@@ -107,7 +107,7 @@ def test_attimo():
     print("Size of DS: ", ts.shape, " l:", l)
     start = time.time()
 
-    k_max = 20
+    k_max = 10
     m_iter = pyattimo.MotifletsIterator(
         ts, w=l, support=k_max, top_k=1
     )
