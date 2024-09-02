@@ -45,7 +45,7 @@ def read_penguin_data_short():
 
 def test_plotting():
     ds_name, ts = read_penguin_data()
-    ts = ts.iloc[497699 - 10_000: 497699 + 10_000, -2].T
+    ts = ts.iloc[497699 - 20_000: 497699 + 20_000, -2].T
 
     mm = Motiflets(ds_name, ts)
     mm.plot_dataset(path="results/images/penguin_data_raw.pdf")
@@ -55,6 +55,7 @@ def test_plotting():
 def test_attimo():
     ds_name, ts = read_penguin_data()
     # ts = ts.iloc[497699 - 50_000: 497699 + 50_000, 0].T
+    # ts = ts.iloc[497699 - 10_000: 497699 + 10_000, 0].T
     ts = ts.iloc[497699 - 20_000: 497699 + 20_000, 0].T
 
     print("Size of DS: ", ts.shape)

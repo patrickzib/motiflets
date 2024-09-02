@@ -368,7 +368,7 @@ def plot_motifset(
                                  sharex=False, figsize=(20, 3),
                                  gridspec_kw={'width_ratios': [4, 1]})
     else:
-        fig, axes = plt.subplots(1, 1, figsize=(20, 3))
+        fig, axes = plt.subplots(1, 1, figsize=(40, 3))
         axes = [axes]
 
     if ground_truth is None:
@@ -378,7 +378,8 @@ def plot_motifset(
     data_raw_sampled, data_index_sampled = data_raw, data_index
 
     if data_raw.shape[0] > max_points:
-        data_index_sampled = MinMaxLTTBDownsampler().downsample(data_raw, n_out=max_points)
+        data_index_sampled = MinMaxLTTBDownsampler().downsample(
+            data_raw, n_out=max_points)
         data_raw_sampled = data_raw[data_index_sampled]
 
     factor = max(1, len(data_raw) / len(data_raw_sampled))
@@ -440,9 +441,6 @@ def plot_motifset(
                          x="time", y="value")
 
     sns.despine()
-
-    # if motifset is None:
-    #    motifset = []
 
     fig.tight_layout()
     if show:
