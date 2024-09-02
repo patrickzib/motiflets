@@ -23,7 +23,6 @@ mpl.rcParams['figure.dpi'] = 150
 path = "../datasets/experiments/"
 
 
-
 def find_dominant_window_sizes(X, offset=0.05):
     """Determine the Window-Size using dominant FFT-frequencies.
 
@@ -74,20 +73,13 @@ def test_plot_data():
     ds_name, series = read_arrhythmia()
     ml = Motiflets(ds_name, series)
     points_to_plot = 10_000
-    ml.plot_dataset(max_points=points_to_plot, path="results/images/arrhythmia_data.pdf")
-
-
-def test_plotting():
-    ds_name, ts = read_arrhythmia()
-    ts = ts.iloc[497699 - 20_000: 497699 + 20_000, -2].T
-
-    mm = Motiflets(ds_name, ts)
-    mm.plot_dataset(path="results/images/penguin_data_raw.pdf")
+    ml.plot_dataset(max_points=points_to_plot,
+                    path="results/images/arrhythmia_data.pdf")
 
 
 def test_attimo():
     ds_name, ts = read_arrhythmia()
-    l = 2*find_dominant_window_sizes(ts, offset=0.05)
+    l = 2 * find_dominant_window_sizes(ts, offset=0.05)
 
     print("Size of DS: ", ts.shape, " l:", l)
     start = time.time()
