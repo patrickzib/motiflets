@@ -21,6 +21,8 @@ from scipy.signal import argrelextrema
 from scipy.stats import zscore
 from tqdm.auto import tqdm
 
+from motiflets.distances import *
+
 # import logging
 # logging.basicConfig(level=logging.INFO)
 
@@ -279,12 +281,16 @@ def _sliding_mean_std(ts, m):
 
 
 @njit(fastmath=True, cache=True, parallel=True)
-def compute_distances_with_knns(ts,
-                                m,
-                                k,
-                                exclude_trivial_match=True,
-                                n_jobs=4,
-                                slack=0.5):
+def compute_distances_with_knns(
+        ts,
+        m,
+        k,
+        exclude_trivial_match=True,
+        n_jobs=4,
+        slack=0.5,
+        distance=znormed_euclidean_distance,
+        distance_preprocessing=sliding_mean_std
+):
     """Compute the full Distance Matrix between all pairs of subsequences.
 
         Computes pairwise distances between n-m+1 subsequences, of length, extracted from
@@ -309,6 +315,11 @@ def compute_distances_with_knns(ts,
         slack: float
             Defines an exclusion zone around each subsequence to avoid trivial matches.
             Defined as percentage of m. E.g. 0.5 is equal to half the window length.
+        distance: callable
+                The distance function to be computed.
+        distance_preprocessing: callable
+                The distance preprocessing function to be computed.
+
         Returns
         -------
         D : 2d array-like
@@ -325,10 +336,12 @@ def compute_distances_with_knns(ts,
     D = np.zeros((n, n), dtype=np.float32)
     knns = np.zeros((n, k), dtype=np.int32)
 
-    means, stds = _sliding_mean_std(ts, m)
+    # means, stds = _sliding_mean_std(ts, m)
+    preprocessing = distance_preprocessing(ts, m)
 
     dot_first = _sliding_dot_product(ts[:m], ts)
     bin_size = ts.shape[0] // n_jobs
+
     for idx in prange(n_jobs):
         start = idx * bin_size
         end = min((idx + 1) * bin_size, ts.shape[0] - m + 1)
@@ -345,7 +358,8 @@ def compute_distances_with_knns(ts,
                              - ts[order - 1] * np.roll(ts[:n], 1)
                 dot_rolled[0] = dot_first[order]
 
-            D[order, :] = distance(dot_rolled, n, m, means, stds, order, halve_m)
+            # D[order, :] = distance(dot_rolled, n, m, means, stds, order, halve_m)
+            D[order, :] = distance(dot_rolled, n, m, preprocessing, order, halve_m)
             dot_prev = dot_rolled
 
     for order in prange(D.shape[-1]):
@@ -357,12 +371,16 @@ def compute_distances_with_knns(ts,
 
 
 @njit(fastmath=True, cache=True, parallel=True)
-def compute_distances_with_knns_sparse(ts,
-                                       m,
-                                       k,
-                                       exclude_trivial_match=True,
-                                       n_jobs=4,
-                                       slack=0.5):
+def compute_distances_with_knns_sparse(
+    ts,
+    m,
+    k,
+    exclude_trivial_match=True,
+    n_jobs=4,
+    slack=0.5,
+    distance=znormed_euclidean_distance,
+    distance_preprocessing=sliding_mean_std
+):
     """ Compute the full Distance Matrix between all pairs of subsequences of a
         multivariate time series.
 
@@ -375,7 +393,7 @@ def compute_distances_with_knns_sparse(ts,
 
         Parameters
         ----------
-        ts : array-like
+        time_series : array-like
             The time series
         m : int
             The window length
@@ -388,6 +406,10 @@ def compute_distances_with_knns_sparse(ts,
         slack: float
             Defines an exclusion zone around each subsequence to avoid trivial matches.
             Defined as percentage of m. E.g. 0.5 is equal to half the window length.
+        distance: callable
+                The distance function to be computed.
+        distance_preprocessing: callable
+                The distance preprocessing function to be computed.
 
         Returns
         -------
@@ -413,7 +435,9 @@ def compute_distances_with_knns_sparse(ts,
     for i in range(n):
         D_sparse.append(Dict.empty(key_type=types.int32, value_type=types.float32))
 
-    means, stds = _sliding_mean_std(ts, m)
+    # means, stds = _sliding_mean_std(ts, m)
+    preprocessing = distance_preprocessing(ts, m)
+
     dot_first = _sliding_dot_product(ts[:m], ts)
     bin_size = ts.shape[0] // n_jobs
 
@@ -434,7 +458,8 @@ def compute_distances_with_knns_sparse(ts,
                              - ts[order - 1] * np.roll(ts[:n], 1)
                 dot_rolled[0] = dot_first[order]
 
-            dist = distance(dot_rolled, n, m, means, stds, order, halve_m)
+            # dist = distance(dot_rolled, n, m, means, stds, order, halve_m)
+            dist = distance(dot_rolled, n, m, preprocessing, order, halve_m)
             dot_prev = dot_rolled
 
             knn = _argknn(dist, k, m, slack=slack)
@@ -466,7 +491,8 @@ def compute_distances_with_knns_sparse(ts,
                              - ts[order - 1] * np.roll(ts[:n], 1)
                 dot_rolled[0] = dot_first[order]
 
-            dist = distance(dot_rolled, n, m, means, stds, order, halve_m)
+            # dist = distance(dot_rolled, n, m, means, stds, order, halve_m)
+            dist = distance(dot_rolled, n, m, preprocessing, order, halve_m)
             dot_prev = dot_rolled
 
             # fill the knns now with the distances computed
@@ -476,21 +502,21 @@ def compute_distances_with_knns_sparse(ts,
     return D_sparse, knns
 
 
-@njit(fastmath=True, cache=True)
-def distance(dot_rolled, n, m, means, stds, order, halve_m):
-    # Implementation of z-normalized Euclidean distance
-    dist = 2 * m * (1 - (dot_rolled - m * means * means[order]) / (
-            m * stds * stds[order]))
-
-    # self-join: exclusion zone
-    trivialMatchRange = (max(0, order - halve_m),
-                         min(order + halve_m, n))
-    dist[trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
-
-    # allow subsequence itself to be in result
-    dist[order] = 0
-
-    return dist
+# @njit(fastmath=True, cache=True)
+# def distance(dot_rolled, n, m, means, stds, order, halve_m):
+#     # Implementation of z-normalized Euclidean distance
+#     dist = 2 * m * (1 - (dot_rolled - m * means * means[order]) / (
+#             m * stds * stds[order]))
+#
+#     # self-join: exclusion zone
+#     trivialMatchRange = (max(0, order - halve_m),
+#                          min(order + halve_m + 1, n))
+#     dist[trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
+#
+#     # allow subsequence itself to be in result
+#     dist[order] = 0
+#
+#     return dist
 
 
 @njit(fastmath=True, cache=True)
@@ -724,7 +750,7 @@ def _check_unique(motifset_1, motifset_2, motif_length):
 
 
 # @njit(fastmath=True, cache=True)
-def _filter_unique(elbow_points, candidates, motif_length):
+def filter_unique(elbow_points, candidates, motif_length):
     """Filters the list of candidate elbows for only the non-overlapping motifsets.
 
     This method applied a duplicate detection by filtering overlapping motif sets.
@@ -761,7 +787,7 @@ def _filter_unique(elbow_points, candidates, motif_length):
     return np.array(filtered_ebp)
 
 
-# @njit(fastmath=True, cache=True)
+@njit(fastmath=True, cache=True)
 def find_elbow_points(dists, alpha=2, elbow_deviation=1.00):
     """Finds elbow-points in the elbow-plot (extent over each k).
 
@@ -795,9 +821,8 @@ def find_elbow_points(dists, alpha=2, elbow_deviation=1.00):
             m2 = (dists[i] - dists[i - 1]) + 0.00001
 
             # avoid detecting elbows in near constant data
-            # TODO adding this removes reproducability
-            # if dists[i - 1] == dists[i]:
-            #    m2 = 1.0  # peaks[i] = 0
+            if dists[i - 1] == dists[i]:
+               m2 = 1.0  # peaks[i] = 0
 
             if (dists[i] > 0) and (dists[i + 1] / dists[i] > elbow_deviation):
                 peaks[i] = (m1 / m2)
@@ -826,7 +851,9 @@ def find_au_ef_motif_length(
         n_jobs=4,
         elbow_deviation=1.00,
         slack=0.5,
-        subsample=1,
+        subsample=2,
+        distance=znormed_euclidean_distance,
+        distance_preprocessing=sliding_mean_std,
         backend="pyattimo"):
     """Computes the Area under the Elbow-Function within an of motif lengths.
 
@@ -849,6 +876,10 @@ def find_au_ef_motif_length(
     slack: float
         Defines an exclusion zone around each subsequence to avoid trivial matches.
         Defined as percentage of m. E.g. 0.5 is equal to half the window length.
+    distance: callable
+        The distance function to be computed.
+    distance_preprocessing: callable
+        The distance preprocessing function to be computed.
     backend : String, default="pyattimo"
         The backend to use. As of now 'pyattimo' and 'default' are supported.
         Use default for the original exact implementation, and pyattimo for a
@@ -891,6 +922,8 @@ def find_au_ef_motif_length(
                 exclusion=exclusion,
                 elbow_deviation=elbow_deviation,
                 slack=slack,
+                distance=distance,
+                distance_preprocessing=distance_preprocessing,
                 backend=backend)
 
             dists_ = dist[(~np.isinf(dist)) & (~np.isnan(dist))]
@@ -901,7 +934,7 @@ def find_au_ef_motif_length(
                         dists_.max() - dists_.min())).sum()
                              / len(dists_))
 
-            elbow_points = _filter_unique(elbow_points, candidates, m // subsample)
+            elbow_points = filter_unique(elbow_points, candidates, m // subsample)
 
             if len(elbow_points > 0):
                 elbows[i] = elbow_points
@@ -941,6 +974,8 @@ def search_k_motiflets_elbow(
         filter=True,
         slack=0.5,
         n_jobs=4,
+        distance=znormed_euclidean_distance,
+        distance_preprocessing=sliding_mean_std,
         backend="pyattimo"
 ):
     """Computes the elbow-function.
@@ -979,6 +1014,10 @@ def search_k_motiflets_elbow(
         Defined as percentage of m. E.g. 0.5 is equal to half the window length.
     n_jobs : int
         Number of jobs to be used.
+    distance: callable
+            The distance function to be computed.
+    distance_preprocessing: callable
+            The distance preprocessing function to be computed.
     backend : String, default="pyattimo"
         The backend to use. As of now 'pyattimo' and 'default' are supported.
         Use default for the original exact implementation, and pyattimo for a
@@ -1031,7 +1070,7 @@ def search_k_motiflets_elbow(
     # backend = "pyattimo"
     if backend == "pyattimo":
         m_iter = pyattimo.MotifletsIterator(
-            data_raw, w=m, max_k=k_max_-1, exclusion_zone=exclusion_m,
+            data_raw, w=m, support=k_max_-1, exclusion_zone=exclusion_m,
         )
         try:
             for mot in m_iter:
@@ -1052,13 +1091,18 @@ def search_k_motiflets_elbow(
         sparse = n >= 30000
         if not sparse:
             D_full, knns = compute_distances_with_knns(
-                data_raw, m, k_max_, n_jobs=n_jobs, slack=slack)
+                data_raw, m, k_max_, n_jobs=n_jobs, slack=slack,
+                distance=distance,
+                distance_preprocessing=distance_preprocessing
+            )
         else:
             D_full, knns = compute_distances_with_knns_sparse(
-                data_raw, m, k_max_, n_jobs=n_jobs, slack=slack)
+                data_raw, m, k_max_, n_jobs=n_jobs, slack=slack,
+                distance = distance,
+                distance_preprocessing = distance_preprocessing,
+            )
 
         upper_bound = np.inf
-
         for test_k in tqdm(range(k_max_ - 1, 1, -1),
                            desc='Compute ks (' + str(k_max_) + ")",
                            position=0, leave=False):
@@ -1096,7 +1140,7 @@ def search_k_motiflets_elbow(
                                      elbow_deviation=elbow_deviation)
 
     if filter:
-        elbow_points = _filter_unique(
+        elbow_points = filter_unique(
             elbow_points, k_motiflet_candidates, m)
 
     return k_motiflet_distances, k_motiflet_candidates, elbow_points, m
