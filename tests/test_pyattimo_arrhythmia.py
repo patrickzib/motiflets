@@ -79,7 +79,8 @@ def test_plot_data():
 
 def test_attimo():
     ds_name, ts = read_arrhythmia()
-    l = 2 * find_dominant_window_sizes(ts, offset=0.05)
+    # l = 2 * find_dominant_window_sizes(ts, offset=0.05)
+    l = 200
 
     print("Size of DS: ", ts.shape, " l:", l)
     start = time.time()
@@ -97,9 +98,11 @@ def test_attimo():
 
     elbow_points = filter_unique(np.arange(len(motifs)), motifs, l)
 
+    points_to_plot = 10_000
     fig, gs = plot_motifsets(
         ds_name,
         ts,
+        max_points=points_to_plot,
         motifsets=np.array(motifs, dtype=np.object_)[elbow_points],
         motif_length=l,
         show=False)

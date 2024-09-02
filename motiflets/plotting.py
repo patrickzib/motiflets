@@ -456,6 +456,7 @@ def plot_motifsets(
         motifset_names=None,
         motif_length=None,
         ground_truth=None,
+        max_points=1000,
         show=True):
     """Plots the data and the found motif sets.
 
@@ -517,8 +518,8 @@ def plot_motifsets(
     data_index, data_raw = ml.pd_series_to_numpy(data)
     data_raw_sampled, data_index_sampled = data_raw, data_index
 
-    if data_raw.shape[0] > 1000:
-        data_index_sampled = MinMaxLTTBDownsampler().downsample(data_raw, n_out=1000)
+    if data_raw.shape[0] > max_points:
+        data_index_sampled = MinMaxLTTBDownsampler().downsample(data_raw, n_out=max_points)
         data_raw_sampled = data_raw[data_index_sampled]
 
     factor = max(1, len(data_raw) / len(data_raw_sampled))

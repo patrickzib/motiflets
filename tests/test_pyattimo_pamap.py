@@ -64,7 +64,7 @@ def find_dominant_window_sizes(X, offset=0.05):
 
 
 def load_dataset(selection=None):
-    desc_filename = path + "/pamap_desc.txt"
+    desc_filename = path + "pamap_desc.txt"
     desc_file = []
 
     with open(desc_filename, 'r') as file:
@@ -101,12 +101,13 @@ def test_attimo():
     ds_name, series = load_dataset()
     ts = series.time_series[0]
 
-    l = 2 * find_dominant_window_sizes(ts, offset=0.05)
+    # l = 2 * find_dominant_window_sizes(ts, offset=0.05)
+    l = 200
 
     print("Size of DS: ", ts.shape, " l:", l)
     start = time.time()
 
-    k_max = 10
+    k_max = 20
     m_iter = pyattimo.MotifletsIterator(
         ts, w=l, support=k_max, top_k=1
     )
@@ -119,9 +120,11 @@ def test_attimo():
 
     elbow_points = filter_unique(np.arange(len(motifs)), motifs, l)
 
+    points_to_plot = 10_000
     fig, gs = plot_motifsets(
         ds_name,
         ts,
+        max_points=points_to_plot,
         motifsets=np.array(motifs, dtype=np.object_)[elbow_points],
         motif_length=l,
         show=False)
