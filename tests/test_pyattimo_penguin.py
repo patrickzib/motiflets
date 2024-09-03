@@ -120,7 +120,8 @@ def test_motiflets():
                 plot_motifs_as_grid=True)
 
             duration = time.time() - start
-            memory_usage = process.memory_info().rss / (1024 * 1024)  # MB
+            # memory_usage = process.memory_info().rss / (1024 * 1024)  # MB
+            memory_usage = mm.memory_usage
 
             current = [n, backend, duration, memory_usage]
 
