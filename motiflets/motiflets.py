@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 """Compute k-Motiflets.
+
+
 """
 
 __author__ = ["patrickzib"]
@@ -1037,7 +1039,9 @@ def search_k_motiflets_elbow(
     # convert to numpy array
     _, data_raw = pd_series_to_numpy(data)
 
+    # used memory
     memory_usage = 0
+    process = psutil.Process()
 
     # auto motif size selection
     if motif_length == 'AU_EF' or motif_length == 'auto':
@@ -1083,6 +1087,8 @@ def search_k_motiflets_elbow(
                     # TODO cross-check extent??
                     k_motiflet_distances[test_k] = mot.extent
                     k_motiflet_candidates[test_k] = np.array(mot.indices)
+
+            memory_usage = process.memory_info().rss / (1024 * 1024)  # MB
         except:
             print("Caught exception in pyattimo", flush=True)
 
@@ -1103,7 +1109,6 @@ def search_k_motiflets_elbow(
                 distance_preprocessing=distance_preprocessing
             )
 
-        process = psutil.Process()
         memory_usage = process.memory_info().rss / (1024 * 1024)  # MB
 
         upper_bound = np.inf
@@ -1132,7 +1137,7 @@ def search_k_motiflets_elbow(
             upper_bound = min(candidate_dist, upper_bound)
     else:
         raise Exception(
-            'Unknown backend: ' + backend + '. Use "pyattimo" or "default".')
+            'Unknown backend: ' + backend + '. Use "pyattimo", "scalable", or "default".')
 
     # smoothen the line to make it monotonically increasing
     k_motiflet_distances[0:2] = k_motiflet_distances[2]

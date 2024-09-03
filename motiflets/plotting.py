@@ -86,6 +86,8 @@ class Motiflets:
         self.distance_preprocessing, self.distance = map_distances(distance)
         self.backend = backend
 
+        self.memory_usage = 0
+
         self.motif_length_range = None
         self.motif_length = 0
         self.all_extrema = []
