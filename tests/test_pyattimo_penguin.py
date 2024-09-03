@@ -103,7 +103,7 @@ def test_motiflets():
     df = pd.DataFrame(columns=['length', 'backend', 'time in s', 'memory in MB'])
 
     results = []
-    length_range = 5_000 * np.arange(1, 25, 1)
+    length_range = 10_000 * np.arange(1, 25, 1)
     for n in length_range:
         for backend in ["default", "scalable", "pyattimo"]:
             start = time.time()
@@ -120,7 +120,8 @@ def test_motiflets():
                 plot_motifs_as_grid=True)
 
             duration = time.time() - start
-            memory_usage = process.memory_info().rss / (1024 * 1024)  # MB
+            # memory_usage = process.memory_info().rss / (1024 * 1024)  # MB
+            memory_usage = mm.memory_usage
 
             current = [n, backend, duration, memory_usage]
 

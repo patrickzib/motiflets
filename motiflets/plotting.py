@@ -86,6 +86,8 @@ class Motiflets:
         self.distance_preprocessing, self.distance = map_distances(distance)
         self.backend = backend
 
+        self.memory_usage = 0
+
         self.motif_length_range = None
         self.motif_length = 0
         self.all_extrema = []
@@ -197,7 +199,7 @@ class Motiflets:
         else:
             self.motif_length = motif_length
 
-        self.dists, self.motiflets, self.elbow_points = plot_elbow(
+        self.dists, self.motiflets, self.elbow_points, self.memory_usage = plot_elbow(
             k_max,
             self.series,
             ds_name=self.ds_name,
@@ -784,7 +786,7 @@ def plot_elbow(k_max,
     print("Data", len(raw_data))
 
     startTime = time.perf_counter()
-    dists, candidates, elbow_points, m = ml.search_k_motiflets_elbow(
+    dists, candidates, elbow_points, m, memory_usage = ml.search_k_motiflets_elbow(
         k_max,
         raw_data,
         motif_length,
@@ -816,7 +818,7 @@ def plot_elbow(k_max,
             font_size=24,
             ground_truth=ground_truth)
 
-    return dists, candidates, elbow_points
+    return dists, candidates, elbow_points, memory_usage
 
 
 def plot_motif_length_selection(

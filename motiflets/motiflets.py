@@ -10,6 +10,7 @@ import itertools
 from ast import literal_eval
 from os.path import exists
 
+import psutil
 import numpy as np
 import numpy.fft as fft
 import pandas as pd
@@ -914,7 +915,7 @@ def find_au_ef_motif_length(
     # TODO parallelize?
     for i, m in enumerate(motif_length_range[::-1]):
         if m // subsample < data.shape[0]:
-            dist, candidates, elbow_points, _ = search_k_motiflets_elbow(
+            dist, candidates, elbow_points, _, memory_usage = search_k_motiflets_elbow(
                 k_max,
                 data,
                 m // subsample,
@@ -1038,6 +1039,10 @@ def search_k_motiflets_elbow(
     # convert to numpy array
     _, data_raw = pd_series_to_numpy(data)
 
+    # used memory
+    memory_usage = 0
+    process = psutil.Process()
+
     # auto motif size selection
     if motif_length == 'AU_EF' or motif_length == 'auto':
         if motif_length_range is None:
@@ -1082,6 +1087,8 @@ def search_k_motiflets_elbow(
                     # TODO cross-check extent??
                     k_motiflet_distances[test_k] = mot.extent
                     k_motiflet_candidates[test_k] = np.array(mot.indices)
+
+            memory_usage = process.memory_info().rss / (1024 * 1024)  # MB
         except:
             print("Caught exception in pyattimo", flush=True)
 
@@ -1102,6 +1109,7 @@ def search_k_motiflets_elbow(
                 distance_preprocessing=distance_preprocessing
             )
 
+        memory_usage = process.memory_info().rss / (1024 * 1024)  # MB
 
         upper_bound = np.inf
         for test_k in tqdm(range(k_max_ - 1, 1, -1),
@@ -1129,7 +1137,7 @@ def search_k_motiflets_elbow(
             upper_bound = min(candidate_dist, upper_bound)
     else:
         raise Exception(
-            'Unknown backend: ' + backend + '. Use "pyattimo" or "default".')
+            'Unknown backend: ' + backend + '. Use "pyattimo", "scalable", or "default".')
 
     # smoothen the line to make it monotonically increasing
     k_motiflet_distances[0:2] = k_motiflet_distances[2]
@@ -1144,7 +1152,7 @@ def search_k_motiflets_elbow(
         elbow_points = filter_unique(
             elbow_points, k_motiflet_candidates, m)
 
-    return k_motiflet_distances, k_motiflet_candidates, elbow_points, m
+    return k_motiflet_distances, k_motiflet_candidates, elbow_points, m, memory_usage
 
 
 @njit(fastmath=True, cache=True)
