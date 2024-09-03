@@ -121,7 +121,7 @@ def test_attimo():
     elbow_points = filter_unique(np.arange(len(motifs)), motifs, l)
 
     points_to_plot = 10_000
-    fig, gs = plot_motifsets(
+    _ = plot_motifsets(
         ds_name,
         ts,
         max_points=points_to_plot,
@@ -129,29 +129,40 @@ def test_attimo():
         motif_length=l,
         show=False)
 
-    plt.savefig("results/images/pamap_pyattimo.pdf")
-
     end = time.time()
+
+    # plt.savefig("results/images/pamap_pyattimo.pdf")
+
     print("Discovered motiflets in", end - start, "seconds")
 
-# def test_motiflets():
-#     ds_name, ts = read_penguin_data()
-#     ts = ts.iloc[497699 - 50_000: 497699 + 50_000, 0].T
-#
-#     print("Size of DS: ", ts.shape)
-#
-#     l = 125 #23
-#     k_max = 20
-#     mm = Motiflets(ds_name, ts)
-#     mm.fit_k_elbow(
-#         k_max, l, plot_elbows=True,
-#         plot_motifs_as_grid=True)
-#
-#     mm.plot_motifset(path="results/images/penguin_motiflets.pdf")
-#
-#     # fig, ax = plot_motifsets(
-#     #    "ECG",
-#     #    ts,
-#     #    motifsets=motifs,
-#     #    motif_length=l,
-#     #    show=False)
+def test_motiflets():
+    ds_name, series = load_dataset()
+    ts = series.time_series[0]
+
+    # l = 2 * find_dominant_window_sizes(ts, offset=0.05)
+    l = 200
+
+    print("Size of DS: ", ts.shape, " l:", l)
+    start = time.time()
+
+    k_max = 10
+
+    mm = Motiflets(ds_name, ts, backend="scalable", n_jobs=8)
+    mm.fit_k_elbow(
+        k_max, l, plot_elbows=False,
+        plot_motifs_as_grid=False)
+
+    end = time.time()
+
+    # plt.savefig("results/images/pamap_pyattimo.pdf")
+
+    print("Discovered motiflets in", end - start, "seconds")
+
+    # mm.plot_motifset(path="results/images/penguin_motiflets.pdf")
+
+    # fig, ax = plot_motifsets(
+    #    "ECG",
+    #    ts,
+    #    motifsets=motifs,
+    #    motif_length=l,
+    #    show=False)
