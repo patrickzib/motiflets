@@ -800,7 +800,7 @@ def plot_elbow(k_max,
     print("Chosen window-size:", m, "in", np.round(endTime, 1), "s")
 
     if filter:
-        elbow_points = ml._filter_unique(elbow_points, candidates, motif_length)
+        elbow_points = ml.filter_unique(elbow_points, candidates, motif_length)
 
     print("Elbow Points", elbow_points)
 
@@ -1286,7 +1286,7 @@ def plot_competitors(
     elbow_points = np.arange(len(motifsets_filtered))
 
     if filter:
-        elbow_points = ml._filter_unique(elbow_points, motifsets_filtered, motif_length)
+        elbow_points = ml.filter_unique(elbow_points, motifsets_filtered, motif_length)
 
     dists = [ml.get_pairwise_extent(D_full, motiflet_pos, upperbound=np.inf)
              for motiflet_pos in motifsets_filtered]

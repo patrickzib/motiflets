@@ -1085,22 +1085,23 @@ def search_k_motiflets_elbow(
         except:
             print("Caught exception in pyattimo", flush=True)
 
-    elif backend == "default":
+    elif (backend == "default") or (backend == "scalable"):
         # switch to sparse matrix representation when length is above 30_000
         # sparse matrix is 2x slower but needs less memory
-        sparse = n >= 30000
-        if not sparse:
-            D_full, knns = compute_distances_with_knns(
-                data_raw, m, k_max_, n_jobs=n_jobs, slack=slack,
-                distance=distance,
-                distance_preprocessing=distance_preprocessing
-            )
-        else:
+        sparse = (n >= 30000) or (backend == "scalable")
+        if sparse:
             D_full, knns = compute_distances_with_knns_sparse(
                 data_raw, m, k_max_, n_jobs=n_jobs, slack=slack,
                 distance = distance,
                 distance_preprocessing = distance_preprocessing,
             )
+        else:
+            D_full, knns = compute_distances_with_knns(
+                data_raw, m, k_max_, n_jobs=n_jobs, slack=slack,
+                distance=distance,
+                distance_preprocessing=distance_preprocessing
+            )
+
 
         upper_bound = np.inf
         for test_k in tqdm(range(k_max_ - 1, 1, -1),

@@ -1,6 +1,4 @@
 import pyattimo
-import scipy.io as sio
-from openpyxl.utils.units import points_to_pixels
 
 from motiflets.plotting import *
 from motiflets.motiflets import *

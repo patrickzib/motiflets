@@ -1,9 +1,12 @@
 import pyattimo
 import scipy.io as sio
-from openpyxl.utils.units import points_to_pixels
+import psutil
+import pandas as pd
+from datetime import datetime
 
 from motiflets.plotting import *
 from motiflets.motiflets import *
+
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 
@@ -17,6 +20,7 @@ import matplotlib as mpl
 mpl.rcParams['figure.dpi'] = 150
 
 path = "../datasets/experiments/"
+
 
 def test_plot_data():
     ds_name, series = read_penguin_data()
@@ -43,27 +47,28 @@ def read_penguin_data_short():
     ds_name = "Penguins (Snippet)"
     return ds_name, series
 
+
 def test_plotting():
     ds_name, ts = read_penguin_data()
-    ts = ts.iloc[497699 - 20_000: 497699 + 20_000, -2].T
+    ts = ts.iloc[497699 - 50_000: 497699 + 50_000, -2].T
 
     mm = Motiflets(ds_name, ts)
     mm.plot_dataset(path="results/images/penguin_data_raw.pdf")
 
 
-
 def test_attimo():
     ds_name, ts = read_penguin_data()
+    # ts = ts.iloc[497699 - 100_000: 497699 + 100_000, 0].T
     # ts = ts.iloc[497699 - 50_000: 497699 + 50_000, 0].T
-    # ts = ts.iloc[497699 - 10_000: 497699 + 10_000, 0].T
-    ts = ts.iloc[497699 - 20_000: 497699 + 20_000, 0].T
+    ts = ts.iloc[497699 - 10_000: 497699 + 10_000, 0].T
+    # ts = ts.iloc[497699 - 20_000: 497699 + 20_000, 0].T
 
     print("Size of DS: ", ts.shape)
 
     start = time.time()
 
-    l = 125 #23
-    k_max = 10
+    l = 125
+    k_max = 20
     m_iter = pyattimo.MotifletsIterator(
         ts, w=l, support=k_max, top_k=1
     )
@@ -80,6 +85,7 @@ def test_attimo():
     fig, gs = plot_motifsets(
         ds_name,
         ts,
+        max_points=10_000,
         motifsets=np.array(motifs, dtype=np.object_)[elbow_points],
         motif_length=l,
         show=False)
@@ -90,24 +96,49 @@ def test_attimo():
     print("Discovered motiflets in", end - start, "seconds")
 
 
-# def test_motiflets():
-#     ds_name, ts = read_penguin_data()
-#     ts = ts.iloc[497699 - 50_000: 497699 + 50_000, 0].T
-#
-#     print("Size of DS: ", ts.shape)
-#
-#     l = 125 #23
-#     k_max = 20
-#     mm = Motiflets(ds_name, ts)
-#     mm.fit_k_elbow(
-#         k_max, l, plot_elbows=True,
-#         plot_motifs_as_grid=True)
-#
-#     mm.plot_motifset(path="results/images/penguin_motiflets.pdf")
-#
-#     # fig, ax = plot_motifsets(
-#     #    "ECG",
-#     #    ts,
-#     #    motifsets=motifs,
-#     #    motif_length=l,
-#     #    show=False)
+def test_motiflets():
+    process = psutil.Process()
+    timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+
+    df = pd.DataFrame(columns=['length', 'backend', 'time in s', 'memory in MB'])
+
+    results = []
+    length_range = 5_000 * np.arange(1, 25, 1)
+    for n in length_range:
+        for backend in ["default", "scalable", "pyattimo"]:
+            start = time.time()
+            print(backend, n)
+            ds_name, ts = read_penguin_data()
+            ts = ts.iloc[497699 - n: 497699 + n, 0].T
+            print("Size of DS: ", ts.shape)
+
+            l = 125  # 23
+            k_max = 20
+            mm = Motiflets(ds_name, ts, backend=backend, n_jobs=64)
+            mm.fit_k_elbow(
+                k_max, l, plot_elbows=True,
+                plot_motifs_as_grid=True)
+
+            duration = time.time() - start
+            memory_usage = process.memory_info().rss / (1024 * 1024)  # MB
+
+            current = [n, backend, duration, memory_usage]
+
+            results.append(current)
+            df.loc[len(df.index)] = current
+
+            new_filename = f"results/scalability_{timestamp}.csv"
+
+            df.to_csv(new_filename, index=False)
+            print("\tDiscovered motiflets in", duration, "seconds")
+            print("\t", current)
+
+    print(results)
+
+    # mm.plot_motifset(path="results/images/penguin_motiflets.pdf")
+    # fig, ax = plot_motifsets(
+    #    "ECG",
+    #    ts,
+    #    motifsets=motifs,
+    #    motif_length=l,
+    #    show=False)
