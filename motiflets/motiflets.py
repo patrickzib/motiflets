@@ -467,13 +467,30 @@ def compute_distances_with_knns_sparse(
             D_knn[order] = dist[knn]
             knns[order] = knn
 
+
+    # Store an upper bound for each k-nn distance
+    k_nn_dist = np.zeros(k, dtype=np.float32)
+    k_nn_dist[0] = np.inf
+    for k in range(1, len(k_nn_dist)):
+        k_nn_dist[k] = 2 * np.min(D_knn[:, k])  # diameter = 2r
+
     # FIXME: Parallelizm does not work, as Dict is not thread safe :(
     for order in np.arange(0, n):
         # memorize which pairs are needed
         for ks, dist in zip(knns[order], D_knn[order]):
             D_bool[order][ks] = True
-            for ks2 in knns[order]:
-                D_bool[ks][ks2] = True
+
+            bound = False
+            k_index = -1
+            for kk in range(len(k_nn_dist)-1, 0, -1):
+                if D_knn[order, -1] <= k_nn_dist[kk]:
+                    bound = True
+                    k_index = kk+1
+                    break
+
+            if bound:
+                for ks2 in knns[order, :k_index]:
+                    D_bool[ks][ks2] = True
 
     # second pass, filling only the pairs needed
     for idx in prange(n_jobs):
