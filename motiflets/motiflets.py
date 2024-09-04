@@ -472,6 +472,7 @@ def compute_distances_with_knns_sparse(
     k_nn_dist = np.zeros(k, dtype=np.float32)
     k_nn_dist[0] = np.inf
     for k in range(1, len(k_nn_dist)):
+        # TODO compute actual bound using pairwise distances?
         k_nn_dist[k] = 2 * np.min(D_knn[:, k])  # diameter = 2r
 
     # FIXME: Parallelizm does not work, as Dict is not thread safe :(
