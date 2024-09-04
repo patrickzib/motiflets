@@ -27,21 +27,22 @@ def read_penguin_data():
 
 def test_motiflets():
     lengths = [#1_000, 5_000,
-               #10_000, 30_000,
-               #50_000, 100_000,
-               150_000, 200_000,
-               250_000
+               10_000, 30_000,
+               50_000, 100_000,
+               #150_000, 200_000,
+               # 250_000
                ]
 
     ds_name, B = read_penguin_data()
     time_s = np.zeros(len(lengths))
 
     for i, length in enumerate(lengths):
+        print("--------------------")
         print("Current", length)
         series = B.iloc[:length,0].T
 
         ml = Motiflets(ds_name, series,
-                       n_jobs=8,
+                       n_jobs=8, backend="scalable"
                        )
 
         k_max = 5
@@ -55,10 +56,14 @@ def test_motiflets():
         )
         t_after = time.time()
         time_s[i] = t_after - t_before
-        print("Time:", time_s[i])
 
-        dict = time_s
-        df = pd.DataFrame(data=dict, columns=['Time'], index=lengths)
-        df["Method"] = "Motiflets (one-dim)"
-        df.index.name = "Lengths"
-        df.to_csv('csv/scalability_univ_motiflets_k5.csv')
+        memory_usage = ml.memory_usage
+
+        print("Time:", time_s[i], "s")
+        print("Memory:", memory_usage, "MB")
+
+        #dict = time_s
+        #df = pd.DataFrame(data=dict, columns=['Time'], index=lengths)
+        #df["Method"] = "Motiflets (one-dim)"
+        #df.index.name = "Lengths"
+        #df.to_csv('csv/scalability_univ_motiflets_k5.csv')
