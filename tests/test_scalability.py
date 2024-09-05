@@ -26,11 +26,14 @@ def read_penguin_data():
 
 
 def test_motiflets():
-    lengths = [#1_000, 5_000,
-               #10_000, 30_000,
-               #50_000,
-                100_000,
-               #150_000, 200_000,
+    lengths = [1_000,
+               5_000,
+               10_000,
+               30_000,
+               # 50_000,
+               # 100_000,
+               # 150_000,
+               # 200_000,
                # 250_000
                ]
 
@@ -40,28 +43,31 @@ def test_motiflets():
     for i, length in enumerate(lengths):
         print("--------------------")
         print("Current", length)
-        series = B.iloc[:length,0].T
+        for distance in ["znormed_ed", "ed", "cosine"]:
+            series = B.iloc[:length,0].T
 
-        ml = Motiflets(ds_name, series,
-                       n_jobs=8, backend="scalable"
-                       )
+            print("Distance", distance)
+            ml = Motiflets(
+                ds_name, series, distance=distance,
+                n_jobs=8, backend="scalable"
+            )
 
-        k_max = 5
+            k_max = 20
 
-        t_before = time.time()
-        _ = ml.fit_k_elbow(
-            k_max,
-            22,
-            plot_elbows=False,
-            plot_motifs_as_grid=False
-        )
-        t_after = time.time()
-        time_s[i] = t_after - t_before
+            t_before = time.time()
+            _ = ml.fit_k_elbow(
+                k_max,
+                22,
+                plot_elbows=False,
+                plot_motifs_as_grid=False
+            )
+            t_after = time.time()
+            time_s[i] = t_after - t_before
 
-        memory_usage = ml.memory_usage
+            memory_usage = ml.memory_usage
 
-        print("Time:", time_s[i], "s")
-        print("Memory:", memory_usage, "MB")
+            print("Time:", time_s[i], "s")
+            print("Memory:", memory_usage, "MB")
 
         #dict = time_s
         #df = pd.DataFrame(data=dict, columns=['Time'], index=lengths)

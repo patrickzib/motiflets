@@ -24,6 +24,7 @@ from tqdm.auto import tqdm
 
 from motiflets.distances import *
 
+
 # import logging
 # logging.basicConfig(level=logging.INFO)
 
@@ -373,14 +374,14 @@ def compute_distances_with_knns(
 
 @njit(fastmath=True, cache=True, parallel=True)
 def compute_distances_with_knns_sparse(
-    ts,
-    m,
-    k,
-    exclude_trivial_match=True,
-    n_jobs=4,
-    slack=0.5,
-    distance=znormed_euclidean_distance,
-    distance_preprocessing=sliding_mean_std
+        ts,
+        m,
+        k,
+        exclude_trivial_match=True,
+        n_jobs=4,
+        slack=0.5,
+        distance=znormed_euclidean_distance,
+        distance_preprocessing=sliding_mean_std
 ):
     """ Compute the full Distance Matrix between all pairs of subsequences of a
         multivariate time series.
@@ -467,13 +468,16 @@ def compute_distances_with_knns_sparse(
             D_knn[order] = dist[knn]
             knns[order] = knn
 
-
     # Store an upper bound for each k-nn distance
-    k_nn_dist = np.zeros(k, dtype=np.float32)
+    k_nn_dist = np.zeros(k, dtype=np.float64)
     k_nn_dist[0] = np.inf
     for k in range(1, len(k_nn_dist)):
-        # TODO compute actual bound using pairwise distances?
-        k_nn_dist[k] = 2 * np.min(D_knn[:, k])  # diameter = 2r
+        # for i in range(len(knns)):
+        #    # TODO compute actual bound using pairwise distances?
+        #    # Normalization missing :-/
+        #    k_nn_dist[k] = min(k_nn_dist[k], get_pairwise_extent_raw(ts, knns[i, :k], m))
+        k_nn_dist[k] = 4 * np.min(D_knn[:, k])  # diameter^2 = (2r)^2
+    # print(k_nn_dist)
 
     # FIXME: Parallelizm does not work, as Dict is not thread safe :(
     for order in np.arange(0, n):
@@ -483,10 +487,10 @@ def compute_distances_with_knns_sparse(
 
             bound = False
             k_index = -1
-            for kk in range(len(k_nn_dist)-1, 0, -1):
+            for kk in range(len(k_nn_dist) - 1, 0, -1):
                 if D_knn[order, -1] <= k_nn_dist[kk]:
                     bound = True
-                    k_index = kk+1
+                    k_index = kk + 1
                     break
 
             if bound:
@@ -521,23 +525,6 @@ def compute_distances_with_knns_sparse(
     return D_sparse, knns
 
 
-# @njit(fastmath=True, cache=True)
-# def distance(dot_rolled, n, m, means, stds, order, halve_m):
-#     # Implementation of z-normalized Euclidean distance
-#     dist = 2 * m * (1 - (dot_rolled - m * means * means[order]) / (
-#             m * stds * stds[order]))
-#
-#     # self-join: exclusion zone
-#     trivialMatchRange = (max(0, order - halve_m),
-#                          min(order + halve_m + 1, n))
-#     dist[trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
-#
-#     # allow subsequence itself to be in result
-#     dist[order] = 0
-#
-#     return dist
-
-
 @njit(fastmath=True, cache=True)
 def get_radius(D_full, motifset_pos):
     """Computes the radius of the passed motif set (motiflet).
@@ -570,7 +557,7 @@ def get_radius(D_full, motifset_pos):
 
 @njit(fastmath=True, cache=True)
 def get_pairwise_extent(D_full, motifset_pos, upperbound=np.inf):
-    """Computes the extent of the motifset.
+    """Computes the extent of the motifset using pre-computed distances.
 
     Parameters
     ----------
@@ -603,6 +590,46 @@ def get_pairwise_extent(D_full, motifset_pos, upperbound=np.inf):
             if motifset_extent > upperbound:
                 return np.inf
 
+    return motifset_extent
+
+
+@njit(fastmath=True, cache=True)
+def get_pairwise_extent_raw(series, motifset_pos, motif_length):
+    """Computes the extent of the motifset.
+
+    Parameters
+    ----------
+    series : array-like
+        The time series
+    motifset_pos : array-like
+        The motif set start-offsets
+    motif_length : int
+        The motif length
+
+    Returns
+    -------
+    motifset_extent : float
+        The extent of the motif set, if smaller than `upperbound`, else np.inf
+    """
+
+    if -1 in motifset_pos:
+        return np.inf
+
+    motifset_extent = np.float64(0.0)
+    for ii in range(len(motifset_pos) - 1):
+        i = motifset_pos[ii]
+        a = series[i:i + motif_length]
+        a = (a - np.mean(a)) / (np.std(a) + 1e-4)
+
+        for jj in range(ii + 1, len(motifset_pos)):
+            j = motifset_pos[jj]
+            b = series[j:j + motif_length]
+            b = (b - np.mean(b)) / (np.std(b) + 1e-4)
+            diff = (a - b)
+            dist = np.dot(diff, diff)
+            motifset_extent = max(motifset_extent, dist)
+
+    print(motifset_extent)
     return motifset_extent
 
 
@@ -841,7 +868,7 @@ def find_elbow_points(dists, alpha=2, elbow_deviation=1.00):
 
             # avoid detecting elbows in near constant data
             if dists[i - 1] == dists[i]:
-               m2 = 1.0  # peaks[i] = 0
+                m2 = 1.0  # peaks[i] = 0
 
             if (dists[i] > 0) and (dists[i + 1] / dists[i] > elbow_deviation):
                 peaks[i] = (m1 / m2)
@@ -1093,7 +1120,7 @@ def search_k_motiflets_elbow(
     # backend = "pyattimo"
     if backend == "pyattimo":
         m_iter = pyattimo.MotifletsIterator(
-            data_raw, w=m, support=k_max_-1, exclusion_zone=exclusion_m,
+            data_raw, w=m, support=k_max_ - 1, exclusion_zone=exclusion_m,
         )
         try:
             for mot in m_iter:
@@ -1114,11 +1141,15 @@ def search_k_motiflets_elbow(
         # switch to sparse matrix representation when length is above 30_000
         # sparse matrix is 2x slower but needs less memory
         sparse = backend == "scalable"
+
+        if distance == "CID":
+            raise Exception('CID is currently not supported for sparse matrices.')
+
         if sparse:
             D_full, knns = compute_distances_with_knns_sparse(
                 data_raw, m, k_max_, n_jobs=n_jobs, slack=slack,
-                distance = distance,
-                distance_preprocessing = distance_preprocessing,
+                distance=distance,
+                distance_preprocessing=distance_preprocessing,
             )
 
             """
