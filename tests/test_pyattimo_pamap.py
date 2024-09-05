@@ -135,6 +135,7 @@ def test_attimo():
 
     print("Discovered motiflets in", end - start, "seconds")
 
+
 def test_motiflets():
     ds_name, series = load_dataset()
     ts = series.time_series[0]
@@ -166,3 +167,49 @@ def test_motiflets():
     #    motifsets=motifs,
     #    motif_length=l,
     #    show=False)
+
+
+def test_motiflets_sparse():
+    lengths = [1_000,
+               5_000,
+               10_000,
+               30_000,
+               # 50_000,
+               # 100_000,
+               # 150_000,
+               # 200_000,
+               # 250_000
+               ]
+
+    ds_name, series = load_dataset()
+    B = series.time_series[0]
+    time_s = np.zeros(len(lengths))
+
+    for i, length in enumerate(lengths):
+        print("--------------------")
+        print("Current", length)
+        for distance in ["znormed_ed", "ed", "cosine"]:
+            series = B[:length]
+
+            print("Distance", distance)
+            ml = Motiflets(
+                ds_name, series, distance=distance,
+                n_jobs=8, backend="scalable"
+            )
+
+            k_max = 20
+
+            t_before = time.time()
+            _ = ml.fit_k_elbow(
+                k_max,
+                22,
+                plot_elbows=False,
+                plot_motifs_as_grid=False
+            )
+            t_after = time.time()
+            time_s[i] = t_after - t_before
+
+            memory_usage = ml.memory_usage
+
+            print("Time:", time_s[i], "s")
+            print("Memory:", memory_usage, "MB")

@@ -488,7 +488,7 @@ def compute_distances_with_knns_sparse(
             bound = False
             k_index = -1
             for kk in range(len(k_nn_dist) - 1, 0, -1):
-                if D_knn[order, -1] <= k_nn_dist[kk]:
+                if D_knn[order, kk] <= k_nn_dist[kk]:
                     bound = True
                     k_index = kk + 1
                     break
@@ -1152,13 +1152,11 @@ def search_k_motiflets_elbow(
                 distance_preprocessing=distance_preprocessing,
             )
 
-            """
             elements = 0
             for A in D_full:
                 elements += len(A)
             n = (data_raw.shape[0] - m + 1)
             print("Size:", elements, str(elements * 100 / n ** 2) + "%")
-            """
         else:
             D_full, knns = compute_distances_with_knns(
                 data_raw, m, k_max_, n_jobs=n_jobs, slack=slack,

@@ -25,7 +25,7 @@ def read_penguin_data():
     return ds_name, series
 
 
-def test_motiflets():
+def test_motiflets_sparse():
     lengths = [1_000,
                5_000,
                10_000,
