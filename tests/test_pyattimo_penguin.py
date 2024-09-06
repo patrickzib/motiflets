@@ -100,7 +100,8 @@ def test_motiflets():
     process = psutil.Process()
     timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
 
-    df = pd.DataFrame(columns=['length', 'backend', 'time in s', 'memory in MB'])
+    df = pd.DataFrame(columns=['length', 'backend', 'time in s',
+                               'memory in MB', 'extent'])
 
     results = []
     length_range = 10_000 * np.arange(1, 25, 1)
@@ -115,15 +116,16 @@ def test_motiflets():
             l = 125  # 23
             k_max = 20
             mm = Motiflets(ds_name, ts, backend=backend, n_jobs=64)
-            mm.fit_k_elbow(
+            dists, _, _ = mm.fit_k_elbow(
                 k_max, l, plot_elbows=True,
                 plot_motifs_as_grid=True)
 
             duration = time.time() - start
             # memory_usage = process.memory_info().rss / (1024 * 1024)  # MB
             memory_usage = mm.memory_usage
+            extent = dists[-1]
 
-            current = [n, backend, duration, memory_usage]
+            current = [n, backend, duration, memory_usage, extent]
 
             results.append(current)
             df.loc[len(df.index)] = current
