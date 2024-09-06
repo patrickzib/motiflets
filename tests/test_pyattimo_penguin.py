@@ -96,12 +96,12 @@ def test_attimo():
     print("Discovered motiflets in", end - start, "seconds")
 
 
-def test_motiflets():
-    process = psutil.Process()
+
+def test_motiflets_scale_n():
     timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
 
     df = pd.DataFrame(columns=['length', 'backend', 'time in s',
-                               'memory in MB', 'extent'])
+                               'memory in MB', "extent"])
 
     results = []
     length_range = 10_000 * np.arange(1, 25, 1)
@@ -130,7 +130,48 @@ def test_motiflets():
             results.append(current)
             df.loc[len(df.index)] = current
 
-            new_filename = f"results/scalability_{timestamp}.csv"
+            new_filename = f"results/scalability_n_{timestamp}.csv"
+
+            df.to_csv(new_filename, index=False)
+            print("\tDiscovered motiflets in", duration, "seconds")
+            print("\t", current)
+
+    print(results)
+
+
+def test_motiflets_scale_k():
+    timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+
+    df = pd.DataFrame(columns=['length', 'backend', 'time in s', 'memory in MB'])
+
+    results = []
+
+    n = 25_000
+    k_range = np.arange(5, 45, 5)
+    for k_max in k_range:
+        for backend in ["default", "scalable", "pyattimo", "extent"]:
+            start = time.time()
+            print(backend, k_max)
+            ds_name, ts = read_penguin_data()
+            ts = ts.iloc[497699 - n: 497699 + n, 0].T
+            print("Size of DS: ", ts.shape)
+
+            l = 125  # 23
+            mm = Motiflets(ds_name, ts, backend=backend, n_jobs=64)
+            dists, _, _ = mm.fit_k_elbow(
+                k_max, l, plot_elbows=True,
+                plot_motifs_as_grid=True)
+
+            duration = time.time() - start
+            memory_usage = mm.memory_usage
+            extent = dists[-1]
+
+            current = [k_max, backend, duration, memory_usage, extent]
+
+            results.append(current)
+            df.loc[len(df.index)] = current
+
+            new_filename = f"results/scalability_k_{timestamp}.csv"
 
             df.to_csv(new_filename, index=False)
             print("\tDiscovered motiflets in", duration, "seconds")
@@ -145,3 +186,4 @@ def test_motiflets():
     #    motifsets=motifs,
     #    motif_length=l,
     #    show=False)
+
