@@ -11,7 +11,6 @@ from ast import literal_eval
 from os.path import exists
 
 import psutil
-import numpy as np
 import numpy.fft as fft
 import pandas as pd
 import pyattimo
@@ -24,9 +23,10 @@ from tqdm.auto import tqdm
 
 from motiflets.distances import *
 
-
-# import logging
-# logging.basicConfig(level=logging.INFO)
+import logging
+logging.basicConfig(level=logging.WARN)
+pyattimo_logger = logging.getLogger('pyattimo')
+pyattimo_logger.setLevel(logging.WARNING)
 
 def as_series(data, index_range, index_name):
     """Coverts a time series to a series with an index.
@@ -1121,7 +1121,10 @@ def search_k_motiflets_elbow(
     if backend == "pyattimo":
         m_iter = pyattimo.MotifletsIterator(
             data_raw, w=m, support=k_max_ - 1,
-            exclusion_zone=exclusion_m, stop_on_threshold=True,
+            exclusion_zone=exclusion_m,
+            stop_on_threshold=True,
+            # delta = 0.5
+            # fraction_threshold=0.1
         )
         try:
             for mot in m_iter:
@@ -1131,7 +1134,7 @@ def search_k_motiflets_elbow(
                 test_k = mot.support
                 if test_k < k_max_:
                     # TODO cross-check extent??
-                    k_motiflet_distances[test_k] = mot.extent
+                    k_motiflet_distances[test_k] = mot.extent**2
                     k_motiflet_candidates[test_k] = np.array(mot.indices)
 
             memory_usage = process.memory_info().rss / (1024 * 1024)  # MB

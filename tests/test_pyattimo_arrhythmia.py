@@ -1,4 +1,5 @@
-import pyattimo
+import gc
+from datetime import datetime
 
 from motiflets.plotting import *
 from motiflets.motiflets import *
@@ -6,18 +7,13 @@ from motiflets.motiflets import *
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 
-import warnings
-
-warnings.simplefilter("ignore")
-
 import logging
-
 logging.basicConfig(level=logging.WARN)
+pyattimo_logger = logging.getLogger('pyattimo')
+pyattimo_logger.setLevel(logging.WARNING)
 
 import matplotlib as mpl
-
 mpl.rcParams['figure.dpi'] = 150
-
 path = "../datasets/experiments/"
 
 
@@ -110,24 +106,62 @@ def test_attimo():
     end = time.time()
     print("Discovered motiflets in", end - start, "seconds")
 
-# def test_motiflets():
-#     ds_name, ts = read_penguin_data()
-#     ts = ts.iloc[497699 - 50_000: 497699 + 50_000, 0].T
-#
-#     print("Size of DS: ", ts.shape)
-#
-#     l = 125 #23
-#     k_max = 20
-#     mm = Motiflets(ds_name, ts)
-#     mm.fit_k_elbow(
-#         k_max, l, plot_elbows=True,
-#         plot_motifs_as_grid=True)
-#
-#     mm.plot_motifset(path="results/images/penguin_motiflets.pdf")
-#
-#     # fig, ax = plot_motifsets(
-#     #    "ECG",
-#     #    ts,
-#     #    motifsets=motifs,
-#     #    motif_length=l,
-#     #    show=False)
+
+
+def test_motiflets_scale_n():
+    timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+
+    df = pd.DataFrame(columns=['length', 'backend', 'time in s',
+                               'memory in MB', "extent"])
+
+    results = []
+    length_range = 25_000 * np.arange(1, 200, 1)
+    for backend in ["pyattimo", "scalable",  "default"]:  # "pyattimo"
+        last_n = 0
+        for n in length_range:
+            start = time.time()
+            print(backend, n)
+
+            ds_name, series = read_arrhythmia()
+            ts = series[:n]
+            print("Size of DS: ", ts.shape)
+
+            l = 200
+            k_max = 20
+
+            mm = Motiflets(ds_name, ts, backend=backend, n_jobs=64)
+            dists, _, _ = mm.fit_k_elbow(
+                k_max, l, plot_elbows=False,
+                plot_motifs_as_grid=False)
+
+            duration = time.time() - start
+            memory_usage = mm.memory_usage
+            extent = dists[-1]
+
+            current = [len(ts), backend, duration, memory_usage, extent]
+
+            results.append(current)
+            df.loc[len(df.index)] = current
+
+            new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}_{timestamp}.csv"
+
+            df.to_csv(new_filename, index=False)
+            print("\tDiscovered motiflets in", duration, "seconds")
+            print("\t", current)
+
+            gc.collect()
+
+            if len(ts) <= last_n:
+                break
+
+            last_n = len(ts)
+
+    print(results)
+
+
+def main():
+    print("running")
+    test_motiflets_scale_n()
+
+if __name__ == "__main__":
+    main()
