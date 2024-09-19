@@ -55,6 +55,7 @@ def test_motiflets_scale_n():
 
             l = 50*68
             k_max = 20
+
             mm = Motiflets(ds_name, ts, backend=backend, n_jobs=64)
             dists, _, _ = mm.fit_k_elbow(
                 k_max, l, plot_elbows=False,
