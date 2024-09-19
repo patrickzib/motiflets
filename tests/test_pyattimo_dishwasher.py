@@ -3,6 +3,7 @@ import scipy.io as sio
 # import psutil
 # import pandas as pd
 from datetime import datetime
+import utils as ut
 
 from motiflets.plotting import *
 from motiflets.motiflets import *
@@ -24,66 +25,32 @@ mpl.rcParams['figure.dpi'] = 150
 
 path = "../datasets/original/"
 
-def read_eeg_data():
-    file = 'npo141.csv'  # Dataset Length n:  269286
-    ds_name = "EEG-Sleep"
+def read_dishwasher():
+    file = 'dishwasher.txt'  # Dataset Length n:  269286
+    ds_name = "Dishwasher"
     series = pd.read_csv(path+file, header=None).squeeze('columns')
     return ds_name, series
 
 def test_plot_data():
-    ds_name, series = read_eeg_data()
+    ds_name, series = read_dishwasher()
     ml = Motiflets(ds_name, series)
     points_to_plot = 10_000
-    ml.plot_dataset(max_points=points_to_plot, path="results/images/eeg_data.pdf")
+    ml.plot_dataset(max_points=points_to_plot, path="results/images/dishwasher_data.pdf")
 
 
 def test_motiflets_scale_n():
-    timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
-    df = pd.DataFrame(columns=['length', 'backend', 'time in s', 'memory in MB', "extent"])
 
-    results = []
-    length_range = 25_000 * np.arange(1, 200, 1)
-    for backend in ["default", "pyattimo", "scalable"]:
-        last_n = 0
-        for n in length_range:
-            start = time.time()
-            print(backend, n)
+    length_range = 25_000 * np.arange(20, 200, 1)
+    l = 125 * 8  # roughly 6.5 seconds
+    k_max = 20  # 40
+    backends = ["default", "pyattimo", "scalable"]
 
-            ds_name, ts = read_eeg_data()
-            ts = ts.iloc[:n]
-            print("Size of DS: ", ts.shape)
-
-            l = 25*25  # roughly 6.5 seconds
-            k_max = 20
-            mm = Motiflets(ds_name, ts, backend=backend, n_jobs=64)
-            dists, _, _ = mm.fit_k_elbow(
-                k_max, l, plot_elbows=False,
-                plot_motifs_as_grid=False)
-
-            duration = time.time() - start
-            memory_usage = mm.memory_usage
-            extent = dists[-1]
-
-            current = [len(ts), backend, duration, memory_usage, extent]
-
-            results.append(current)
-            df.loc[len(df.index)] = current
-
-            new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}_{timestamp}.csv"
-
-            df.to_csv(new_filename, index=False)
-            print("\tDiscovered motiflets in", duration, "seconds")
-            print("\t", current)
-
-            gc.collect()
-
-            if len(ts) <= last_n:
-                break
-
-            last_n = len(ts)
-
-    print(results)
-
+    ut.test_motiflets_scale_n(
+        read_dishwasher,
+        length_range,
+        l, k_max,
+        backends
+    )
 
 
 def main():
