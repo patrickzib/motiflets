@@ -18,7 +18,7 @@ def test_motiflets_scale_n(
     df = pd.DataFrame(columns=['length', 'backend', 'time in s', 'memory in MB', "extent"])
 
     results = []
-    for backend in [backends]:
+    for backend in backends:
         last_n = 0
         for n in length_range:
             start = time.time()

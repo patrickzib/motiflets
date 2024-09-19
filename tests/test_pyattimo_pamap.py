@@ -1,9 +1,6 @@
-import gc
-from datetime import datetime
 import utils as ut
-
-from motiflets.plotting import *
 from motiflets.motiflets import *
+from motiflets.plotting import *
 
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
