@@ -53,6 +53,9 @@ def test_motiflets_scale_n():
             ts = ts.iloc[:n]
             print("Size of DS: ", ts.shape)
 
+            if len(ts) <= last_n:
+                break
+
             l = 50*68
             k_max = 20
 
@@ -78,8 +81,6 @@ def test_motiflets_scale_n():
 
             gc.collect()
 
-            if len(ts) <= last_n:
-                break
 
             last_n = len(ts)
 

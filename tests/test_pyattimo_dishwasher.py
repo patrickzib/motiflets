@@ -52,6 +52,9 @@ def test_motiflets_scale_n():
             ds_name, ts = read_dishwasher()
             ts = ts.iloc[:n]
 
+            if len(ts) <= last_n:
+                break
+
             print("Size of DS: ", ts.shape)
 
             l = 125*8  # roughly 6.5 seconds
@@ -77,9 +80,6 @@ def test_motiflets_scale_n():
             print("\t", current)
 
             gc.collect()
-
-            if len(ts) <= last_n:
-                break
 
             last_n = len(ts)
 
