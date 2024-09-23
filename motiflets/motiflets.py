@@ -437,7 +437,6 @@ def compute_distances_with_knns_sparse(
     for i in range(n):
         D_sparse.append(Dict.empty(key_type=types.int32, value_type=types.float32))
 
-    # means, stds = _sliding_mean_std(ts, m)
     preprocessing = distance_preprocessing(ts, m)
 
     dot_first = _sliding_dot_product(ts[:m], ts)
@@ -460,13 +459,16 @@ def compute_distances_with_knns_sparse(
                              - ts[order - 1] * np.roll(ts[:n], 1)
                 dot_rolled[0] = dot_first[order]
 
-            # dist = distance(dot_rolled, n, m, means, stds, order, halve_m)
             dist = distance(dot_rolled, n, m, preprocessing, order, halve_m)
             dot_prev = dot_rolled
 
             knn = _argknn(dist, k, m, slack=slack)
-            D_knn[order] = dist[knn]
-            knns[order] = knn
+            D_knn[order, :] = dist[knn[-1]]     # in case too little knns are returned
+            knns[order, :] = knn[-1]
+
+            D_knn[order, :len(dist[knn])] = dist[knn]
+            knns[order, :len(knn)] = knn
+
 
     # Store an upper bound for each k-nn distance
     k_nn_dist = np.zeros(k, dtype=np.float64)
@@ -514,7 +516,6 @@ def compute_distances_with_knns_sparse(
                              - ts[order - 1] * np.roll(ts[:n], 1)
                 dot_rolled[0] = dot_first[order]
 
-            # dist = distance(dot_rolled, n, m, means, stds, order, halve_m)
             dist = distance(dot_rolled, n, m, preprocessing, order, halve_m)
             dot_prev = dot_rolled
 
