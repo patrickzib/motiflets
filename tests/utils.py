@@ -17,6 +17,7 @@ def test_motiflets_scale_n(
     timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
     df = pd.DataFrame(columns=['length', 'backend', 'time in s', 'memory in MB', "extent"])
 
+    last_time = -1
     results = []
     for backend in backends:
         last_n = 0
@@ -27,7 +28,10 @@ def test_motiflets_scale_n(
             ds_name, ts = read_data()
             ts = ts.iloc[:n]
 
-            if len(ts) <= last_n:
+            if (len(ts) <= last_n
+                    or (backend == "default" and len(ts) > 500_000) \
+                    or (last_time > 7200)     # larger than 2 hours
+            ):
                 break
 
             print("Size of DS: ", ts.shape)
@@ -55,5 +59,6 @@ def test_motiflets_scale_n(
             gc.collect()
 
             last_n = len(ts)
+            last_time = duration
 
     print(results)
