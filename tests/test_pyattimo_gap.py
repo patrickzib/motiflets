@@ -33,17 +33,19 @@ def test_plot_data():
     ml.plot_dataset(max_points=points_to_plot, path="results/images/gap_data.pdf")
 
 
-def test_motiflets_scale_n():
+def test_motiflets_scale_n(
+        backends = ["default", "pyattimo", "scalable"],
+        delta = None
+    ):
     length_range = 25_000 * np.arange(1, 200, 1)
     l = 50 * 68
     k_max = 20
-    backends = ["scalable"]  # "pyattimo", "default",
 
     ut.test_motiflets_scale_n(
         read_data,
         length_range,
         l, k_max,
-        backends
+        backends, delta
     )
 
 

@@ -33,7 +33,8 @@ class Motiflets:
             distance="znormed_ed",
             slack=0.5,
             n_jobs=4,
-            backend="pyattimo"
+            backend="pyattimo",
+            delta = None,
     ):
         """Computes the AU_EF plot to extract the best motif lengths
 
@@ -68,6 +69,8 @@ class Motiflets:
                 The backend to use. As of now 'pyattimo' and 'default' are supported.
                 Use default for the original exact implementation, and pyattimo for a
                 fast, scalable but approximate implementation.
+            delta : float
+                Delta parameter for pyattimo.
 
             Returns
             -------
@@ -92,6 +95,7 @@ class Motiflets:
         self.all_elbows = []
         self.all_top_motiflets = []
         self.all_dists = []
+        self.delta = delta
 
         self.motif_length = 0
         self.memory_usage = 0
@@ -145,7 +149,8 @@ class Motiflets:
             n_jobs=self.n_jobs,
             distance=self.distance,
             distance_preprocessing=self.distance_preprocessing,
-            backend=self.backend
+            backend=self.backend,
+            delta=self.delta
             # plot_elbows=plot_elbows,
             # plot_grid=plot_motifs_as_grid,
             # plot=plot,
@@ -213,7 +218,8 @@ class Motiflets:
             slack=self.slack,
             distance=self.distance,
             distance_preprocessing=self.distance_preprocessing,
-            backend=self.backend
+            backend=self.backend,
+            delta=self.delta
         )
 
         return self.dists, self.motiflets, self.elbow_points
@@ -731,7 +737,8 @@ def plot_elbow(k_max,
                slack=0.5,
                distance=znormed_euclidean_distance,
                distance_preprocessing=sliding_mean_std,
-               backend="pyattimo"
+               backend="pyattimo",
+               delta = None
                ):
     """Plots the elbow-plot for k-Motiflets.
 
@@ -795,7 +802,8 @@ def plot_elbow(k_max,
         slack=slack,
         distance=distance,
         distance_preprocessing=distance_preprocessing,
-        backend=backend)
+        backend=backend,
+        delta=delta)
     endTime = (time.perf_counter() - startTime)
 
     print("Chosen window-size:", m, "in", np.round(endTime, 1), "s")
@@ -828,7 +836,7 @@ def plot_motif_length_selection(
         subsample=2,
         distance=znormed_euclidean_distance,
         distance_preprocessing=sliding_mean_std,
-        backend="pyattimo"
+        backend="pyattimo", delta=None
 ):
     """Computes the AU_EF plot to extract the best motif lengths
 
@@ -891,7 +899,8 @@ def plot_motif_length_selection(
             subsample=subsample,
             distance=distance,
             distance_preprocessing=distance_preprocessing,
-            backend=backend)
+            backend=backend,
+            delta=delta)
     endTime = (time.perf_counter() - startTime)
     print("\tTime", np.round(endTime, 1), "s")
     indices = ~np.isinf(au_ef)

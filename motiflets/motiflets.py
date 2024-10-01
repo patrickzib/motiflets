@@ -901,7 +901,8 @@ def find_au_ef_motif_length(
         subsample=2,
         distance=znormed_euclidean_distance,
         distance_preprocessing=sliding_mean_std,
-        backend="pyattimo"):
+        backend="pyattimo",
+        delta=None):
     """Computes the Area under the Elbow-Function within an of motif lengths.
 
     Parameters
@@ -971,7 +972,8 @@ def find_au_ef_motif_length(
                 slack=slack,
                 distance=distance,
                 distance_preprocessing=distance_preprocessing,
-                backend=backend)
+                backend=backend,
+                delta=delta)
 
             dists_ = dist[(~np.isinf(dist)) & (~np.isnan(dist))]
             if dists_.max() - dists_.min() == 0:
@@ -1023,7 +1025,8 @@ def search_k_motiflets_elbow(
         n_jobs=4,
         distance=znormed_euclidean_distance,
         distance_preprocessing=sliding_mean_std,
-        backend="pyattimo"
+        backend="pyattimo",
+        delta=None
 ):
     """Computes the elbow-function.
 
@@ -1099,7 +1102,8 @@ def search_k_motiflets_elbow(
             n_jobs=n_jobs,
             elbow_deviation=elbow_deviation,
             slack=slack,
-            backend=backend)
+            backend=backend,
+            delta=delta)
         m = np.int32(m)
     elif isinstance(motif_length, int) or \
             isinstance(motif_length, np.int32) or \
@@ -1120,13 +1124,22 @@ def search_k_motiflets_elbow(
 
     # backend = "pyattimo"
     if backend == "pyattimo":
-        m_iter = pyattimo.MotifletsIterator(
-            data_raw, w=m, support=k_max_ - 1,
-            exclusion_zone=exclusion_m,
-            stop_on_threshold=True,
-            # delta = 0.5
-            # fraction_threshold=0.1
-        )
+        if delta:
+            print(f"PyAttimo: Setting delta to {delta}")
+            m_iter = pyattimo.MotifletsIterator(
+                data_raw, w=m, support=k_max_ - 1,
+                exclusion_zone=exclusion_m,
+                stop_on_threshold=True,
+                delta = delta
+                # fraction_threshold=0.1
+            )
+        else:
+            m_iter = pyattimo.MotifletsIterator(
+                data_raw, w=m, support=k_max_ - 1,
+                exclusion_zone=exclusion_m,
+                stop_on_threshold=True,
+                # fraction_threshold=0.1
+            )
         try:
             for mot in m_iter:
                 print("n:", n, "m", m, "k", k_max_, "support", mot.support, flush=True)

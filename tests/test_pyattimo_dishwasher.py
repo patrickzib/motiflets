@@ -38,18 +38,19 @@ def test_plot_data():
     ml.plot_dataset(max_points=points_to_plot, path="results/images/dishwasher_data.pdf")
 
 
-def test_motiflets_scale_n():
-
-    length_range = 25_000 * np.arange(20, 200, 1)
+def test_motiflets_scale_n(
+        backends = ["default", "pyattimo", "scalable"],
+        delta = None
+    ):
+    length_range = 25_000 * np.arange(1, 200, 1)
     l = 125 * 8  # roughly 6.5 seconds
     k_max = 20  # 40
-    backends = ["default", "pyattimo", "scalable"]
 
     ut.test_motiflets_scale_n(
         read_dishwasher,
         length_range,
         l, k_max,
-        backends
+        backends, delta
     )
 
 

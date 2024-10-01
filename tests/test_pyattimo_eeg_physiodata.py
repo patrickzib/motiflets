@@ -38,17 +38,20 @@ def test_plot_data():
     ml.plot_dataset(max_points=points_to_plot, path="results/images/eeg_data.pdf")
 
 
-def test_motiflets_scale_n():
+def test_motiflets_scale_n(
+        backends = ["default", "pyattimo", "scalable"],
+        delta = None
+    ):
     length_range = 25_000 * np.arange(1, 200, 1)
     l = 25 * 25  # roughly 6.5 seconds
     k_max = 20
-    backends = ["default", "pyattimo", "scalable"]
 
     ut.test_motiflets_scale_n(
         read_eeg_data,
         length_range,
         l, k_max,
-        backends
+        backends,
+        delta
     )
 
 

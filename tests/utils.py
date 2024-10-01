@@ -12,7 +12,7 @@ def test_motiflets_scale_n(
         length_range,
         l, k_max,
         backends=["default", "pyattimo", "scalable"],
-
+        delta = None,
         ):
     timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
     df = pd.DataFrame(columns=['length', 'backend', 'time in s', 'memory in MB', "extent"])
@@ -36,7 +36,8 @@ def test_motiflets_scale_n(
 
             print("Size of DS: ", ts.shape)
 
-            mm = Motiflets(ds_name, ts, backend=backend, n_jobs=64)
+            mm = Motiflets(
+                ds_name, ts, backend=backend, n_jobs=64, delta=delta)
             dists, _, _ = mm.fit_k_elbow(
                 k_max, l, plot_elbows=False,
                 plot_motifs_as_grid=False)
@@ -50,7 +51,10 @@ def test_motiflets_scale_n(
             results.append(current)
             df.loc[len(df.index)] = current
 
-            new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}_{timestamp}.csv"
+            if delta:
+                new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}_{delta}_{timestamp}.csv"
+            else:
+                new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}_{timestamp}.csv"
 
             df.to_csv(new_filename, index=False)
             print("\tDiscovered motiflets in", duration, "seconds")

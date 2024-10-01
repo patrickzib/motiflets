@@ -208,17 +208,19 @@ def test_motiflets_sparse():
             print("Memory:", memory_usage, "MB")
 
 
-def test_motiflets_scale_n():
+def test_motiflets_scale_n(
+        backends = ["default", "pyattimo", "scalable"],
+        delta = None
+    ):
     length_range = 10_000 * np.arange(1, 200, 1)
     l = 200
     k_max = 10
-    backends = ["default", "pyattimo", "scalable"]
 
     ut.test_motiflets_scale_n(
         load_dataset,
         length_range,
         l, k_max,
-        backends
+        backends, delta
     )
 
 

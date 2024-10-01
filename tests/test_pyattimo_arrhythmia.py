@@ -108,56 +108,20 @@ def test_attimo():
 
 
 
-def test_motiflets_scale_n():
-    timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
-
-    df = pd.DataFrame(columns=['length', 'backend', 'time in s',
-                               'memory in MB', "extent"])
-
-    results = []
+def test_motiflets_scale_n(
+        backends=["default", "pyattimo", "scalable"],
+        delta=None
+    ):
     length_range = 25_000 * np.arange(1, 200, 1)
-    for backend in ["pyattimo", "scalable",  "default"]:  # "pyattimo"
-        last_n = 0
-        for n in length_range:
-            start = time.time()
-            print(backend, n)
+    l = 200
+    k_max = 20
 
-            ds_name, series = read_arrhythmia()
-            ts = series[:n]
-            print("Size of DS: ", ts.shape)
-
-            l = 200
-            k_max = 20
-
-            mm = Motiflets(ds_name, ts, backend=backend, n_jobs=64)
-            dists, _, _ = mm.fit_k_elbow(
-                k_max, l, plot_elbows=False,
-                plot_motifs_as_grid=False)
-
-            duration = time.time() - start
-            memory_usage = mm.memory_usage
-            extent = dists[-1]
-
-            current = [len(ts), backend, duration, memory_usage, extent]
-
-            results.append(current)
-            df.loc[len(df.index)] = current
-
-            new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}_{timestamp}.csv"
-
-            df.to_csv(new_filename, index=False)
-            print("\tDiscovered motiflets in", duration, "seconds")
-            print("\t", current)
-
-            gc.collect()
-
-            if len(ts) <= last_n:
-                break
-
-            last_n = len(ts)
-
-    print(results)
-
+    ut.test_motiflets_scale_n(
+        read_arrhythmia,
+        length_range,
+        l, k_max,
+        backends, delta
+    )
 
 def main():
     print("running")
