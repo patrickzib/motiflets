@@ -1129,8 +1129,8 @@ def search_k_motiflets_elbow(
             m_iter = pyattimo.MotifletsIterator(
                 data_raw, w=m, support=k_max_ - 1,
                 exclusion_zone=exclusion_m,
-                stop_on_threshold=True,
                 delta = delta
+                # stop_on_threshold=True,
                 # fraction_threshold=0.1
             )
         else:

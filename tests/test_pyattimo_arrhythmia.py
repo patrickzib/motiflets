@@ -1,4 +1,5 @@
 import gc
+import utils as ut
 from datetime import datetime
 
 from motiflets.plotting import *
@@ -112,7 +113,7 @@ def test_motiflets_scale_n(
         backends=["default", "pyattimo", "scalable"],
         delta=None
     ):
-    length_range = 25_000 * np.arange(1, 200, 1)
+    length_range = 50_000 * np.arange(1, 200, 1)
     l = 200
     k_max = 20
 
