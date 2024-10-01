@@ -50,7 +50,7 @@ def as_series(data, index_range, index_name):
     return series
 
 
-def _resample(data, sampling_factor=10000):
+def resample(data, sampling_factor=10000):
     """Resamples a time series to roughly `sampling_factor` points.
 
     The method searches a factor to skip every i-th point.
@@ -128,7 +128,7 @@ def read_dataset_with_index(dataset, sampling_factor=10000):
     data = pd.read_csv(full_path, index_col=0).squeeze('columns')
     print("Dataset Original Length n: ", len(data))
 
-    data, factor = _resample(data, sampling_factor)
+    data, factor = resample(data, sampling_factor)
     print("Dataset Sampled Length n: ", len(data))
 
     data[:] = zscore(data)
@@ -195,7 +195,7 @@ def read_dataset(dataset, sampling_factor=10000):
     data = np.array(data)[0]
     print("Dataset Original Length n: ", len(data))
 
-    data, factor = _resample(data, sampling_factor)
+    data, factor = resample(data, sampling_factor)
     print("Dataset Sampled Length n: ", len(data))
 
     return zscore(data)
