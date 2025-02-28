@@ -111,6 +111,13 @@ We finally plot these motifs:
 The first repetitions perfectly match the calibration signal (orange), while the latter 16 
 repetitions perfectly match the ECG waves (green).
 
+
+## Sub-Dimensional Motif Discovery
+
+If you are interested in sub-dimensional motif discovery, you might also want to check our research on <a href="https://github.com/patrickzib/leitmotifs/">Leitmotifs</a>. 
+
+
+
 # Use Cases
 
 Data Sets: We collected challenging real-life data sets to assess the quality and scalability of MD algorithms. An overview of datasets can be found in Table 2 of our paper. 
@@ -132,6 +139,7 @@ Data Sets: We collected challenging real-life data sets to assess the quality an
 - Jupyter-Notebook <a href="notebooks/use_cases_motif_sets_synthetic.ipynb">Semi-Synthetic with implanted Ground Truth</a>: One example series form our 25 semi-synthetic time series. To measure the precision of the different MD methods we created a semi-synthetic dataset using the first 25 datasets of an anomaly benchmark and implanted motif sets of varying sizes $k \in [5, \dots, 10]$ of fixed length $l=500$.
 
 - Jupyter-Notebook <a href="notebooks/use_cases_motif_sets_synthetic-all.ipynb">Full results for the Semi-Synthetic Dataset with implanted Ground Truth</a>: To measure the precision of the different MD methods we created a semi-synthetic dataset using the first 25 datasets of an anomaly benchmark and implanted motif sets of varying sizes $k \in [5, \dots, 10]$ of fixed length $l=500$.
+
 
 ## Citation
 If you use this work, please cite as:
