@@ -276,9 +276,9 @@ def _sliding_mean_std(ts, m):
     return [movmean, movstd]
 
 
-@njit(fastmath=True, cache=True, parallel=True)
+# @njit(fastmath=True, cache=True, parallel=True)
 def compute_distances_with_knns(
-        ts,
+        time_series,
         m,
         k,
         exclude_trivial_match=True,
@@ -298,22 +298,22 @@ def compute_distances_with_knns(
 
         Parameters
         ----------
-        ts : array-like
+        time_series : array-like
             The time series
         m : int
             The window length
         k : int
             Number of nearest neighbors
-        exclude_trivial_match : bool
+        exclude_trivial_match : bool (default: True)
             Trivial matches will be excluded if this parameter is set
-        n_jobs : int
+        n_jobs : int (default: 4)
             Number of jobs to be used.
-        slack: float
+        slack: float (default: 0.5)
             Defines an exclusion zone around each subsequence to avoid trivial matches.
             Defined as percentage of m. E.g. 0.5 is equal to half the window length.
-        distance: callable
+        distance: callable (default: znormed_euclidean_distance)
                 The distance function to be computed.
-        distance_preprocessing: callable
+        distance_preprocessing: callable (default: sliding_mean_std)
                 The distance preprocessing function to be computed.
 
         Returns
@@ -324,7 +324,8 @@ def compute_distances_with_knns(
             The k-nns for each subsequence
 
     """
-    n = np.int32(ts.shape[0] - m + 1)
+    dims = time_series.shape[0]
+    n = np.int32(time_series.shape[-1] - m + 1)
     halve_m = 0
     if exclude_trivial_match:
         halve_m = int(m * slack)
@@ -332,43 +333,48 @@ def compute_distances_with_knns(
     D = np.zeros((n, n), dtype=np.float32)
     knns = np.zeros((n, k), dtype=np.int32)
 
-    # means, stds = _sliding_mean_std(ts, m)
-    preprocessing = distance_preprocessing(ts, m)
-
-    dot_first = _sliding_dot_product(ts[:m], ts)
-    bin_size = ts.shape[0] // n_jobs
+    bin_size = time_series.shape[-1] // n_jobs
 
     for idx in prange(n_jobs):
         start = idx * bin_size
-        end = min((idx + 1) * bin_size, ts.shape[0] - m + 1)
+        end = min((idx + 1) * bin_size, time_series.shape[-1] - m + 1)
 
-        dot_prev = None
+        for d in np.arange(dims):
+            ts = time_series[d, :]
+            preprocessing = distance_preprocessing(ts, m)
+            dot_first = _sliding_dot_product(ts[:m], ts)
+
+            dot_prev = None
+            for order in np.arange(start, end):
+                if order == start:
+                    # O(n log n) operation
+                    dot_rolled = _sliding_dot_product(ts[start:start + m], ts)
+                else:
+                    # constant time O(1) operations
+                    dot_rolled = np.roll(dot_prev, 1) \
+                                 + ts[order + m - 1] * ts[m - 1:n + m] \
+                                 - ts[order - 1] * np.roll(ts[:n], 1)
+                    dot_rolled[0] = dot_first[order]
+
+                dist = distance(dot_rolled, n, m, preprocessing, order, halve_m)
+
+                D[order] += dist
+                dot_prev = dot_rolled
+
         for order in np.arange(start, end):
-            if order == start:
-                # O(n log n) operation
-                dot_rolled = _sliding_dot_product(ts[start:start + m], ts)
-            else:
-                # constant time O(1) operations
-                dot_rolled = np.roll(dot_prev, 1) \
-                             + ts[order + m - 1] * ts[m - 1:n + m] \
-                             - ts[order - 1] * np.roll(ts[:n], 1)
-                dot_rolled[0] = dot_first[order]
+            knn = _argknn(D[order], k, m, slack=slack)
 
-            # D[order, :] = distance(dot_rolled, n, m, means, stds, order, halve_m)
-            D[order, :] = distance(dot_rolled, n, m, preprocessing, order, halve_m)
-            dot_prev = dot_rolled
+            knns[order, :len(knn)] = knn
+            knns[order, len(knn):] = -1
 
-    for order in prange(D.shape[-1]):
-        knn = _argknn(D[order], k, m, slack=slack)
-        knns[order, :len(knn)] = knn
-        knns[order, len(knn):] = -1
+    D = D / dims
 
     return D, knns
 
 
-@njit(fastmath=True, cache=True, parallel=True)
+@njit(fastmath=True, cache=True)
 def compute_distances_with_knns_sparse(
-    ts,
+    time_series,
     m,
     k,
     exclude_trivial_match=True,
@@ -395,16 +401,16 @@ def compute_distances_with_knns_sparse(
             The window length
         k : int
             Number of nearest neighbors
-        exclude_trivial_match : bool
+        exclude_trivial_match : bool (default: True)
             Trivial matches will be excluded if this parameter is set
-        n_jobs : int
+        n_jobs : int (default: 4)
             Number of jobs to be used.
-        slack: float
+        slack: float (default: 0.5)
             Defines an exclusion zone around each subsequence to avoid trivial matches.
             Defined as percentage of m. E.g. 0.5 is equal to half the window length.
-        distance: callable
+        distance: callable (default: znormed_euclidean_distance)
                 The distance function to be computed.
-        distance_preprocessing: callable
+        distance_preprocessing: callable (default: sliding_mean_std)
                 The distance preprocessing function to be computed.
 
         Returns
@@ -415,7 +421,8 @@ def compute_distances_with_knns_sparse(
             The k-nns for each subsequence
 
     """
-    n = np.int32(ts.shape[0] - m + 1)
+    dims = time_series.shape[0]
+    n = np.int32(time_series.shape[-1] - m + 1)
     halve_m = 0
     if exclude_trivial_match:
         halve_m = int(m * slack)
@@ -431,36 +438,45 @@ def compute_distances_with_knns_sparse(
     for i in range(n):
         D_sparse.append(Dict.empty(key_type=types.int32, value_type=types.float32))
 
-    # means, stds = _sliding_mean_std(ts, m)
-    preprocessing = distance_preprocessing(ts, m)
+    preprocessing = []
+    dot_first = []
 
-    dot_first = _sliding_dot_product(ts[:m], ts)
-    bin_size = ts.shape[0] // n_jobs
+    for d in np.arange(dims):
+        ts = time_series[d, :]
+        preprocessing.append(distance_preprocessing(ts, m))
+        dot_first.append(_sliding_dot_product(ts[:m], ts))
+
+    bin_size = time_series.shape[-1] // n_jobs
 
     # first pass, computing the k-nns
     for idx in prange(n_jobs):
+        dot_rolled = np.zeros((dims, n), dtype=np.float32)
+        dot_prev = np.zeros((dims, n), dtype=np.float32)
         start = idx * bin_size
         end = min((idx + 1) * bin_size, n)
 
-        dot_prev = None
-        for order in np.arange(start, end):
-            if order == start:
-                # O(n log n) operation
-                dot_rolled = _sliding_dot_product(ts[start:start + m], ts)
-            else:
-                # constant time O(1) operations
-                dot_rolled = np.roll(dot_prev, 1) \
-                             + ts[order + m - 1] * ts[m - 1:n + m] \
-                             - ts[order - 1] * np.roll(ts[:n], 1)
-                dot_rolled[0] = dot_first[order]
+        for order in np.arange(start, end, dtype=np.int32):
+            dist = np.zeros(n, dtype=np.float32)
+            for d in np.arange(dims):
+                ts = time_series[d, :]
+                if order == start:
+                    # O(n log n) operation
+                    dot_rolled[d] = _sliding_dot_product(ts[start:start + m], ts)
+                else:
+                    # constant time O(1) operations
+                    dot_rolled[d] = np.roll(dot_prev[d], 1) \
+                                 + ts[order + m - 1] * ts[m - 1:n + m] \
+                                 - ts[order - 1] * np.roll(ts[:n], 1)
+                    dot_rolled[d][0] = dot_first[d][order]
 
-            # dist = distance(dot_rolled, n, m, means, stds, order, halve_m)
-            dist = distance(dot_rolled, n, m, preprocessing, order, halve_m)
-            dot_prev = dot_rolled
+                dist += distance(dot_rolled[d], n, m, preprocessing[d], order, halve_m)
+                dot_prev[d] = dot_rolled[d]
 
             knn = _argknn(dist, k, m, slack=slack)
-            D_knn[order] = dist[knn]
-            knns[order] = knn
+            D_knn[order, :len(knn)] = dist[knn]
+
+            knns[order, :len(knn)] = knn
+            knns[order, len(knn):] = -1
 
     # FIXME: Parallelizm does not work, as Dict is not thread safe :(
     for order in np.arange(0, n):
@@ -470,28 +486,33 @@ def compute_distances_with_knns_sparse(
             for ks2 in knns[order]:
                 D_bool[ks][ks2] = True
 
+
     # second pass, filling only the pairs needed
     for idx in prange(n_jobs):
+        dot_rolled = np.zeros((dims, n), dtype=np.float32)
+        dot_prev = np.zeros((dims, n), dtype=np.float32)
+
         start = idx * bin_size
-        end = min((idx + 1) * bin_size, ts.shape[0] - m + 1)
+        end = min((idx + 1) * bin_size, n)
 
-        dot_prev = None
-        for order in np.arange(start, end):
-            if order == start:
-                # O(n log n) operation
-                dot_rolled = _sliding_dot_product(ts[start:start + m], ts)
-            else:
-                # constant time O(1) operations
-                dot_rolled = np.roll(dot_prev, 1) \
-                             + ts[order + m - 1] * ts[m - 1:n + m] \
-                             - ts[order - 1] * np.roll(ts[:n], 1)
-                dot_rolled[0] = dot_first[order]
+        for order in np.arange(start, end, dtype=np.int32):
+            dist = np.zeros(n, dtype=np.float32)
+            for d in np.arange(dims):
+                ts = time_series[d, :]
+                if order == start:
+                    # O(n log n) operation
+                    dot_rolled[d] = (_sliding_dot_product(ts[start:start + m], ts))
+                else:
+                    # constant time O(1) operations
+                    dot_rolled[d] = np.roll(dot_prev[d], 1) \
+                                 + ts[order + m - 1] * ts[m - 1:n + m] \
+                                 - ts[order - 1] * np.roll(ts[:n], 1)
+                    dot_rolled[d][0] = dot_first[d][order]
 
-            # dist = distance(dot_rolled, n, m, means, stds, order, halve_m)
-            dist = distance(dot_rolled, n, m, preprocessing, order, halve_m)
-            dot_prev = dot_rolled
+                dist += distance(dot_rolled[d], n, m, preprocessing[d], order, halve_m)
+                dot_prev[d] = dot_rolled[d]
 
-            # fill the knns now with the distances computed
+            # fill the k-nns now with the distances computed
             for key in D_bool[order]:
                 D_sparse[order][key] = dist[key]
 
@@ -666,7 +687,7 @@ def get_approximate_k_motiflet(
         The k in k-Motiflets
     D : 2d array-like
         The distance matrix
-    upper_bound : float
+    upper_bound : float (default: np.inf)
         Used for admissible pruning
 
     Returns
@@ -677,7 +698,7 @@ def get_approximate_k_motiflet(
         motiflet_dist:
             The extent of the motiflet found
     """
-    n = len(ts) - m + 1
+    n = ts.shape[-1] - m + 1
     motiflet_dist = upper_bound
     motiflet_candidate = None
 
@@ -862,20 +883,22 @@ def find_au_ef_motif_length(
         The interval of k's to compute the area of a single AU_EF.
     motif_length_range : array-like
         The range of lengths to compute the AU-EF.
-    exclusion : 2d-array
+    exclusion : 2d-array (default=None)
         exclusion zone - use when searching for the TOP-2 motiflets
-    n_jobs : int
+    n_jobs : int (default=4)
         Number of jobs to be used.
-    elbow_deviation : float, default=1.00
+    elbow_deviation : float, (default=1.00)
         The minimal absolute deviation needed to detect an elbow.
         It measures the absolute change in deviation from k to k+1.
         1.05 corresponds to 5% increase in deviation.
-    slack: float
+    slack: float (default=0.5)
         Defines an exclusion zone around each subsequence to avoid trivial matches.
         Defined as percentage of m. E.g. 0.5 is equal to half the window length.
-    distance: callable
+    subsample : int (default=2)
+        The factor to subsample the time series.
+    distance: callable (default=znormed_euclidean_distance)
         The distance function to be computed.
-    distance_preprocessing: callable
+    distance_preprocessing: callable (default=sliding_mean_std)
         The distance preprocessing function to be computed.
 
     Returns
@@ -895,7 +918,10 @@ def find_au_ef_motif_length(
     """
     # apply sampling for speedup only
     if subsample > 1:
-        data = data[::subsample]
+        if data.ndim >= 2:
+            data = data[:, ::subsample]
+        else:
+            data = data[::subsample]
 
     # in reverse order
     au_efs = np.zeros(len(motif_length_range), dtype=object)
@@ -906,7 +932,7 @@ def find_au_ef_motif_length(
 
     # TODO parallelize?
     for i, m in enumerate(motif_length_range[::-1]):
-        if m // subsample < data.shape[0]:
+        if m // subsample < data.shape[-1]:
             dist, candidates, elbow_points, _ = search_k_motiflets_elbow(
                 k_max,
                 data,
@@ -983,32 +1009,32 @@ def search_k_motiflets_elbow(
         use [2...k_max] to compute the elbow plot (user parameter).
     data : array-like
         the TS
-    motif_length : int
+    motif_length : int (default='auto')
         the length of the motif (user parameter) or
         `motif_length == 'AU_EF'` or `motif_length == 'auto'`.
-    motif_length_range : array-like
+    motif_length_range : array-like (default=None)
         Can be used to determine to length of the motif set automatically.
         If a range is passed and `motif_length == 'auto'`, the best window length
         is first determined, prior to computing the elbow-plot.
-    exclusion : 2d-array
+    exclusion : 2d-array (default=None)
         exclusion zone - use when searching for the TOP-2 motiflets
-    approximate_motiflet_pos : array-like
+    approximate_motiflet_pos : array-like (default=None)
         An initial estimate of the positions of the k-Motiflets for each k in the
         given range [2...k_max]. Will be used for bounding distance computations.
-    elbow_deviation : float, default=1.00
+    elbow_deviation : float, default=1.00 (user parameter)
         The minimal absolute deviation needed to detect an elbow.
         It measures the absolute change in deviation from k to k+1.
         1.05 corresponds to 5% increase in deviation.
-    filter: bool, default=True
+    filter: bool, default=True (user parameter)
         filters overlapping motiflets from the result,
-    slack: float
+    slack: float (default=0.5)
         Defines an exclusion zone around each subsequence to avoid trivial matches.
         Defined as percentage of m. E.g. 0.5 is equal to half the window length.
-    n_jobs : int
+    n_jobs : int (default=4)
         Number of jobs to be used.
-    distance: callable
+    distance: callable (default=znormed_euclidean_distance)
             The distance function to be computed.
-    distance_preprocessing: callable
+    distance_preprocessing: callable (default=sliding_mean_std)
             The distance preprocessing function to be computed.
 
     Returns
@@ -1046,7 +1072,7 @@ def search_k_motiflets_elbow(
         assert False
 
     # non-overlapping motifs only
-    n = data_raw.shape[0] - m + 1
+    n = data_raw.shape[-1] - m + 1
     k_max_ = max(3, min(int(n // (m * slack)), k_max))
 
     # non-overlapping motifs only
@@ -1055,10 +1081,18 @@ def search_k_motiflets_elbow(
 
     # switch to sparse matrix representation when length is above 30_000
     # sparse matrix is 2x slower but needs less memory
-    sparse = n >= 30000
+    if data_raw.ndim == 1:
+        sparse = n >= 30000
+    else:
+        d = data_raw.shape[0]
+        sparse_gb = ((n ** 2) * d) * 32 / (1024 ** 3) / 8
+        sparse = sparse_gb > 8.0
+
     if not sparse:
         D_full, knns = compute_distances_with_knns(
-            data_raw, m, k_max_, n_jobs=n_jobs, slack=slack,
+            data_raw, m, k_max_,
+            n_jobs=n_jobs,
+            slack=slack,
             distance=distance,
             distance_preprocessing=distance_preprocessing,
         )
@@ -1152,7 +1186,7 @@ def find_k_motiflets(ts, D_full, m, k, upperbound=None, slack=0.5):
     -------
     best found motiflet and its extent.
     """
-    n = len(ts) - m + 1
+    n = ts.shape[-1] - m + 1
 
     motiflet_dist = upperbound
     if upperbound is None:
