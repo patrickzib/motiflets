@@ -276,7 +276,7 @@ def _sliding_mean_std(ts, m):
     return [movmean, movstd]
 
 
-# @njit(fastmath=True, cache=True, parallel=True)
+@njit(fastmath=True, cache=True, parallel=True)
 def compute_distances_with_knns(
         time_series,
         m,
