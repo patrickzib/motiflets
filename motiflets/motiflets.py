@@ -745,7 +745,6 @@ def _check_unique(motifset_1, motifset_2, motif_length):
     return True
 
 
-# @njit(fastmath=True, cache=True)
 def _filter_unique(elbow_points, candidates, motif_length):
     """Filters the list of candidate elbows for only the non-overlapping motifsets.
 
