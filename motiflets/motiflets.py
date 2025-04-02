@@ -325,6 +325,8 @@ def compute_distances_with_knns(
             The k-nns for each subsequence
 
     """
+    assert time_series.ndim == 2  # Input dim must be 2d
+
     dims = time_series.shape[0]
     n = np.int32(time_series.shape[-1] - m + 1)
     halve_m = 0
@@ -422,6 +424,8 @@ def compute_distances_with_knns_sparse(
             The k-nns for each subsequence
 
     """
+    assert time_series.ndim == 2  # Input dim must be 2d
+
     dims = time_series.shape[0]
     n = np.int32(time_series.shape[-1] - m + 1)
     halve_m = 0

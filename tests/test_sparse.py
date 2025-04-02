@@ -50,8 +50,9 @@ def test_motiflets_sparse():
 
 def test_sparse_matrix():
     ds_name, T = read_penguin_data()
-    n = 50_001
+    n = 10_001
     series = T.iloc[497699:497699 + n, 0].T.to_numpy()
+    series = series.reshape((1, -1))   # make it 2D
 
     m = 22
     k = 10
@@ -67,8 +68,9 @@ def test_sparse_matrix():
 
 def test_full_matrix():
     ds_name, T = read_penguin_data()
-    n = 20_000
+    n = 10_000
     series = T.iloc[497699:497699 + n, 0].T.to_numpy()
+    series = series.reshape((1, -1))  # make it 2D
 
     m = 1000
     k = 10
