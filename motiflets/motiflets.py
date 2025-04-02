@@ -22,6 +22,7 @@ from tqdm.auto import tqdm
 
 from motiflets.distances import *
 
+
 def as_series(data, index_range, index_name):
     """Coverts a time series to a series with an index.
 
@@ -276,7 +277,7 @@ def _sliding_mean_std(ts, m):
     return [movmean, movstd]
 
 
-# @njit(fastmath=True, cache=True, parallel=True)
+@njit(fastmath=True, cache=True, parallel=True)
 def compute_distances_with_knns(
         time_series,
         m,
@@ -374,14 +375,14 @@ def compute_distances_with_knns(
 
 @njit(fastmath=True, cache=True)
 def compute_distances_with_knns_sparse(
-    time_series,
-    m,
-    k,
-    exclude_trivial_match=True,
-    n_jobs=4,
-    slack=0.5,
-    distance=znormed_euclidean_distance,
-    distance_preprocessing=sliding_mean_std
+        time_series,
+        m,
+        k,
+        exclude_trivial_match=True,
+        n_jobs=4,
+        slack=0.5,
+        distance=znormed_euclidean_distance,
+        distance_preprocessing=sliding_mean_std
 ):
     """ Compute the full Distance Matrix between all pairs of subsequences of a
         multivariate time series.
@@ -465,8 +466,8 @@ def compute_distances_with_knns_sparse(
                 else:
                     # constant time O(1) operations
                     dot_rolled[d] = np.roll(dot_prev[d], 1) \
-                                 + ts[order + m - 1] * ts[m - 1:n + m] \
-                                 - ts[order - 1] * np.roll(ts[:n], 1)
+                                    + ts[order + m - 1] * ts[m - 1:n + m] \
+                                    - ts[order - 1] * np.roll(ts[:n], 1)
                     dot_rolled[d][0] = dot_first[d][order]
 
                 dist += distance(dot_rolled[d], n, m, preprocessing[d], order, halve_m)
@@ -486,7 +487,6 @@ def compute_distances_with_knns_sparse(
             for ks2 in knns[order]:
                 D_bool[ks][ks2] = True
 
-
     # second pass, filling only the pairs needed
     for idx in prange(n_jobs):
         dot_rolled = np.zeros((dims, n), dtype=np.float32)
@@ -505,8 +505,8 @@ def compute_distances_with_knns_sparse(
                 else:
                     # constant time O(1) operations
                     dot_rolled[d] = np.roll(dot_prev[d], 1) \
-                                 + ts[order + m - 1] * ts[m - 1:n + m] \
-                                 - ts[order - 1] * np.roll(ts[:n], 1)
+                                    + ts[order + m - 1] * ts[m - 1:n + m] \
+                                    - ts[order - 1] * np.roll(ts[:n], 1)
                     dot_rolled[d][0] = dot_first[d][order]
 
                 dist += distance(dot_rolled[d], n, m, preprocessing[d], order, halve_m)
@@ -517,23 +517,6 @@ def compute_distances_with_knns_sparse(
                 D_sparse[order][key] = dist[key]
 
     return D_sparse, knns
-
-
-# @njit(fastmath=True, cache=True)
-# def distance(dot_rolled, n, m, means, stds, order, halve_m):
-#     # Implementation of z-normalized Euclidean distance
-#     dist = 2 * m * (1 - (dot_rolled - m * means * means[order]) / (
-#             m * stds * stds[order]))
-#
-#     # self-join: exclusion zone
-#     trivialMatchRange = (max(0, order - halve_m),
-#                          min(order + halve_m + 1, n))
-#     dist[trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
-#
-#     # allow subsequence itself to be in result
-#     dist[order] = 0
-#
-#     return dist
 
 
 @njit(fastmath=True, cache=True)
