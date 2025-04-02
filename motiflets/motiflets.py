@@ -1359,3 +1359,58 @@ def compute_distances_full(ts,
                                        n_jobs=n_jobs,
                                        slack=slack)
     return D
+
+
+
+def stitch_and_search_motiflet(
+        data,
+        m,
+        k_max,
+        motiflet,
+        search_window,
+        n_jobs=4,
+        slack=0.5,
+        upper_bound=np.inf
+    ):
+
+    assert search_window > m
+
+    _, data_raw = pd_series_to_numpy(data)
+
+    parts_to_stitch = []
+    indices = []
+    for pos in motiflet:
+        start = max(0, pos - search_window)
+        end = min(pos + search_window, len(data_raw))
+
+        indices.append(np.arange(start, end, 1))
+        parts_to_stitch.append(data_raw[start, end])
+
+    new_series = np.concatenate(parts_to_stitch)
+    new_indices = np.concatenate(indices)
+
+    D_full, knns = compute_distances_with_knns(
+        new_series,
+        m,
+        k_max,
+        n_jobs=n_jobs,
+        slack=slack,
+        # distance=distance,
+        # distance_preprocessing=distance_preprocessing
+    )
+
+    candidate, candidate_extent, _ = get_approximate_k_motiflet(
+        data_raw,
+        m,
+        k_max - 1,
+        D_full,
+        knns,
+        upper_bound=upper_bound,
+    )
+
+    new_motiflet_pos = new_indices[candidate]
+    return new_motiflet_pos, candidate_extent
+
+
+
+
