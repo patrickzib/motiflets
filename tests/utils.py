@@ -61,7 +61,7 @@ def test_motiflets_scale_n(
                     l,
                     motiflet,
                     extent,
-                    l * 4,
+                    l * 4,  # search in a local neighborhood of 4 times the motif length
                     upper_bound=extent
                 )
 
