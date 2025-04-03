@@ -53,6 +53,23 @@ def test_motiflets_scale_n(
             extent = dists[-1]
             motiflet = motiflets[-1]
 
+
+            if backend == "pyattimo":
+                # try to refine the positions of the motiflets
+                new_motiflet, new_extent = stitch_and_local_motiflet_search(
+                    ts,
+                    l,
+                    motiflet,
+                    extent,
+                    l * 4,
+                    upper_bound=extent
+                )
+
+                if new_extent < extent:
+                    print(f"Searching in local neighborhood found a better motif")
+                    motiflet = new_motiflet
+                    extent = new_extent
+
             current = [len(ts), backend, duration, memory_usage, extent, motiflet]
 
             results.append(current)
