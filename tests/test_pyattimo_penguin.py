@@ -12,19 +12,15 @@ matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 
 import warnings
-
 warnings.simplefilter("ignore")
 
 import logging
-
 logging.basicConfig(level=logging.WARN)
 pyattimo_logger = logging.getLogger('pyattimo')
 pyattimo_logger.setLevel(logging.WARNING)
 
 import matplotlib as mpl
-
 mpl.rcParams['figure.dpi'] = 150
-
 
 def test_plot_data():
     ds_name, series = read_penguin_1m()
@@ -110,11 +106,13 @@ def test_attimo():
     print("Discovered motiflets in", end - start, "seconds")
 
 
+
 def test_motiflets_scale_n(
-        backends=["default", "pyattimo", "scalable"],
-        delta=None,
-        use_1m=True,
-):
+        backends = ["default", "pyattimo", "scalable"],
+        delta = None,
+        subsampling = None,
+        use_1m=True
+    ):
     length_range = 50_000 * np.arange(1, 200, 1)
     l = 125  # 23
     k_max = 20
@@ -124,7 +122,8 @@ def test_motiflets_scale_n(
         length_range,
         l, k_max,
         backends,
-        delta
+        delta,
+        subsampling
     )
 
 
@@ -175,6 +174,7 @@ def test_motiflets_scale_k():
     #    motifsets=motifs,
     #    motif_length=l,
     #    show=False)
+
 
 
 def main():

@@ -209,8 +209,9 @@ def test_motiflets_sparse():
 
 
 def test_motiflets_scale_n(
-        backends = ["pyattimo", "default", "scalable"],
-        delta = None
+        backends = ["default", "pyattimo", "scalable"],
+        delta = None,
+        subsampling=None
     ):
     length_range = 50_000 * np.arange(1, 200, 1)
     l = 200
@@ -220,7 +221,9 @@ def test_motiflets_scale_n(
         load_dataset,
         length_range,
         l, k_max,
-        backends, delta
+        backends,
+        delta,
+        subsampling
     )
 
 

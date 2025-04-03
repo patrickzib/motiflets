@@ -11,7 +11,7 @@ import test_pyattimo_arrhythmia as arrhythmia
 
 def main():
     backends = ["pyattimo"]
-    deltas = [0.10]
+    deltas = [0.90, 0.50, 0.10]
 
     for delta in deltas:
         print(f"Using delta {delta}")
@@ -71,6 +71,29 @@ def main():
             print(traceback.format_exc())
         except BaseException as e:
             print(f"Caught a panic: {e}")
+
+    backends = ["default"]
+    subsamplings = [2, 3, 4, 5, 6, 7, 8, 9, 10]
+    for subsampling in subsamplings:
+        print(f"Using subsampling {subsampling}")
+        astro.test_motiflets_scale_n(backends=backends, subsampling=subsampling)
+        arrhythmia.test_motiflets_scale_n(backends=backends, subsampling=subsampling)
+        dishwasher.test_motiflets_scale_n(backends=backends, subsampling=subsampling)
+        eeg.test_motiflets_scale_n(backends=backends, subsampling=subsampling)
+        gap.test_motiflets_scale_n(backends=backends, subsampling=subsampling)
+        pamap.test_motiflets_scale_n(backends=backends, subsampling=subsampling)
+        penguin.test_motiflets_scale_n(backends=backends, subsampling=subsampling)
+
+
+    backends = ["scalable, default"]
+    astro.test_motiflets_scale_n(backends=backends)
+    arrhythmia.test_motiflets_scale_n(backends=backends)
+    dishwasher.test_motiflets_scale_n(backends=backends)
+    eeg.test_motiflets_scale_n(backends=backends)
+    gap.test_motiflets_scale_n(backends=backends)
+    pamap.test_motiflets_scale_n(backends=backends)
+    penguin.test_motiflets_scale_n(backends=backends)
+
 
 if __name__ == "__main__":
     main()

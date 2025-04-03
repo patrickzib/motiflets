@@ -10,6 +10,7 @@ import itertools
 from ast import literal_eval
 from os.path import exists
 
+import numpy as np
 import psutil
 import numpy.fft as fft
 import pandas as pd
@@ -463,12 +464,11 @@ def compute_distances_with_knns_sparse(
             dot_prev = dot_rolled
 
             knn = _argknn(dist, k, m, slack=slack)
-            D_knn[order, :] = dist[knn[-1]]     # in case too little knns are returned
+            D_knn[order, :] = dist[knn[-1]]  # in case too little knns are returned
             knns[order, :] = knn[-1]
 
             D_knn[order, :len(dist[knn])] = dist[knn]
             knns[order, :len(knn)] = knn
-
 
     # Store an upper bound for each k-nn distance
     k_nn_dist = np.zeros(k, dtype=np.float64)
@@ -796,7 +796,6 @@ def _check_unique(motifset_1, motifset_2, motif_length):
     return True
 
 
-# @njit(fastmath=True, cache=True)
 def filter_unique(elbow_points, candidates, motif_length):
     """Filters the list of candidate elbows for only the non-overlapping motifsets.
 
@@ -1153,7 +1152,7 @@ def search_k_motiflets_elbow(
                 test_k = mot.support
                 if test_k < k_max_:
                     # TODO cross-check extent??
-                    k_motiflet_distances[test_k] = mot.extent**2
+                    k_motiflet_distances[test_k] = mot.extent ** 2
                     k_motiflet_candidates[test_k] = np.array(mot.indices)
 
             memory_usage = process.memory_info().rss / (1024 * 1024)  # MB
@@ -1364,3 +1363,73 @@ def compute_distances_full(ts,
                                        n_jobs=n_jobs,
                                        slack=slack)
     return D
+
+
+def stitch_and_local_motiflet_search(
+        data,
+        m,
+        motiflet,
+        extent,
+        search_window,
+        n_jobs=4,
+        slack=0.5,
+        distance=znormed_euclidean_distance,
+        distance_preprocessing=sliding_mean_std,
+        upper_bound=np.inf
+):
+    """Searches in the local neighborhood, i.e. the trivial matches, of the found motif
+     for a better match.
+    """
+
+    assert search_window > m
+
+    _, data_raw = pd_series_to_numpy(data)
+    k_max = len(motiflet) + 1
+
+    parts_to_stitch = []
+    indices = []
+    last_end = 0  # used to avoid overlaps
+
+    for pos in np.sort(motiflet):
+        start = max(last_end, max(0, pos - search_window))
+        end = min(pos + search_window, len(data_raw))
+
+        indices.append(np.arange(start, end, 1))
+        parts_to_stitch.append(data_raw[start:end])
+
+        last_end = end
+
+        # TODO append a guard i.e. np.inf to avoid matches between
+        #      stitched subsequences?
+
+    new_series = np.concatenate(parts_to_stitch)
+    new_indices = np.concatenate(indices)
+
+    assert len(np.unique(new_indices)) == len(new_indices)
+
+    D, knns = compute_distances_with_knns(
+        new_series,
+        m,
+        k_max,
+        n_jobs=n_jobs,
+        slack=slack,
+        distance=distance,
+        distance_preprocessing=distance_preprocessing
+    )
+
+    cardinality = len(motiflet)
+    candidate, candidate_extent, _ = get_approximate_k_motiflet(
+        new_series,
+        m,
+        cardinality,
+        D,
+        knns,
+        upper_bound=upper_bound,
+    )
+
+    new_motiflet_pos = new_indices[candidate]
+
+    if candidate_extent < extent:
+        return new_motiflet_pos, candidate_extent
+    else:
+        return motiflet, extent

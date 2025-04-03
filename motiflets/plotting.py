@@ -806,7 +806,7 @@ def plot_elbow(k_max,
         delta=delta)
     endTime = (time.perf_counter() - startTime)
 
-    print("Chosen window-size:", m, "in", np.round(endTime, 1), "s")
+    print("Found motiflets in", np.round(endTime, 1), "s")
 
     if filter:
         elbow_points = ml.filter_unique(elbow_points, candidates, motif_length)
