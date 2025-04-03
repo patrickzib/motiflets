@@ -49,7 +49,7 @@ def test_motiflets_scale_n(
 
             l_new = l
             if subsampling:
-                if isinstance(ts,pd.DataFrame):
+                if isinstance(ts, pd.DataFrame):
                     ts = ts.iloc[::subsampling]
                 else:
                     ts = ts[::subsampling]
