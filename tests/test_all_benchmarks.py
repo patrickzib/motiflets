@@ -9,6 +9,18 @@ import test_pyattimo_eeg_physiodata as eeg
 import test_pyattimo_arrhythmia as arrhythmia
 
 
+def run_safe(module, backends, delta, use_1m=None):
+    try:
+        if use_1m:
+            module.test_motiflets_scale_n(backends=backends, delta=delta, use_1m=use_1m)
+        else:
+            module.test_motiflets_scale_n(backends=backends, delta=delta)
+    except Exception as e:
+        print(traceback.format_exc())
+    except BaseException as e:
+        print(f"Caught a panic: {e}")
+
+
 def main():
     backends = ["pyattimo"]
     deltas = [0.10, 0.25, 0.50]
@@ -16,61 +28,15 @@ def main():
     for delta in deltas:
         print(f"Using delta {delta}")
 
-        try:
-           astro.test_motiflets_scale_n(backends=backends, delta=delta)
-        except Exception as e:
-           print(traceback.format_exc())
-        except BaseException as e:
-           print(f"Caught a panic: {e}")
+        run_safe(astro, backends, delta)
+        run_safe(arrhythmia, backends, delta)
+        run_safe(dishwasher, backends, delta)
+        run_safe(eeg, backends, delta)
+        run_safe(gap, backends, delta)
+        run_safe(pamap, backends, delta)
+        run_safe(penguin, backends, delta, use_1m=True)
+        run_safe(penguin, backends, delta, use_1m=False)
 
-        try:
-            arrhythmia.test_motiflets_scale_n(backends=backends, delta=delta)
-        except Exception as e:
-            print(traceback.format_exc())
-        except BaseException as e:
-           print(f"Caught a panic: {e}")
-
-        try:
-           dishwasher.test_motiflets_scale_n(backends=backends, delta=delta)
-        except Exception as e:
-           print(traceback.format_exc())
-        except BaseException as e:
-           print(f"Caught a panic: {e}")
-
-        try:
-           eeg.test_motiflets_scale_n(backends=backends, delta=delta)
-        except Exception as e:
-           print(traceback.format_exc())
-        except BaseException as e:
-           print(f"Caught a panic: {e}")
-
-        try:
-           gap.test_motiflets_scale_n(backends=backends, delta=delta)
-        except Exception as e:
-           print(traceback.format_exc())
-        except BaseException as e:
-           print(f"Caught a panic: {e}")
-
-        try:
-           pamap.test_motiflets_scale_n(backends=backends, delta=delta)
-        except Exception as e:
-           print(traceback.format_exc())
-        except BaseException as e:
-           print(f"Caught a panic: {e}")
-
-        try:
-           penguin.test_motiflets_scale_n(backends=backends, delta=delta, use_1m=True)
-        except Exception as e:
-           print(traceback.format_exc())
-        except BaseException as e:
-           print(f"Caught a panic: {e}")
-
-        try:
-            penguin.test_motiflets_scale_n(backends=backends, delta=delta, use_1m=False)
-        except Exception as e:
-            print(traceback.format_exc())
-        except BaseException as e:
-            print(f"Caught a panic: {e}")
 
     backends = ["default"]
     subsamplings = [2, 3, 4, 5, 6, 7, 8, 9, 10]
@@ -82,8 +48,8 @@ def main():
         eeg.test_motiflets_scale_n(backends=backends, subsampling=subsampling)
         gap.test_motiflets_scale_n(backends=backends, subsampling=subsampling)
         pamap.test_motiflets_scale_n(backends=backends, subsampling=subsampling)
-        penguin.test_motiflets_scale_n(backends=backends, subsampling=subsampling)
-
+        penguin.test_motiflets_scale_n(backends=backends, subsampling=subsampling, use_1m=True)
+        penguin.test_motiflets_scale_n(backends=backends, subsampling=subsampling, use_1m=False)
 
     backends = ["scalable, default"]
     astro.test_motiflets_scale_n(backends=backends)
@@ -92,7 +58,8 @@ def main():
     eeg.test_motiflets_scale_n(backends=backends)
     gap.test_motiflets_scale_n(backends=backends)
     pamap.test_motiflets_scale_n(backends=backends)
-    penguin.test_motiflets_scale_n(backends=backends)
+    penguin.test_motiflets_scale_n(backends=backends, use_1m=True)
+    penguin.test_motiflets_scale_n(backends=backends, use_1m=False)
 
 
 if __name__ == "__main__":
