@@ -75,7 +75,7 @@ def load_dataset(selection=None):
             (ts_name, int(window_size), np.array([int(_) for _ in change_points]), ts))
 
     return "PAMAP", pd.DataFrame.from_records(
-        df, columns=["name", "window_size", "change_points", "time_series"])
+        df, columns=["name", "window_size", "change_points", "time_series"]).time_series[0]
 
 
 def test_plot_data():
@@ -92,7 +92,7 @@ def test_plot_data():
 
 def test_attimo():
     ds_name, series = load_dataset()
-    ts = series.time_series[0]
+    ts = series
 
     # l = 2 * find_dominant_window_sizes(ts, offset=0.05)
     l = 200
@@ -131,7 +131,7 @@ def test_attimo():
 
 def test_motiflets():
     ds_name, series = load_dataset()
-    ts = series.time_series[0]
+    ts = series
 
     # l = 2 * find_dominant_window_sizes(ts, offset=0.05)
     l = 200
@@ -175,7 +175,7 @@ def test_motiflets_sparse():
                ]
 
     ds_name, series = load_dataset()
-    B = series.time_series[0]
+    B = series
     time_s = np.zeros(len(lengths))
 
     for i, length in enumerate(lengths):
@@ -209,7 +209,7 @@ def test_motiflets_sparse():
 
 
 def test_motiflets_scale_n(
-        backends = ["default", "pyattimo", "scalable"],
+        backends = ["pyattimo", "default", "scalable"],
         delta = None
     ):
     length_range = 50_000 * np.arange(1, 200, 1)

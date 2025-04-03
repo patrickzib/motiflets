@@ -1,5 +1,7 @@
 from datetime import datetime
 
+import pandas as pd
+
 from motiflets.plotting import *
 from motiflets.motiflets import *
 
@@ -26,7 +28,10 @@ def test_motiflets_scale_n(
             print(backend, n)
 
             ds_name, ts = read_data()
-            ts = ts.iloc[:n]
+            if isinstance(ts,pd.DataFrame):
+                ts = ts.iloc[:n]
+            else:
+                ts = ts[:n]
 
             if (len(ts) <= last_n
                     or (backend == "default" and len(ts) > 500_000) \
@@ -46,7 +51,11 @@ def test_motiflets_scale_n(
             memory_usage = mm.memory_usage
             extent = dists[-1]
 
-            current = [len(ts), backend, duration, memory_usage, extent]
+            backend_name = backend
+            if backend == "pyattimo" and delta is not None:
+                backend_name = f"pyattimo (delta={delta})"
+
+            current = [len(ts), backend_name, duration, memory_usage, extent]
 
             results.append(current)
             df.loc[len(df.index)] = current

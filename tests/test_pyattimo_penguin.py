@@ -12,15 +12,19 @@ matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 
 import warnings
+
 warnings.simplefilter("ignore")
 
 import logging
+
 logging.basicConfig(level=logging.WARN)
 pyattimo_logger = logging.getLogger('pyattimo')
 pyattimo_logger.setLevel(logging.WARNING)
 
 import matplotlib as mpl
+
 mpl.rcParams['figure.dpi'] = 150
+
 
 def test_plot_data():
     ds_name, series = read_penguin_1m()
@@ -31,7 +35,11 @@ def test_plot_data():
     ml.plot_dataset(max_points=points_to_plot, path="results/images/penguin_data.pdf")
 
 
-def read_penguin_1m():
+def read_penguin_1m_channel0():
+    return read_penguin_1m(channel="X-Acc")
+
+
+def read_penguin_1m(channel=None):
     path = "../datasets/experiments/"
     series = pd.read_csv(path + "penguin.txt",
                          names=(["X-Acc", "Y-Acc", "Z-Acc",
@@ -39,6 +47,10 @@ def read_penguin_1m():
                                  "7", "Pressure", "9"]),
                          delimiter="\t", header=None)
     ds_name = "Penguin1M"
+
+    if channel is not None:
+        return ds_name, series[channel]
+
     return ds_name, series
 
 
@@ -47,7 +59,8 @@ def read_penguin_3m():
     ds_name = "Penguin3M"
     test = sio.loadmat(path + 'penguinLabel.mat')
     series = test["data"].T
-    return ds_name, series[2,:]
+    return ds_name, series[2, :]
+
 
 def test_plotting():
     ds_name, ts = read_penguin_1m()
@@ -58,10 +71,10 @@ def test_plotting():
 
 
 def test_attimo():
-    ds_name, ts = read_penguin_1m()
+    ds_name, ts = read_penguin_1m(channel=0)
     # ts = ts.iloc[497699 - 100_000: 497699 + 100_000, 0].T
     # ts = ts.iloc[497699 - 50_000: 497699 + 50_000, 0].T
-    ts = ts.iloc[497699 - 10_000: 497699 + 10_000, 0].T
+    ts = ts.iloc[497699 - 10_000: 497699 + 10_000]
     # ts = ts.iloc[497699 - 20_000: 497699 + 20_000, 0].T
 
     print("Size of DS: ", ts.shape)
@@ -97,18 +110,17 @@ def test_attimo():
     print("Discovered motiflets in", end - start, "seconds")
 
 
-
 def test_motiflets_scale_n(
-        backends = ["default", "pyattimo", "scalable"],
-        delta = None
-    ):
+        backends=["default", "pyattimo", "scalable"],
+        delta=None,
+        use_1m=True,
+):
     length_range = 50_000 * np.arange(1, 200, 1)
     l = 125  # 23
     k_max = 20
 
-
     ut.test_motiflets_scale_n(
-        read_penguin_1m,
+        read_penguin_1m_channel0 if use_1m else read_penguin_3m,
         length_range,
         l, k_max,
         backends,
@@ -165,10 +177,10 @@ def test_motiflets_scale_k():
     #    show=False)
 
 
-
 def main():
     print("running")
     test_motiflets_scale_n()
+
 
 if __name__ == "__main__":
     main()

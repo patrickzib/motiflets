@@ -1127,18 +1127,23 @@ def search_k_motiflets_elbow(
         if delta:
             print(f"PyAttimo: Setting delta to {delta}")
             m_iter = pyattimo.MotifletsIterator(
-                data_raw, w=m, support=k_max_ - 1,
+                data_raw,
+                w=m,
+                support=k_max_ - 1,
                 exclusion_zone=exclusion_m,
-                delta = delta
-                # stop_on_threshold=True,
-                # fraction_threshold=0.1
+                delta=delta,
+                stop_on_threshold=True,
+                fraction_threshold=np.log(n) / n,
             )
         else:
             m_iter = pyattimo.MotifletsIterator(
-                data_raw, w=m, support=k_max_ - 1,
+                data_raw,
+                w=m,
+                support=k_max_ - 1,
                 exclusion_zone=exclusion_m,
+                delta=0.5,
                 stop_on_threshold=True,
-                # fraction_threshold=0.1
+                fraction_threshold=np.log(n) / n,
             )
         try:
             for mot in m_iter:
