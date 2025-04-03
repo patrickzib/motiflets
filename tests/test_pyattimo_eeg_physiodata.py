@@ -40,7 +40,7 @@ def test_plot_data():
 
 def test_motiflets_scale_n(
         backends = ["default", "pyattimo", "scalable"],
-        # backends = ["pyattimo"],
+        subsampling=None,
         delta = None
     ):
     length_range = 50_000 * np.arange(1, 200, 1)
@@ -53,6 +53,7 @@ def test_motiflets_scale_n(
         length_range,
         l, k_max,
         backends,
+        subsampling,
         delta
     )
 

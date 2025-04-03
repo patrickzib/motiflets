@@ -34,7 +34,8 @@ def test_plot_data():
 
 def test_motiflets_scale_n(
         backends = ["default", "pyattimo", "scalable"],
-        delta = None
+        delta = None,
+        subsampling = None
     ):
     length_range = 50_000 * np.arange(1, 200, 1)
     l = 70 * 38  # roughly 6.5 seconds
@@ -44,7 +45,9 @@ def test_motiflets_scale_n(
         read_data,
         length_range,
         l, k_max,
-        backends, delta
+        backends,
+        delta,
+        subsampling
     )
 
 

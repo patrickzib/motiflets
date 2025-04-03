@@ -100,7 +100,8 @@ def test_attimo():
 
 def test_motiflets_scale_n(
         backends = ["default", "pyattimo", "scalable"],
-        delta = None
+        delta = None,
+        subsampling = None
     ):
     length_range = 50_000 * np.arange(1, 200, 1)
     l = 125  # 23
@@ -112,7 +113,8 @@ def test_motiflets_scale_n(
         length_range,
         l, k_max,
         backends,
-        delta
+        delta,
+        subsampling
     )
 
 

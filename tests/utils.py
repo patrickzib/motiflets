@@ -18,6 +18,7 @@ def test_motiflets_scale_n(
         l, k_max,
         backends=["default", "pyattimo", "scalable"],
         delta = None,
+        subsampling=None,
         ):
     timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
     df = pd.DataFrame(columns=['length', 'backend', 'time in s', 'memory in MB', "extent", "motiflet"])
@@ -39,13 +40,19 @@ def test_motiflets_scale_n(
             ):
                 break
 
-            print("Size of DS: ", ts.shape)
+            print("Size of TS: ", ts.shape)
+
+            l_new = l
+            if subsampling:
+                ts = ts.iloc[::subsampling]
+                l_new = int(l / subsampling)
+                print("Applying Subsampling, New Size:", ts.shape)
 
             mm = Motiflets(
                 ds_name, ts, backend=backend, n_jobs=cores, delta=delta)
 
             dists, motiflets, _ = mm.fit_k_elbow(
-                k_max, l, plot_elbows=False,
+                k_max, l_new, plot_elbows=False,
                 plot_motifs_as_grid=False)
 
             duration = time.time() - start
@@ -53,8 +60,10 @@ def test_motiflets_scale_n(
             extent = dists[-1]
             motiflet = motiflets[-1]
 
+            if subsampling:
+                motiflet = motiflet * subsampling   # scale up again
 
-            if backend == "pyattimo":
+            if backend == "pyattimo" or subsampling:
                 # try to refine the positions of the motiflets
                 new_motiflet, new_extent = stitch_and_local_motiflet_search(
                     ts,
@@ -62,13 +71,12 @@ def test_motiflets_scale_n(
                     motiflet,
                     extent,
                     l * 4,  # search in a local neighborhood of 4 times the motif length
-                    upper_bound=extent
+                    # upper_bound=extent  # does not work with subsampling
                 )
 
-                if new_extent < extent:
-                    print(f"Searching in local neighborhood found a better motif")
-                    motiflet = new_motiflet
-                    extent = new_extent
+                print(f"Searching in local neighborhood, found a better motif")
+                motiflet = new_motiflet
+                extent = new_extent
 
             current = [len(ts), backend, duration, memory_usage, extent, motiflet]
 
