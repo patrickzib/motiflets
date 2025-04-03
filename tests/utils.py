@@ -100,6 +100,8 @@ def test_motiflets_scale_n(
 
             if delta:
                 new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}_{delta}_{timestamp}.csv"
+            elif subsampling:
+                new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}_{subsampling}_{timestamp}.csv"
             else:
                 new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}_{timestamp}.csv"
 

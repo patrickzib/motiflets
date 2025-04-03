@@ -11,7 +11,7 @@ import test_pyattimo_arrhythmia as arrhythmia
 
 def main():
     backends = ["pyattimo"]
-    deltas = [0.90, 0.50, 0.10]
+    deltas = [0.10, 0.25, 0.50]
 
     for delta in deltas:
         print(f"Using delta {delta}")
