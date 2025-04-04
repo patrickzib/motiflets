@@ -1407,6 +1407,10 @@ def stitch_and_local_motiflet_search(
 
     assert len(np.unique(new_indices)) == len(new_indices)
 
+    print ("Motiflet", motiflet)
+    print ("Window", search_window)
+    print ("Parameters", len(new_series), m, k_max, n_jobs, slack)
+
     D, knns = compute_distances_with_knns(
         new_series,
         m,

@@ -25,17 +25,17 @@ def main():
     backends = ["pyattimo"]
     deltas = [0.10, 0.25, 0.50]
 
-    for delta in deltas:
-        print(f"Using delta {delta}")
-
-        run_safe(astro, backends, delta)
-        run_safe(arrhythmia, backends, delta)
-        run_safe(dishwasher, backends, delta)
-        run_safe(eeg, backends, delta)
-        run_safe(gap, backends, delta)
-        run_safe(pamap, backends, delta)
-        run_safe(penguin, backends, delta, use_1m=True)
-        run_safe(penguin, backends, delta, use_1m=False)
+    # for delta in deltas:
+    #     print(f"Using delta {delta}")
+    #
+    #     run_safe(astro, backends, delta)
+    #     run_safe(arrhythmia, backends, delta)
+    #     run_safe(dishwasher, backends, delta)
+    #     run_safe(eeg, backends, delta)
+    #     run_safe(gap, backends, delta)
+    #     run_safe(pamap, backends, delta)
+    #     run_safe(penguin, backends, delta, use_1m=True)
+    #     run_safe(penguin, backends, delta, use_1m=False)
 
 
     backends = ["default"]

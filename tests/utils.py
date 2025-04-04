@@ -39,6 +39,8 @@ def test_motiflets_scale_n(
             else:
                 ts = ts[:n]
 
+            ts_orig = ts
+
             if (len(ts) <= last_n
                     or (backend == "default" and len(ts) > 500_000) \
                     or (last_time > 3600)     # larger than 2 hours
@@ -70,12 +72,12 @@ def test_motiflets_scale_n(
             motiflet = motiflets[-1]
 
             if subsampling:
-                motiflet = motiflet * subsampling   # scale up again
+                motiflet = np.array(motiflet) * subsampling   # scale up again
 
             if backend == "pyattimo" or subsampling:
                 # try to refine the positions of the motiflets
                 new_motiflet, new_extent = stitch_and_local_motiflet_search(
-                    ts,
+                    ts_orig,
                     l,
                     motiflet,
                     extent,
@@ -99,9 +101,9 @@ def test_motiflets_scale_n(
             df.loc[len(df.index)] = current
 
             if delta:
-                new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}_{delta}_{timestamp}.csv"
+                new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}_delta_{delta}_{timestamp}.csv"
             elif subsampling:
-                new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}_{subsampling}_{timestamp}.csv"
+                new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}_subs_{subsampling}_{timestamp}.csv"
             else:
                 new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}_{timestamp}.csv"
 
