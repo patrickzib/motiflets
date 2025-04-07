@@ -1,7 +1,7 @@
 # import psutil
 # import pandas as pd
 import utils as ut
-from motiflets.motiflets import *
+# from motiflets.motiflets import *
 from motiflets.plotting import *
 
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -53,8 +53,8 @@ def test_motiflets_scale_n(
         length_range,
         l, k_max,
         backends,
-        subsampling,
-        delta
+        delta=delta,
+        subsampling=subsampling
     )
 
 
