@@ -66,9 +66,10 @@ class Motiflets:
             n_jobs : int
                 Number of jobs to be used.
             backend : String, default="pyattimo"
-                The backend to use. As of now 'pyattimo' and 'default' are supported.
-                Use default for the original exact implementation, and pyattimo for a
-                fast, scalable but approximate implementation.
+                The backend to use. As of now 'pyattimo', 'scalable', 'stitch',
+                and 'default' are supported.
+                Use 'default' for the original exact implementation, and 'pyattimo'
+                for a fast, scalable but approximate implementation.
             delta : float
                 Delta parameter for pyattimo.
 
@@ -776,8 +777,9 @@ def plot_elbow(k_max,
     distance_preprocessing: callable
         The distance preprocessing function to be computed.
     backend : String, default="pyattimo"
-        The backend to use. As of now 'pyattimo' and 'default' are supported.
-        Use default for the original exact implementation, and pyattimo for a
+        The backend to use. As of now 'pyattimo', 'scalable', 'stitch', and 'default'
+        are supported.
+        Use 'default' for the original exact implementation, and 'pyattimo' for a
         fast, scalable but approximate implementation.
 
     Returns
@@ -871,8 +873,9 @@ def plot_motif_length_selection(
     distance_preprocessing: callable
         The distance preprocessing function to be computed.
     backend : String, default="pyattimo"
-        The backend to use. As of now 'pyattimo' and 'default' are supported.
-        Use default for the original exact implementation, and pyattimo for a
+        The backend to use. As of now 'pyattimo', 'scalable', 'stitch', and 'default'
+        are supported.
+        Use 'default' for the original exact implementation, and 'pyattimo' for a
         fast, scalable but approximate implementation.
 
     Returns
