@@ -76,7 +76,7 @@ def test_motiflets_scale_n(
 
             if backend == "pyattimo" or subsampling:
                 # try to refine the positions of the motiflets
-                new_motiflet, new_extent = stitch_and_local_motiflet_search(
+                new_motiflet, new_extent = stitch_and_refine(
                     ts_orig,
                     l,
                     motiflet,
