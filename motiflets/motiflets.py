@@ -488,7 +488,7 @@ def compute_distances_with_knns_sparse(
 
             bound = False
             k_index = -1
-            for kk in range(len(kth_extent) - 1, 0, -1):
+            for kk in range(len(kth_extent), 0, -1):
                 if D_knn[order, kk] <= kth_extent[kk]:
                     bound = True
                     k_index = kk + 1
@@ -635,9 +635,9 @@ def compute_distances_with_knns_stitch(
 
     # compute potential offsets to use
     stitch_offsets = np.zeros(ts.shape[0], dtype=np.bool_)
-    for order in np.arange(0, n - m + 1, dtype=np.int32):
+    for order in np.arange(D_knn.shape[0], dtype=np.int32):
         if not stitch_offsets[order]:
-            for kk in range(len(kth_extent)-1, 1, -1):
+            for kk in range(len(kth_extent), 0, -1):
                 # if there is at least one match, use all k-nns up to there
                 if D_knn[order, kk] <= kth_extent[kk]:
                     for pos in np.arange(kk, dtype=np.int32):
@@ -651,6 +651,7 @@ def compute_distances_with_knns_stitch(
         ts_stitched, m, k,
         n_jobs=n_jobs,
         slack=slack,
+        exclude_trivial_match=exclude_trivial_match,
         distance=distance,
         distance_preprocessing=distance_preprocessing
     )
@@ -660,11 +661,15 @@ def compute_distances_with_knns_stitch(
     exclusion_zone = np.zeros(len(ts_stitched), dtype=np.bool_)
     for i in range(0, len(idx_stitched) - 1):
         if idx_stitched[i] + 1 < idx_stitched[i+1]:
-            exclusion_zone[max(0, i - halve_m): i] = True
-            exclusion_zone[(i+1): min((i+1) + halve_m, len(ts_stitched))] = True
+            pos = i + 1
+            exclusion_zone[max(0, pos - m + 1) : pos] = True
+            # assert not exclusion_zone[pos]
+            # print (i, idx_stitched[i], idx_stitched[pos])
 
+    #print(idx_stitched)
     D_stitched[:, exclusion_zone] = np.inf
-    # D_stitched[exclusion_zone, :] = np.inf
+    D_stitched[exclusion_zone, :] = np.inf
+    knns_stitched[exclusion_zone, :] = -1
 
     print(f"TS reduced from {len(ts)} to {len(ts_stitched)}")
     return D_stitched, knns_stitched, ts_stitched, idx_stitched
@@ -805,6 +810,7 @@ def _argknn(
     halve_m = int(m * slack)
     dists = np.copy(dist)
 
+    # dist_pos = np.argsort(dist)
     dist_pos = np.argpartition(dist, 2 * k)[:2 * k]
     dist_sort = dist[dist_pos]
 
@@ -1349,15 +1355,15 @@ def search_k_motiflets_elbow(
 
             # Top-N retrieval
             # FIXME
-            if exclusion is not None and exclusion[test_k] is not None:
-                if not sparse:
-                    for pos in exclusion[test_k].flatten():
-                        if pos is not None:
-                            trivialMatchRange = (max(0, pos - exclusion_m),
-                                                 min(pos + exclusion_m, len(D_full)))
-                        D_full[:, trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
-                else:
-                    raise Exception('Top-k is not supported for sparse matrices.')
+            # if exclusion is not None and exclusion[test_k] is not None:
+            #     if not sparse:
+            #         for pos in exclusion[test_k].flatten():
+            #             if pos is not None:
+            #                 trivialMatchRange = (max(0, pos - exclusion_m),
+            #                                      min(pos + exclusion_m, len(D_full)))
+            #             D_full[:, trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
+            #     else:
+            #         raise Exception('Top-k is not supported for sparse matrices.')
 
             if data_stitched is not None:
                 candidate, candidate_dist, _ = get_approximate_k_motiflet(
@@ -1365,7 +1371,16 @@ def search_k_motiflets_elbow(
                     upper_bound=upper_bound,
                 )
                 # map back to original indices
+                #print(f"Stitched Candidate {candidate} {knns[candidate[0]]}")
+                #print(f"k-NN dists {D_full[candidate[0], knns[candidate[0]]]}")
                 candidate = idx_stitched[candidate]
+
+                #B = np.array([330, 913,  54, 473, 652])
+                #print(f"B {idx_stitched[B]}, {get_pairwise_extent(D_full, B)}")
+
+                #A = np.array([331, 914,  55, 474, 653])
+                #print(f"A {idx_stitched[A]}, {get_pairwise_extent(D_full, A)}")
+
             else:
                 candidate, candidate_dist, _ = get_approximate_k_motiflet(
                     data_raw, m, test_k, D_full, knns,
@@ -1587,8 +1602,8 @@ def stitch_and_refine(
         exclusion_zone = np.zeros(len(ts_stitched), dtype=np.bool_)
         for i in range(0, len(idx_stitched) - 1):
             if idx_stitched[i] + 1 < idx_stitched[i + 1]:
-                exclusion_zone[max(0, i - halve_m): i] = True
-                exclusion_zone[(i + 1): min((i + 1) + halve_m, len(ts_stitched))] = True
+                exclusion_zone[max(0, i - halve_m):
+                               min((i + 1) + halve_m, len(ts_stitched))] = True
 
         # apply symmetric exclusion zone
         D[:, exclusion_zone] = np.inf
