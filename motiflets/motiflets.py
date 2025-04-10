@@ -10,13 +10,12 @@ import itertools
 from ast import literal_eval
 from os.path import exists
 
-import numpy as np
 import psutil
 import numpy.fft as fft
 import pandas as pd
 import pyattimo
 from joblib import Parallel, delayed
-from numba import njit, prange, objmode, types
+from numba import prange, objmode, types
 from numba.typed import Dict, List
 from scipy.signal import argrelextrema
 from scipy.stats import zscore
@@ -286,7 +285,7 @@ def _sliding_mean_std(ts, m):
 
 
 @njit(fastmath=True, cache=True, parallel=True)
-def compute_distances_with_knns(
+def compute_distances_with_knns_full(
         ts,
         m,
         k,
@@ -363,14 +362,12 @@ def compute_distances_with_knns(
                              - ts[order - 1] * np.roll(ts[:n], 1)
                 dot_rolled[0] = dot_first[order]
 
-            # D[order, :] = distance(dot_rolled, n, m, means, stds, order, halve_m)
             D[order, :] = distance(dot_rolled, n, m, preprocessing, order, halve_m)
             dot_prev = dot_rolled
 
-    for order in prange(D.shape[-1]):
-        knn = _argknn(D[order], k, m, slack=slack)
-        knns[order, :len(knn)] = knn
-        knns[order, len(knn):] = -1
+            knn = _argknn(D[order], k, m, slack=slack)
+            knns[order, :len(knn)] = knn
+            knns[order, len(knn):] = -1
 
     return D, knns
 
@@ -425,52 +422,18 @@ def compute_distances_with_knns_sparse(
 
     """
     n = np.int32(ts.shape[0] - m + 1)
-    halve_m = 0
-    if exclude_trivial_match:
-        halve_m = int(m * slack)
 
-    D_knn = np.zeros((n, k), dtype=np.float32)
-    knns = np.zeros((n, k), dtype=np.int32)
-
-    # TODO: no sparse matrix support in numba. Thus we use this hack
-    D_bool = [Dict.empty(key_type=types.int32, value_type=types.bool_) for _ in
-              range(n)]
-
-    D_sparse = List()
-    for i in range(n):
-        D_sparse.append(Dict.empty(key_type=types.int32, value_type=types.float32))
-
-    preprocessing = distance_preprocessing(ts, m)
-
-    dot_first = _sliding_dot_product(ts[:m], ts)
-    bin_size = ts.shape[0] // n_jobs
-
-    # first pass, computing the k-nns
-    for idx in prange(n_jobs):
-        start = idx * bin_size
-        end = min((idx + 1) * bin_size, n)
-
-        dot_prev = None
-        for order in np.arange(start, end):
-            if order == start:
-                # O(n log n) operation
-                dot_rolled = _sliding_dot_product(ts[start:start + m], ts)
-            else:
-                # constant time O(1) operations
-                dot_rolled = np.roll(dot_prev, 1) \
-                             + ts[order + m - 1] * ts[m - 1:n + m] \
-                             - ts[order - 1] * np.roll(ts[:n], 1)
-                dot_rolled[0] = dot_first[order]
-
-            dist = distance(dot_rolled, n, m, preprocessing, order, halve_m)
-            dot_prev = dot_rolled
-
-            knn = _argknn(dist, k, m, slack=slack)
-            D_knn[order, :] = dist[knn[-1]]  # in case too little knns are returned
-            knns[order, :] = knn[-1]
-
-            D_knn[order, :len(dist[knn])] = dist[knn]
-            knns[order, :len(knn)] = knn
+    D_knn, knns, bin_size, dot_first, preprocessing, halve_m \
+        = compute_distances_with_knns(
+            ts,
+            m,
+            k,
+            exclude_trivial_match,
+            n_jobs,
+            slack,
+            distance,
+            distance_preprocessing
+        )
 
     # Store an upper bound for each k-nn distance
     kth_extent = compute_upper_bound(
@@ -479,6 +442,10 @@ def compute_distances_with_knns_sparse(
         distance_preprocessing,
         k, knns, m,
         n_jobs, slack, ts)
+
+    # TODO: no sparse matrix support in numba. Thus we use this hack
+    D_bool = [Dict.empty(key_type=types.int32, value_type=types.bool_) for _ in
+              range(n)]
 
     # FIXME: Parallelizm does not work, as Dict is not thread safe :(
     for order in np.arange(0, n):
@@ -497,6 +464,10 @@ def compute_distances_with_knns_sparse(
             if bound:
                 for ks2 in knns[order, :k_index]:
                     D_bool[ks][ks2] = True
+
+    D_sparse = List()
+    for i in range(n):
+        D_sparse.append(Dict.empty(key_type=types.int32, value_type=types.float32))
 
     # second pass, filling only the pairs needed
     for idx in prange(n_jobs):
@@ -525,67 +496,17 @@ def compute_distances_with_knns_sparse(
     return D_sparse, knns
 
 
-@njit(fastmath=True, cache=True)
-def compute_upper_bound(
-        D_knn,
-        distance,
-        distance_preprocessing,
-        k,
-        knns,
-        m,
-        n_jobs,
-        slack,
-        ts):
-    kth_extent = np.zeros(k, dtype=np.float64)
-    kth_extent[0] = np.inf
-    kth_extent[1] = np.inf
-
-    for kk in range(2, len(kth_extent)):
-        best_knn_pos = np.argmin(D_knn[:, kk])
-        motiflet_candidate = knns[best_knn_pos, :kk]
-
-        # stitch only the offsets needed
-        parts_to_stitch = []
-        for pos in np.sort(motiflet_candidate):
-            start = pos
-            end = pos + m
-            parts_to_stitch.extend(ts[start:end])
-
-        idx = np.arange(0, len(motiflet_candidate)) * m
-
-        D_refine, _ = compute_distances_with_knns(
-            np.array(parts_to_stitch), m, kk,
-            n_jobs=n_jobs,
-            slack=slack,
-            distance=distance,
-            distance_preprocessing=distance_preprocessing
-        )
-
-        # compute extent
-        extent = get_pairwise_extent(D_refine, idx, np.inf)
-        kth_extent[kk] = extent
-
-        assert extent < 4 * np.min(D_knn[:, kk])
-        # print(f"extent:\t {extent} "
-        #      f"diameter:\t {4 * np.min(D_knn[:, k])}")
-
-    return kth_extent
-
-
 @njit(fastmath=True, cache=True, parallel=True)
-def compute_distances_with_knns_stitch(
+def compute_distances_with_knns(
         ts,
         m,
         k,
-        exclude_trivial_match=True,
-        n_jobs=4,
-        slack=0.5,
-        distance=znormed_euclidean_distance,
-        distance_preprocessing=sliding_mean_std
+        exclude_trivial_match,
+        n_jobs,
+        slack,
+        distance,
+        distance_preprocessing
 ):
-    """ Compute the full Distance Matrix between all pairs of subsequences of a
-        multivariate time series.
-    """
     n = np.int32(ts.shape[0] - m + 1)
     halve_m = 0
     if exclude_trivial_match:
@@ -626,6 +547,81 @@ def compute_distances_with_knns_stitch(
             D_knn[order, :len(dist[knn])] = dist[knn]
             knns[order, :len(knn)] = knn
 
+    return D_knn, knns, bin_size, dot_first, preprocessing, halve_m
+
+
+@njit(fastmath=True, cache=True)
+def compute_upper_bound(
+        D_knn,
+        distance,
+        distance_preprocessing,
+        k,
+        knns,
+        m,
+        n_jobs,
+        slack,
+        ts):
+    kth_extent = np.zeros(k, dtype=np.float64)
+    kth_extent[0] = np.inf
+    kth_extent[1] = np.inf
+
+    for kk in range(2, len(kth_extent)):
+        best_knn_pos = np.argmin(D_knn[:, kk])
+        motiflet_candidate = knns[best_knn_pos, :kk]
+
+        # stitch only the offsets needed
+        parts_to_stitch = []
+        for pos in np.sort(motiflet_candidate):
+            start = pos
+            end = pos + m
+            parts_to_stitch.extend(ts[start:end])
+
+        idx = np.arange(0, len(motiflet_candidate)) * m
+
+        D_refine, _ = compute_distances_with_knns_full(
+            np.array(parts_to_stitch), m, kk,
+            n_jobs=n_jobs,
+            slack=slack,
+            distance=distance,
+            distance_preprocessing=distance_preprocessing
+        )
+
+        # compute extent
+        extent = get_pairwise_extent(D_refine, idx, np.inf)
+        kth_extent[kk] = extent
+
+        assert extent < 4 * np.min(D_knn[:, kk])
+        # print(f"extent:\t {extent} "
+        #      f"diameter:\t {4 * np.min(D_knn[:, k])}")
+
+    return kth_extent
+
+
+@njit(fastmath=True, cache=True, parallel=True)
+def compute_distances_with_knns_stitch(
+        ts,
+        m,
+        k,
+        exclude_trivial_match=True,
+        n_jobs=4,
+        slack=0.5,
+        distance=znormed_euclidean_distance,
+        distance_preprocessing=sliding_mean_std
+):
+    """ Compute the full Distance Matrix between all pairs of subsequences of a
+        multivariate time series.
+    """
+    D_knn, knns, _, _, _, _ = compute_distances_with_knns(
+            ts,
+            m,
+            k,
+            exclude_trivial_match,
+            n_jobs,
+            slack,
+            distance,
+            distance_preprocessing
+        )
+
     # Store an upper bound for each k-nn distance
     kth_extent = compute_upper_bound(
         D_knn,
@@ -634,20 +630,12 @@ def compute_distances_with_knns_stitch(
         k, knns, m,
         n_jobs, slack, ts)
 
-    # compute potential offsets to use
-    stitch_offsets = np.zeros(ts.shape[0], dtype=np.bool_)
-    for order in np.arange(D_knn.shape[0], dtype=np.int32):
-        for kk in np.arange(len(kth_extent) - 1, 1, -1):
-            # if there is at least one match, use all k-nns up to there
-            if D_knn[order, kk] <= kth_extent[kk]:
-                for pos in knns[order, :kk + 1]:
-                    stitch_offsets[pos: pos + m] = True
-                break
+    # compute potential offsets to use from k-NNs
+    idx_stitched, ts_stitched = extract_stitched_time_series(
+        ts, m, D_knn, knns, kth_extent)
 
-    # Stitching offsets, and computing the distance matrix on stitched parts
-    idx_stitched = np.arange(len(ts), dtype=np.int32)[stitch_offsets]
-    ts_stitched = ts[stitch_offsets]
-    D_stitched, knns_stitched = compute_distances_with_knns(
+    # compute distances and knns from stitched time series
+    D_stitched, knns_stitched = compute_distances_with_knns_full(
         ts_stitched, m, k,
         n_jobs=n_jobs,
         slack=slack,
@@ -656,6 +644,15 @@ def compute_distances_with_knns_stitch(
         distance_preprocessing=distance_preprocessing
     )
 
+    # build and apply exclusion zone
+    apply_exclusion_zone(D_stitched, idx_stitched, knns_stitched, m, ts_stitched)
+
+    print(f"TS length reduced from {len(ts)} to {len(ts_stitched)}")
+    return D_stitched, knns_stitched, ts_stitched, idx_stitched
+
+
+@njit(fastmath=True, cache=True)
+def apply_exclusion_zone(D_stitched, idx_stitched, knns_stitched, m, ts_stitched):
     # identify ids where stitches occurred.
     # We need these for building the exclusion zone
     exclusion_zone = np.zeros(len(ts_stitched), dtype=np.bool_)
@@ -663,13 +660,29 @@ def compute_distances_with_knns_stitch(
         if idx_stitched[i] + 1 < idx_stitched[i + 1]:
             pos = i + 1
             exclusion_zone[max(0, pos - m + 1): pos] = True
-
     D_stitched[:, exclusion_zone] = np.inf
     D_stitched[exclusion_zone, :] = np.inf
     knns_stitched[exclusion_zone, :] = -1
 
-    print(f"TS reduced from {len(ts)} to {len(ts_stitched)}")
-    return D_stitched, knns_stitched, ts_stitched, idx_stitched
+
+@njit(fastmath=True, cache=True)
+def extract_stitched_time_series(
+        ts, m,
+        D_knn,
+        knns,
+        kth_extent):
+    stitch_offsets = np.zeros(ts.shape[0], dtype=np.bool_)
+    for order in np.arange(D_knn.shape[0], dtype=np.int32):
+        for kk in np.arange(len(kth_extent) - 1, 1, -1):
+            # if there is at least one match, use all k-nns up to there
+            if D_knn[order, kk] <= kth_extent[kk]:
+                for pos in knns[order, :kk + 1]:
+                    stitch_offsets[pos: pos + m] = True
+                break
+    # Stitching offsets, and computing the distance matrix on stitched parts
+    idx_stitched = np.arange(len(ts), dtype=np.int32)[stitch_offsets]
+    ts_stitched = ts[stitch_offsets]
+    return idx_stitched, ts_stitched
 
 
 @njit(fastmath=True, cache=True)
@@ -1337,7 +1350,7 @@ def search_k_motiflets_elbow(
                 distance_preprocessing=distance_preprocessing,
             )
         else:
-            D_full, knns = compute_distances_with_knns(
+            D_full, knns = compute_distances_with_knns_full(
                 data_raw, m, k_max_, n_jobs=n_jobs, slack=slack,
                 distance=distance,
                 distance_preprocessing=distance_preprocessing
@@ -1524,10 +1537,10 @@ def compute_distances_full(ts,
 
     """
 
-    D, _ = compute_distances_with_knns(ts, m, k=1,
-                                       exclude_trivial_match=exclude_trivial_match,
-                                       n_jobs=n_jobs,
-                                       slack=slack)
+    D, _ = compute_distances_with_knns_full(ts, m, k=1,
+                                            exclude_trivial_match=exclude_trivial_match,
+                                            n_jobs=n_jobs,
+                                            slack=slack)
     return D
 
 
@@ -1574,7 +1587,7 @@ def stitch_and_refine(
     print("Window", search_window)
     print("Parameters", len(ts_stitched), m, k_max, n_jobs, slack)
 
-    D, knns = compute_distances_with_knns(
+    D, knns = compute_distances_with_knns_full(
         ts_stitched,
         m,
         k_max,
