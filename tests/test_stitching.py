@@ -36,7 +36,7 @@ def test_discover_motiflets():
     motiflet = motif_candidates[-1]
     extent = motif_distances[-1]
 
-    new_motiflet, new_extent = stitch_and_local_motiflet_search(
+    new_motiflet, new_extent = stitch_and_refine(
         series,
         motif_length,
         motiflet,

@@ -644,12 +644,6 @@ def compute_distances_with_knns_stitch(
                     stitch_offsets[pos: pos + m] = True
                 break
 
-    assert stitch_offsets[98965 + m - 1]
-    assert stitch_offsets[27191 + m - 1]
-    assert stitch_offsets[93736 + m - 1]
-    assert stitch_offsets[61111 + m - 1]
-    assert stitch_offsets[64189 + m - 1]
-
     # Stitching offsets, and computing the distance matrix on stitched parts
     idx_stitched = np.arange(len(ts), dtype=np.int32)[stitch_offsets]
     ts_stitched = ts[stitch_offsets]
@@ -669,10 +663,7 @@ def compute_distances_with_knns_stitch(
         if idx_stitched[i] + 1 < idx_stitched[i + 1]:
             pos = i + 1
             exclusion_zone[max(0, pos - m + 1): pos] = True
-            # assert not exclusion_zone[pos]
-            # print (i, idx_stitched[i], idx_stitched[pos])
 
-    # print(idx_stitched)
     D_stitched[:, exclusion_zone] = np.inf
     D_stitched[exclusion_zone, :] = np.inf
     knns_stitched[exclusion_zone, :] = -1
@@ -1377,15 +1368,7 @@ def search_k_motiflets_elbow(
                     upper_bound=upper_bound,
                 )
                 # map back to original indices
-                # print(f"Stitched Candidate {candidate} {knns[candidate[0]]}")
-                # print(f"k-NN dists {D_full[candidate[0], knns[candidate[0]]]}")
                 candidate = idx_stitched[candidate]
-
-                # B = np.array([330, 913,  54, 473, 652])
-                # print(f"B {idx_stitched[B]}, {get_pairwise_extent(D_full, B)}")
-
-                # A = np.array([331, 914,  55, 474, 653])
-                # print(f"A {idx_stitched[A]}, {get_pairwise_extent(D_full, A)}")
 
             else:
                 candidate, candidate_dist, _ = get_approximate_k_motiflet(
@@ -1603,17 +1586,16 @@ def stitch_and_refine(
 
     # identify ids where stitches occurred.
     # We need these for building the exclusion zone
-    if slack > 0:
-        halve_m = int(m * slack)
-        exclusion_zone = np.zeros(len(ts_stitched), dtype=np.bool_)
-        for i in range(0, len(idx_stitched) - 1):
-            if idx_stitched[i] + 1 < idx_stitched[i + 1]:
-                exclusion_zone[max(0, i - halve_m):
-                               min((i + 1) + halve_m, len(ts_stitched))] = True
+    exclusion_zone = np.zeros(len(ts_stitched), dtype=np.bool_)
+    for i in range(0, len(idx_stitched) - 1):
+        if idx_stitched[i] + 1 < idx_stitched[i + 1]:
+            pos = i + 1
+            exclusion_zone[max(0, pos - m + 1): pos] = True
 
-        # apply symmetric exclusion zone
-        D[:, exclusion_zone] = np.inf
-        # D[exclusion_zone, :] = np.inf
+    # apply symmetric exclusion zone
+    D[:, exclusion_zone] = np.inf
+    D[exclusion_zone, :] = np.inf
+    knns[exclusion_zone, :] = -1
 
     cardinality = len(motiflet)
     candidate, candidate_extent, _ = get_approximate_k_motiflet(
