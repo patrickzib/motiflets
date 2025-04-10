@@ -1561,34 +1561,17 @@ def stitch_and_refine(
 
         last_end = end
 
-    new_series = np.array(parts_to_stitch)
-    new_indices = np.array(indices)
+    ts_stitched = np.array(parts_to_stitch)
+    idx_stitched = np.array(indices)
 
-    # avoid matches at stitching borders
-    # FIXME!!
-    # exclusion_zone = np.array(len(data_raw), dtype=np.bool_)
-    # exclusion_zone[:] = False
-    # halve_m = slack * m
-    # for i in range(len(indices)):
-    #     pos = indices[i]
-    #     print (pos - halve_m)
-    #
-    #     # start
-    #     if (i == 0) or indices[i] > indices[i-1] + 1:
-    #         exclusion_zone[pos : pos + halve_m] = True
-    #
-    #     # end, check for non-adjacent positions
-    #     elif (i == len(indices) - 1) or (indices[i] < indices[i+1] - 1):
-    #         exclusion_zone[pos - halve_m : pos] = True
-
-    assert len(np.unique(new_indices)) == len(new_indices)
+    assert len(np.unique(idx_stitched)) == len(idx_stitched)
 
     print("Motiflet", motiflet)
     print("Window", search_window)
-    print("Parameters", len(new_series), m, k_max, n_jobs, slack)
+    print("Parameters", len(ts_stitched), m, k_max, n_jobs, slack)
 
     D, knns = compute_distances_with_knns(
-        new_series,
+        ts_stitched,
         m,
         k_max,
         n_jobs=n_jobs,
@@ -1597,13 +1580,23 @@ def stitch_and_refine(
         distance_preprocessing=distance_preprocessing
     )
 
-    # apply symmetric exclusion zone
-    # D[:, exclusion_zone] = np.inf
-    # D[exclusion_zone, :] = np.inf
+    # identify ids where stitches occurred.
+    # We need these for building the exclusion zone
+    if slack > 0:
+        halve_m = int(m * slack)
+        exclusion_zone = np.zeros(len(ts_stitched), dtype=np.bool_)
+        for i in range(0, len(idx_stitched) - 1):
+            if idx_stitched[i] + 1 < idx_stitched[i + 1]:
+                exclusion_zone[max(0, i - halve_m): i] = True
+                exclusion_zone[(i + 1): min((i + 1) + halve_m, len(ts_stitched))] = True
+
+        # apply symmetric exclusion zone
+        D[:, exclusion_zone] = np.inf
+        # D[exclusion_zone, :] = np.inf
 
     cardinality = len(motiflet)
     candidate, candidate_extent, _ = get_approximate_k_motiflet(
-        new_series,
+        ts_stitched,
         m,
         cardinality,
         D,
@@ -1611,7 +1604,7 @@ def stitch_and_refine(
         upper_bound=upper_bound,
     )
 
-    new_motiflet_pos = new_indices[candidate]
+    new_motiflet_pos = idx_stitched[candidate]
 
     if candidate_extent < extent:
         return new_motiflet_pos, candidate_extent
