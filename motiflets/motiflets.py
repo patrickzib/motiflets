@@ -488,7 +488,7 @@ def compute_distances_with_knns_sparse(
 
             bound = False
             k_index = -1
-            for kk in range(len(kth_extent), 0, -1):
+            for kk in np.arange(len(kth_extent)-1, 1, -1):
                 if D_knn[order, kk] <= kth_extent[kk]:
                     bound = True
                     k_index = kk + 1
@@ -538,6 +538,7 @@ def compute_upper_bound(
         ts):
     kth_extent = np.zeros(k, dtype=np.float64)
     kth_extent[0] = np.inf
+    kth_extent[1] = np.inf
 
     for kk in range(2, len(kth_extent)):
         best_knn_pos = np.argmin(D_knn[:, kk])
@@ -637,7 +638,7 @@ def compute_distances_with_knns_stitch(
     stitch_offsets = np.zeros(ts.shape[0], dtype=np.bool_)
     for order in np.arange(D_knn.shape[0], dtype=np.int32):
         if not stitch_offsets[order]:
-            for kk in range(len(kth_extent), 0, -1):
+            for kk in np.arange(len(kth_extent)-1, 1, -1):
                 # if there is at least one match, use all k-nns up to there
                 if D_knn[order, kk] <= kth_extent[kk]:
                     for pos in np.arange(kk, dtype=np.int32):
