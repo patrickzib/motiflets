@@ -634,34 +634,19 @@ def compute_distances_with_knns_stitch(
         n_jobs, slack, ts)
 
     # compute potential offsets to use
-    offsets = np.zeros(ts.shape[0], dtype=np.bool_)
+    stitch_offsets = np.zeros(ts.shape[0], dtype=np.bool_)
     for order in np.arange(0, n - m + 1, dtype=np.int32):
-        if not offsets[order]:
-            for kk in range(len(kth_extent)-1, 2, -1):
+        if not stitch_offsets[order]:
+            for kk in range(len(kth_extent)-1, 1, -1):
                 # if there is at least one match, use all k-nns up to there
                 if D_knn[order, kk] <= kth_extent[kk]:
                     for pos in np.arange(kk, dtype=np.int32):
-                        offsets[knns[order, pos]: knns[order, pos] + m] = True
+                        stitch_offsets[knns[order, pos]: knns[order, pos] + m] = True
                     break
-    # offsets[:] = True
-
-    # FIXME Something is wrong with this code :/
-    # inclusion_zone = np.zeros(n, dtype=np.bool_)
-    # i = 0
-    # while i < len(offsets):
-    #     if offsets[i]:
-    #         i += halve_m
-    #         while i + halve_m < len(offsets) and offsets[i] and offsets[i + halve_m]:
-    #             inclusion_zone[i] = True
-    #             i += 1
-    #         i += halve_m + 1
-    #     else:
-    #         i += 1
-    # exclusion_zone = np.logical_not(inclusion_zone)
 
     # Stitching offsets, and computing the distance matrix on stitched parts
-    idx_stitched = np.arange(len(ts), dtype=np.int32)[offsets]
-    ts_stitched = ts[offsets]
+    idx_stitched = np.arange(len(ts), dtype=np.int32)[stitch_offsets]
+    ts_stitched = ts[stitch_offsets]
     D_stitched, knns_stitched = compute_distances_with_knns(
         ts_stitched, m, k,
         n_jobs=n_jobs,
@@ -670,8 +655,16 @@ def compute_distances_with_knns_stitch(
         distance_preprocessing=distance_preprocessing
     )
 
-    #D_stitched[:, exclusion_zone] = np.inf
-    #D_stitched[exclusion_zone, :] = np.inf
+    # identify ids where stitches occurred.
+    # We need these for building the exclusion zone
+    exclusion_zone = np.zeros(len(ts_stitched), dtype=np.bool_)
+    for i in range(0, len(idx_stitched) - 1):
+        if idx_stitched[i] + 1 < idx_stitched[i+1]:
+            exclusion_zone[max(0, i - halve_m): i] = True
+            exclusion_zone[(i+1): min((i+1) + halve_m, len(ts_stitched))] = True
+
+    D_stitched[:, exclusion_zone] = np.inf
+    # D_stitched[exclusion_zone, :] = np.inf
 
     print(f"TS reduced from {len(ts)} to {len(ts_stitched)}")
     return D_stitched, knns_stitched, ts_stitched, idx_stitched
