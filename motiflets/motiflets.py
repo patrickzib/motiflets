@@ -750,8 +750,6 @@ def compute_distances_with_knns_stitch_cascading_lb(
         D_triangle[i] = np.max(D[0])
     D_triangle = np.sqrt(D_triangle)
 
-    print (D_paa.shape, D_triangle.shape)
-
     stitch_offsets = np.zeros(ts.shape[0], dtype=np.bool_)
     for i in range(D_paa.shape[0]-1):
         for j in range(D_triangle.shape[0]):
@@ -774,6 +772,9 @@ def compute_distances_with_knns_stitch_cascading_lb(
 
     idx_stitched_paa = np.arange(len(ts), dtype=np.int32)[stitch_offsets]
     ts_stitched_paa = ts[stitch_offsets]
+
+    print(D_paa[0])
+    print(D_paa[2])
 
     print(f"TS length reduced from {len(ts)} to {len(ts_stitched_paa)}")
 
