@@ -284,7 +284,7 @@ def _sliding_mean_std(ts, m):
     return [movmean, movstd]
 
 
-@njit(fastmath=True, cache=True, parallel=True)
+# @njit(fastmath=True, cache=True, parallel=True)
 def compute_distances_with_knns_full(
         ts,
         m,
@@ -550,7 +550,7 @@ def compute_distances_with_knns(
     return D_knn, knns, bin_size, dot_first, preprocessing, halve_m
 
 
-@njit(fastmath=True, cache=True)
+# @njit(fastmath=True, cache=True)
 def compute_upper_bound(
         D_knn,
         distance,
@@ -560,7 +560,8 @@ def compute_upper_bound(
         m,
         n_jobs,
         slack,
-        ts):
+        ts,
+        exclude_trivial_match=True):
     kth_extent = np.zeros(k, dtype=np.float64)
     kth_extent[0] = np.inf
     kth_extent[1] = np.inf
@@ -578,12 +579,15 @@ def compute_upper_bound(
 
         idx = np.arange(0, len(motiflet_candidate)) * m
 
+        # print ("ToStitch", len(np.array(parts_to_stitch)), m, kk)
+
         D_refine, _ = compute_distances_with_knns_full(
             np.array(parts_to_stitch), m, kk,
             n_jobs=n_jobs,
             slack=slack,
             distance=distance,
-            distance_preprocessing=distance_preprocessing
+            distance_preprocessing=distance_preprocessing,
+            exclude_trivial_match=exclude_trivial_match
         )
 
         # compute extent
@@ -649,6 +653,171 @@ def compute_distances_with_knns_stitch(
 
     print(f"TS length reduced from {len(ts)} to {len(ts_stitched)}")
     return D_stitched, knns_stitched, ts_stitched, idx_stitched
+
+
+@njit(fastmath=True, cache=True)
+def compute_paa(ts, segment_size):
+    segments = np.int32(np.ceil(len(ts) / segment_size))
+
+    paa = np.zeros(segments, dtype=np.float64)
+    paa_segment_sizes = np.zeros(segments, dtype=np.int32)  # needed for lower bounding
+
+    for i in np.arange(0, segments, dtype=np.int32):
+        start = i*segment_size
+        end = min((i+1)*segment_size, len(ts))
+        paa[i] = ts[start:end].mean()
+        paa_segment_sizes[i] = end - start
+
+    return paa, paa_segment_sizes
+
+
+
+# @njit(fastmath=True, cache=True, parallel=True)
+def compute_distances_with_knns_stitch_cascading_lb(
+        ts,
+        m,
+        k,
+        exclude_trivial_match=True,
+        n_jobs=4,
+        slack=0.5,
+        distance=znormed_euclidean_distance,
+        distance_preprocessing=sliding_mean_std
+):
+    """ Compute the full Distance Matrix between all pairs of subsequences of a
+        multivariate time series.
+    """
+
+    # Compute paa representation first
+    segment_size = 16
+    paa, paa_segment_sizes = compute_paa(ts, segment_size=segment_size)
+
+    # Compute distance for paa representation next
+    D_paa, knns_paa = compute_distances_with_knns_full(
+        paa,
+        m // segment_size,
+        k,
+        False,  # exclude_trivial_match
+        n_jobs,
+        slack,  # FIXME how to use Slack?
+        distance,
+        distance_preprocessing
+    )
+
+    # print ("Shape", np.take_along_axis(D_paa, knns_paa, axis=1).shape, knns_paa.shape)
+    D_paa *= segment_size
+
+    # Store an upper bound based on the k-th-nn distance
+    kth_extent = compute_upper_bound(
+        D_knn=np.take_along_axis(D_paa, knns_paa, axis=1),
+        distance=distance,
+        distance_preprocessing=distance_preprocessing,
+        k=k,
+        knns=knns_paa,
+        m=m // segment_size,
+        n_jobs=n_jobs,
+        exclude_trivial_match=False,
+        slack=slack,  # FIXME how to use Slack?
+        ts=paa)
+
+    # make it a lower bound
+    # FIXME it would be better/correct to use the actual segment sizes
+    # kth_extent = np.sqrt(kth_extent)
+    D_paa = np.sqrt(D_paa)
+
+    # For each segment compute the distance matrix for application in the
+    # triangular equality
+    D_triangle = np.zeros((len(D_paa)), dtype=np.float32)
+    for i in range(len(paa) - 1):
+        ts_triangle = ts[i*16: min((i+1)*16 - 1 + m, len(ts))]
+
+        # FIXME. Replace with:
+        #preprocessing = distance_preprocessing(ts_triangle, m)
+        #dot_product = _sliding_dot_product(ts_triangle[:m], ts)
+        #D[order, :] = distance(dot_product, len(ts_triangle), m, preprocessing, 0, halve_m)
+
+        D, _, = compute_distances_with_knns_full(
+            ts=ts_triangle,
+            m=m,
+            k=k,
+            exclude_trivial_match=False,  # FIXME!!!???
+            n_jobs=n_jobs,
+            slack=slack,
+            distance=distance,
+            distance_preprocessing=distance_preprocessing,
+        )
+
+        # Only keep max value from first row
+        D_triangle[i] = np.max(D[0])
+    D_triangle = np.sqrt(D_triangle)
+
+    print (D_paa.shape, D_triangle.shape)
+
+    stitch_offsets = np.zeros(ts.shape[0], dtype=np.bool_)
+    for i in range(D_paa.shape[0]-1):
+        for j in range(D_triangle.shape[0]):
+            # apply triangular inequality
+            if not np.isinf(D_paa[i, j]):
+                D_paa[i, j] = max(0, D_paa[i, j] - D_triangle[i] - D_triangle[j])
+                # D_paa[j, i] = D_paa[i, j]
+
+        # FIXME how to tread too many equally far points?
+        knns = _argknn(D_paa[i], k, m, slack=0)  # TODO how to address slack here?
+        # print("knns", knns)
+
+        # check if smaller than current extent? then keep it
+        for kk in np.arange(len(kth_extent) - 1, 1, -1):
+            if D_paa[i, knns[kk]] <= np.sqrt(kth_extent[kk]):
+                for pos in knns[:kk + 1]:
+                    for ss in range(segment_size):   # all points represented by the segment
+                        stitch_offsets[pos*segment_size + ss: pos*segment_size + ss + m] = True
+                break
+
+    idx_stitched_paa = np.arange(len(ts), dtype=np.int32)[stitch_offsets]
+    ts_stitched_paa = ts[stitch_offsets]
+
+    print(f"TS length reduced from {len(ts)} to {len(ts_stitched_paa)}")
+
+
+
+    D_knn, knns, _, _, _, _ = compute_distances_with_knns(
+            ts, # ts_stitched_paa,
+            m,
+            k,
+            exclude_trivial_match,
+            n_jobs,
+            slack,
+            distance,
+            distance_preprocessing
+        )
+
+    # Store an upper bound based on the k-th-nn distance
+    kth_extent = compute_upper_bound(
+        D_knn,
+        distance,
+        distance_preprocessing,
+        k, knns, m,
+        n_jobs, slack, ts)
+
+    # compute potential offsets to use from k-NNs
+    idx_stitched, ts_stitched = extract_stitched_time_series(
+        ts, m, D_knn, knns, kth_extent)
+
+    # compute distances and knns from stitched time series
+    D_stitched, knns_stitched = compute_distances_with_knns_full(
+        ts_stitched, m, k,
+        n_jobs=n_jobs,
+        slack=slack,
+        exclude_trivial_match=exclude_trivial_match,
+        distance=distance,
+        distance_preprocessing=distance_preprocessing
+    )
+
+    # build and apply exclusion zone
+    apply_exclusion_zone(D_stitched, idx_stitched, knns_stitched, m, ts_stitched)
+
+    print(f"TS length reduced from {len(ts)} to {len(ts_stitched)}")
+    return D_stitched, knns_stitched, ts_stitched, idx_stitched
+
 
 
 @njit(fastmath=True, cache=True)
@@ -821,7 +990,8 @@ def _argknn(
     dists = np.copy(dist)
 
     # dist_pos = np.argsort(dist)
-    dist_pos = np.argpartition(dist, 2 * k)[:2 * k]
+    new_k = min(2 * k, len(dist)-1)
+    dist_pos = np.argpartition(dist, new_k)[:new_k]
     dist_sort = dist[dist_pos]
 
     idx = []  # there may be less than k, thus use a list
@@ -1319,7 +1489,8 @@ def search_k_motiflets_elbow(
         except:
             print("Caught exception in pyattimo", flush=True)
 
-    elif (backend == "default") or (backend == "scalable") or (backend == "stitch"):
+    elif ((backend == "default") or (backend == "scalable") or
+          (backend == "stitch") or (backend == "cascade")):
         # switch to sparse matrix representation when length is above 30_000
         # sparse matrix is 2x slower but needs less memory
         sparse = backend == "scalable"
@@ -1345,6 +1516,12 @@ def search_k_motiflets_elbow(
             """
         elif backend == "stitch":
             D_full, knns, data_stitched, idx_stitched = compute_distances_with_knns_stitch(
+                data_raw, m, k_max_, n_jobs=n_jobs, slack=slack,
+                distance=distance,
+                distance_preprocessing=distance_preprocessing,
+            )
+        elif backend == "cascade":
+            D_full, knns, data_stitched, idx_stitched = compute_distances_with_knns_stitch_cascading_lb(
                 data_raw, m, k_max_, n_jobs=n_jobs, slack=slack,
                 distance=distance,
                 distance_preprocessing=distance_preprocessing,
@@ -1395,7 +1572,7 @@ def search_k_motiflets_elbow(
     else:
         raise Exception(
             'Unknown backend: ' + backend + '. ' +
-            'Use "pyattimo", "scalable", "stitch", or "default".')
+            'Use "pyattimo", "scalable", "cascade", "stitch", or "default".')
 
     # smoothen the line to make it monotonically increasing
     k_motiflet_distances[0:2] = k_motiflet_distances[2]
