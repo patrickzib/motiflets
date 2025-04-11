@@ -72,4 +72,4 @@ def test_full_matrix():
 
     m = 1000
     k = 10
-    _, _ = ml.compute_distances_with_knns(series, m=m, k=k)
+    _, _ = ml.compute_distances_with_knns_full(series, m=m, k=k)

@@ -29,15 +29,15 @@ def read_penguin_data():
 
 def test_motiflets_sparse():
     lengths = [
-        1_000,
-        #5_000,
-        #10_000,
+        1_024,
+        5_120,
+        # 10_000,
         #30_000,
         #50_000,
         #100_000,
-        150_000,
-        200_000,
-        250_000
+        #150_000,
+        #200_000,
+        #250_000
     ]
 
     ds_name, B = read_penguin_data()
@@ -46,7 +46,7 @@ def test_motiflets_sparse():
     for i, length in enumerate(lengths):
         print("--------------------")
         for distance in ["znormed_ed"]:  # , "ed", "cosine"
-            for backend in ["stitch", "scalable"]:  # , "default"
+            for backend in ["cascade"]: # ["default", "stitch", "scalable"]:
                 series = B.iloc[:length, 0].T
 
                 print("Distance", distance)
@@ -64,7 +64,7 @@ def test_motiflets_sparse():
                 t_before = time.time()
                 extent, motiflets, _ = ml.fit_k_elbow(
                     k_max,
-                    22,
+                    32,
                     plot_elbows=False,
                     plot_motifs_as_grid=False
                 )
