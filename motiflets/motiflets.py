@@ -821,7 +821,8 @@ def _argknn(
     dists = np.copy(dist)
 
     # dist_pos = np.argsort(dist)
-    dist_pos = np.argpartition(dist, 2 * k)[:2 * k]
+    new_k = min(len(dist)-1, 2*k)
+    dist_pos = np.argpartition(dist, new_k)[:new_k]
     dist_sort = dist[dist_pos]
 
     idx = []  # there may be less than k, thus use a list
