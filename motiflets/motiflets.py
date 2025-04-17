@@ -24,10 +24,9 @@ from tqdm.auto import tqdm
 from motiflets.distances import *
 
 import logging
-
-logging.basicConfig(level=logging.WARN)
+logging.basicConfig(level=logging.CRITICAL)
 pyattimo_logger = logging.getLogger('pyattimo')
-pyattimo_logger.setLevel(logging.WARNING)
+pyattimo_logger.setLevel(logging.CRITICAL)
 
 
 def as_series(data, index_range, index_name):
@@ -422,6 +421,9 @@ def compute_distances_with_knns_sparse(
 
     """
     n = np.int32(ts.shape[0] - m + 1)
+    halve_m = 0
+    if exclude_trivial_match:
+        halve_m = int(m * slack)
 
     D_knn, knns, bin_size, dot_first, preprocessing, halve_m \
         = compute_distances_with_knns(
@@ -435,17 +437,23 @@ def compute_distances_with_knns_sparse(
             distance_preprocessing
         )
 
-    # Store an upper bound for each k-nn distance
-    kth_extent = compute_upper_bound(
-        D_knn,
-        distance,
-        distance_preprocessing,
-        k, knns, m,
-        n_jobs, slack, ts)
-
     # TODO: no sparse matrix support in numba. Thus we use this hack
     D_bool = [Dict.empty(key_type=types.int32, value_type=types.bool_) for _ in
               range(n)]
+
+    # Store an upper bound for each k-nn distance
+    #kth_extent = compute_upper_bound(
+    #   D_knn,
+    #   distance,
+    #   distance_preprocessing,
+    #   k, knns, m,
+    #   n_jobs, slack, ts)
+
+    # Store an upper bound for each k-nn distance
+    kth_extent = np.zeros(k, dtype=np.float64)
+    kth_extent[0] = np.inf
+    for k in range(1, len(kth_extent)):
+       kth_extent[k] = 4 * np.min(D_knn[:, k])  # diameter^2 = (2r)^2
 
     # FIXME: Parallelizm does not work, as Dict is not thread safe :(
     for order in np.arange(0, n):
@@ -455,8 +463,8 @@ def compute_distances_with_knns_sparse(
 
             bound = False
             k_index = -1
-            for kk in np.arange(len(kth_extent) - 1, 1, -1):
-                if D_knn[order, kk] <= kth_extent[kk]:
+            for kk in range(len(kth_extent) - 1, 0, -1):
+                if D_knn[order, kk] <= kth_extent[kk]:  # k_nn_dist[kk]:
                     bound = True
                     k_index = kk + 1
                     break
@@ -563,11 +571,10 @@ def compute_upper_bound(
         ts):
     kth_extent = np.zeros(k, dtype=np.float64)
     kth_extent[0] = np.inf
-    kth_extent[1] = np.inf
 
-    for kk in range(2, len(kth_extent)):
+    for kk in range(1, len(kth_extent)):  # FIXME: len or len -1
         best_knn_pos = np.argmin(D_knn[:, kk])
-        motiflet_candidate = knns[best_knn_pos, :kk]
+        motiflet_candidate = knns[best_knn_pos, :kk+1]   # FIXME: kk+1 or kk?
 
         # stitch only the offsets needed
         parts_to_stitch = []
@@ -590,7 +597,8 @@ def compute_upper_bound(
         extent = get_pairwise_extent(D_refine, idx, np.inf)
         kth_extent[kk] = extent
 
-        assert extent < 4 * np.min(D_knn[:, kk])
+        assert extent <= 4 * np.min(D_knn[:, kk])  # FIXME kk or kk+1 ???
+        assert extent >= np.min(D_knn[:, kk])      # FIXME kk or kk+1 ???
         # print(f"extent:\t {extent} "
         #      f"diameter:\t {4 * np.min(D_knn[:, k])}")
 
@@ -1293,7 +1301,7 @@ def search_k_motiflets_elbow(
                 exclusion_zone=exclusion_m,
                 delta=delta,
                 stop_on_threshold=True,
-                fraction_threshold=np.log(n) / n,
+                fraction_threshold=np.log(n) / n
             )
         else:
             m_iter = pyattimo.MotifletsIterator(
@@ -1301,9 +1309,9 @@ def search_k_motiflets_elbow(
                 w=m,
                 support=k_max_ - 1,
                 exclusion_zone=exclusion_m,
-                delta=0.5,
-                stop_on_threshold=True,
-                fraction_threshold=np.log(n) / n,
+                # delta=0.5,
+                # stop_on_threshold=True,
+                # fraction_threshold=np.log(n) / n,
             )
         try:
             for mot in m_iter:
@@ -1545,7 +1553,7 @@ def compute_distances_full(ts,
     return D
 
 
-@njit(fastmath=True, cache=True)
+# @njit(fastmath=True, cache=True)
 def stitch_and_refine(
         data,
         m,
@@ -1588,7 +1596,7 @@ def stitch_and_refine(
     print("Window", search_window)
     print("Parameters", len(ts_stitched), m, k_max, n_jobs, slack)
 
-    D, knns = compute_distances_with_knns_full(
+    D_stitched, knns_stitched = compute_distances_with_knns_full(
         ts_stitched,
         m,
         k_max,
@@ -1600,30 +1608,22 @@ def stitch_and_refine(
 
     # identify ids where stitches occurred.
     # We need these for building the exclusion zone
-    exclusion_zone = np.zeros(len(ts_stitched), dtype=np.bool_)
-    for i in range(0, len(idx_stitched) - 1):
-        if idx_stitched[i] + 1 < idx_stitched[i + 1]:
-            pos = i + 1
-            exclusion_zone[max(0, pos - m + 1): pos] = True
-
-    # apply symmetric exclusion zone
-    D[:, exclusion_zone] = np.inf
-    D[exclusion_zone, :] = np.inf
-    knns[exclusion_zone, :] = -1
+    apply_exclusion_zone(D_stitched, idx_stitched, knns_stitched, m, ts_stitched)
 
     cardinality = len(motiflet)
     candidate, candidate_extent, _ = get_approximate_k_motiflet(
         ts_stitched,
         m,
         cardinality,
-        D,
-        knns,
+        D_stitched,
+        knns_stitched,
         upper_bound=upper_bound,
     )
 
     new_motiflet_pos = idx_stitched[candidate]
 
     if candidate_extent < extent:
+        print (f"Improved extent. Old: {extent}, New: {candidate_extent}, Factor: {extent / candidate_extent}")
         return new_motiflet_pos, candidate_extent
     else:
         return motiflet, extent

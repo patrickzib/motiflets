@@ -1,7 +1,5 @@
 from datetime import datetime
 
-import pandas as pd
-
 from motiflets.plotting import *
 from motiflets.motiflets import *
 
@@ -21,8 +19,8 @@ def test_motiflets_scale_n(
         backends=["default", "pyattimo", "scalable"],
         delta = None,
         subsampling=None,
-        ):
-    timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+    ):
+    # timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
     df = pd.DataFrame(columns=['length', 'backend', 'time in s', 'memory in MB', "extent", "motiflet"])
 
     last_time = -1
@@ -30,6 +28,8 @@ def test_motiflets_scale_n(
     for backend in backends:
         last_n = 0
         for n in length_range:
+            gc.collect()
+
             start = time.time()
             print(backend, n)
 
@@ -59,6 +59,7 @@ def test_motiflets_scale_n(
                 l_new = int(l / subsampling)
                 print("Applying Subsampling, New Size:", ts.shape)
 
+            print(f"Number of cores {cores}")
             mm = Motiflets(
                 ds_name, ts, backend=backend, n_jobs=cores, delta=delta)
 
@@ -85,13 +86,16 @@ def test_motiflets_scale_n(
                     # upper_bound=extent  # does not work with subsampling
                 )
 
-                print(f"Searching in local neighborhood, found a better motif")
-                motiflet = new_motiflet
-                extent = new_extent
+                if new_extent < extent:
+                    print(f"Searching in local neighborhood. Found a better motif")
+                    motiflet = new_motiflet
+                    extent = new_extent
 
             backend_name = backend
             if backend == "pyattimo" and delta is not None:
-                backend_name = f"{backend_name} (delta={delta})"
+                backend_name = f"{backend_name} (delta={delta}, v=0.6.4)"
+            elif backend == "pyattimo":
+                backend_name = f"{backend_name} (v=0.6.4)"
             elif subsampling:
                 backend_name = f"{backend_name} (subsampling={subsampling})"
 
@@ -101,11 +105,11 @@ def test_motiflets_scale_n(
             df.loc[len(df.index)] = current
 
             if delta:
-                new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}_delta_{delta}_{timestamp}.csv"
+                new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}_delta_{delta}.csv"
             elif subsampling:
-                new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}_subs_{subsampling}_{timestamp}.csv"
+                new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}_subs_{subsampling}.csv"
             else:
-                new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}_{timestamp}.csv"
+                new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}.csv"
 
             df.to_csv(new_filename, index=False)
             print("\tDiscovered motiflets in", duration, "seconds")

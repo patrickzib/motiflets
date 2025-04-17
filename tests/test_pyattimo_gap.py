@@ -40,7 +40,7 @@ def test_motiflets_scale_n(
     ):
     length_range = 50_000 * np.arange(1, 200, 1)
     l = 50 * 68
-    k_max = 20
+    k_max = 10 # 20
 
     ut.test_motiflets_scale_n(
         read_data,

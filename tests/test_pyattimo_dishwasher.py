@@ -45,7 +45,7 @@ def test_motiflets_scale_n(
     ):
     length_range = 50_000 * np.arange(1, 200, 1)
     l = 125 * 8  # roughly 6.5 seconds
-    k_max = 20  # 40
+    k_max = 10 # 20  # 40
 
     ut.test_motiflets_scale_n(
         read_dishwasher,
