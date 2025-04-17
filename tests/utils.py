@@ -57,7 +57,7 @@ def test_motiflets_scale_n(
                     ts = ts[::subsampling]
 
                 l_new = int(l / subsampling)
-                print("Applying Subsampling, New Size:", ts.shape)
+                print("Applying Subsampling, New Size:", l_new)
 
             print(f"Number of cores {cores}")
             mm = Motiflets(
@@ -99,7 +99,7 @@ def test_motiflets_scale_n(
             elif subsampling:
                 backend_name = f"{backend_name} (subsampling={subsampling})"
 
-            current = [len(ts), backend_name, duration, memory_usage, extent, motiflet]
+            current = [len(ts_orig), backend_name, duration, memory_usage, extent, motiflet]
 
             results.append(current)
             df.loc[len(df.index)] = current
@@ -117,7 +117,8 @@ def test_motiflets_scale_n(
 
             gc.collect()
 
-            last_n = len(ts)
+            last_n = len(ts_orig)
             last_time = duration
+
 
     print(results)
