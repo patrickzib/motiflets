@@ -442,18 +442,18 @@ def compute_distances_with_knns_sparse(
               range(n)]
 
     # Store an upper bound for each k-nn distance
-    #kth_extent = compute_upper_bound(
-    #   D_knn,
-    #   distance,
-    #   distance_preprocessing,
-    #   k, knns, m,
-    #   n_jobs, slack, ts)
+    kth_extent = compute_upper_bound(
+       D_knn,
+       distance,
+       distance_preprocessing,
+       k, knns, m,
+       n_jobs, slack, ts)
 
     # Store an upper bound for each k-nn distance
-    kth_extent = np.zeros(k, dtype=np.float64)
-    kth_extent[0] = np.inf
-    for k in range(1, len(kth_extent)):
-       kth_extent[k] = 4 * np.min(D_knn[:, k])  # diameter^2 = (2r)^2
+    #kth_extent = np.zeros(k, dtype=np.float64)
+    #kth_extent[0] = np.inf
+    #for k in range(1, len(kth_extent)):
+    #   kth_extent[k] = 4 * np.min(D_knn[:, k])  # diameter^2 = (2r)^2
 
     # FIXME: Parallelizm does not work, as Dict is not thread safe :(
     for order in np.arange(0, n):
@@ -464,7 +464,7 @@ def compute_distances_with_knns_sparse(
             bound = False
             k_index = -1
             for kk in range(len(kth_extent) - 1, 0, -1):
-                if D_knn[order, kk] <= kth_extent[kk]:  # k_nn_dist[kk]:
+                if D_knn[order, kk] <= kth_extent[kk]:
                     bound = True
                     k_index = kk + 1
                     break
@@ -569,12 +569,15 @@ def compute_upper_bound(
         n_jobs,
         slack,
         ts):
+
     kth_extent = np.zeros(k, dtype=np.float64)
     kth_extent[0] = np.inf
 
-    for kk in range(1, len(kth_extent)):  # FIXME: len or len -1
+    for kk in range(1, len(kth_extent)):
+        # kk is the kk-th NN
+        # The motiflet candidate has thus kk+1 elements (including the query itself)
         best_knn_pos = np.argmin(D_knn[:, kk])
-        motiflet_candidate = knns[best_knn_pos, :kk+1]   # FIXME: kk+1 or kk?
+        motiflet_candidate = knns[best_knn_pos, :kk+1]
 
         # stitch only the offsets needed
         parts_to_stitch = []
@@ -586,7 +589,8 @@ def compute_upper_bound(
         idx = np.arange(0, len(motiflet_candidate)) * m
 
         D_refine, _ = compute_distances_with_knns_full(
-            np.array(parts_to_stitch), m, kk,
+            np.array(parts_to_stitch), m,
+            2,  # k is actually not needed
             n_jobs=n_jobs,
             slack=slack,
             distance=distance,
@@ -597,11 +601,12 @@ def compute_upper_bound(
         extent = get_pairwise_extent(D_refine, idx, np.inf)
         kth_extent[kk] = extent
 
-        assert extent <= 4 * np.min(D_knn[:, kk])  # FIXME kk or kk+1 ???
-        assert extent >= np.min(D_knn[:, kk])      # FIXME kk or kk+1 ???
-        # print(f"extent:\t {extent} "
-        #      f"diameter:\t {4 * np.min(D_knn[:, k])}")
+        # extent must be within the diameter of the sphere
+        minimum = D_knn[:, kk]
+        assert extent <= 4 * np.min(minimum)
+        assert np.min(minimum) <= extent
 
+    # print (kth_extent)
     return kth_extent
 
 
@@ -642,6 +647,8 @@ def compute_distances_with_knns_stitch(
     idx_stitched, ts_stitched = extract_stitched_time_series(
         ts, m, D_knn, knns, kth_extent)
 
+    print(f"TS length reduced from {len(ts)} to {len(ts_stitched)}")
+
     # compute distances and knns from stitched time series
     D_stitched, knns_stitched = compute_distances_with_knns_full(
         ts_stitched, m, k,
@@ -655,7 +662,6 @@ def compute_distances_with_knns_stitch(
     # build and apply exclusion zone
     apply_exclusion_zone(D_stitched, idx_stitched, knns_stitched, m, ts_stitched)
 
-    print(f"TS length reduced from {len(ts)} to {len(ts_stitched)}")
     return D_stitched, knns_stitched, ts_stitched, idx_stitched
 
 
