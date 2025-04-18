@@ -41,7 +41,7 @@ def test_motiflets_scale_n(
 
             ts_orig = ts
 
-            if (len(ts) <= last_n
+            if (len(ts_orig) <= last_n
                     or (backend == "default" and len(ts) > 500_000) \
                     or (last_time > 3600)     # larger than 2 hours
             ):
