@@ -78,8 +78,6 @@ def test_motiflets_scale_n(
                 plot_elbows=False,
                 plot_motifs_as_grid=False)
 
-            duration = time.time() - start
-            memory_usage = mm.memory_usage
             extent = dists[-1]
             motiflet = motiflets[-1]
 
@@ -110,6 +108,8 @@ def test_motiflets_scale_n(
             elif subsampling:
                 backend_name = f"{backend_name} (subsampling={subsampling})"
 
+            duration = time.time() - start
+            memory_usage = mm.memory_usage
             current = [len(ts_orig), backend_name, duration, memory_usage, extent, motiflet]
 
             results.append(current)
@@ -124,7 +124,7 @@ def test_motiflets_scale_n(
 
             df.to_csv(new_filename, index=False)
             print("\tDiscovered motiflets in", duration, "seconds")
-            print("\t", current)
+            print("\t", current[-1])
 
             gc.collect()
 

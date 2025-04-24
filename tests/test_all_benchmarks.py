@@ -38,28 +38,28 @@ def main():
     #     run_safe(penguin, backends, delta, use_1m=False)
 
 
-    # backends = ["default"]
-    # subsamplings = [2, 3, 4, 5, 6, 7, 8, 9, 10]
-    # for subsampling in subsamplings:
-    #     print(f"Using subsampling {subsampling}")
-    #     # arrhythmia.test_motiflets_scale_n(backends=backends, subsampling=subsampling)
-    #     # astro.test_motiflets_scale_n(backends=backends, subsampling=subsampling)
-    #     # dishwasher.test_motiflets_scale_n(backends=backends, subsampling=subsampling)
-    #     # eeg.test_motiflets_scale_n(backends=backends, subsampling=subsampling)
-    #     # gap.test_motiflets_scale_n(backends=backends, subsampling=subsampling)
-    #     # pamap.test_motiflets_scale_n(backends=backends, subsampling=subsampling)
-    #     # penguin.test_motiflets_scale_n(backends=backends, subsampling=subsampling, use_1m=True)
-    #     # penguin.test_motiflets_scale_n(backends=backends, subsampling=subsampling, use_1m=False)
+    backends = ["scalable"]  # , "scalable"
+    subsamplings = [16, 8, 4, 2]
+    for subsampling in subsamplings:
+        print(f"Using subsampling {subsampling}")
+        arrhythmia.test_motiflets_scale_n(backends=backends, subsampling=subsampling)
+        astro.test_motiflets_scale_n(backends=backends, subsampling=subsampling)
+        dishwasher.test_motiflets_scale_n(backends=backends, subsampling=subsampling)
+        eeg.test_motiflets_scale_n(backends=backends, subsampling=subsampling)
+        gap.test_motiflets_scale_n(backends=backends, subsampling=subsampling)
+        pamap.test_motiflets_scale_n(backends=backends, subsampling=subsampling)
+        penguin.test_motiflets_scale_n(backends=backends, subsampling=subsampling, use_1m=True)
+        penguin.test_motiflets_scale_n(backends=backends, subsampling=subsampling, use_1m=False)
 
-    backends = ["scalable"]
-    penguin.test_motiflets_scale_n(backends=backends, use_1m=True)
-    penguin.test_motiflets_scale_n(backends=backends, use_1m=False)
-    astro.test_motiflets_scale_n(backends=backends)
-    arrhythmia.test_motiflets_scale_n(backends=backends)
-    dishwasher.test_motiflets_scale_n(backends=backends)
-    eeg.test_motiflets_scale_n(backends=backends)
-    gap.test_motiflets_scale_n(backends=backends)
-    pamap.test_motiflets_scale_n(backends=backends)
+    # backends = ["scalable"]
+    # penguin.test_motiflets_scale_n(backends=backends, use_1m=True)
+    # penguin.test_motiflets_scale_n(backends=backends, use_1m=False)
+    # astro.test_motiflets_scale_n(backends=backends)
+    # arrhythmia.test_motiflets_scale_n(backends=backends)
+    # dishwasher.test_motiflets_scale_n(backends=backends)
+    # eeg.test_motiflets_scale_n(backends=backends)
+    # gap.test_motiflets_scale_n(backends=backends)
+    # pamap.test_motiflets_scale_n(backends=backends)
 
 if __name__ == "__main__":
     main()
