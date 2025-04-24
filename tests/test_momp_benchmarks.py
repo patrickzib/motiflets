@@ -66,10 +66,10 @@ def test_motiflets_scale_n(
     )
 
 
-def run_safe(ds_name, series, l_range, k_max, backends, delta):
+def run_safe(ds_name, series, l_range, k_max, backends, delta, subsampling=None):
     try:
-        n = 10000  # len(series)
-        test_motiflets_scale_n(ds_name, series, n, l_range, k_max, backends=backends, delta=delta)
+        # n = 10000  # len(series)
+        test_motiflets_scale_n(ds_name, series, n, l_range, k_max, backends=backends, delta=delta, subsampling=subsampling)
     except Exception as e:
         print(traceback.format_exc())
     except BaseException as e:
@@ -77,12 +77,13 @@ def run_safe(ds_name, series, l_range, k_max, backends, delta):
 
 
 l_range = [128, 256, 512, 1024, 2048]
-ks = [5, 10, 20]
+# ks = [5, 10, 20]
 deltas = [None, 0.25]
 
 def main():
     for ds_name in filenames.keys():
         filename = filenames[ds_name]
+
         backends = ["pyattimo"]
         for delta in deltas:
             run_safe(
@@ -94,7 +95,16 @@ def main():
             ds_name, read_mat(filename), l_range, 10, backends, delta
         )
 
-        break
+        backends = ["scalable"]
+        run_safe(
+            ds_name, read_mat(filename), l_range, 10, backends, delta
+        )
+
+        run_safe(
+            ds_name, read_mat(filename), l_range, 10, backends, delta, subsampling=16
+        )
+
+        # break
 
 
 if __name__ == "__main__":
