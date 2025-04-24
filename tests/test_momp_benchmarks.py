@@ -48,6 +48,7 @@ def read_mat(filename):
     print(f"\tStats Mean {np.mean(data):0.3f}, Std {np.std(data):0.3f} " +
           f"Min {np.min(data):0.3f} Max {np.max(data):0.3f}")
 
+    # np.savetxt(path + "/csv/" + filename + ".csv", data[:100000], delimiter=",")
     return data
 
 
