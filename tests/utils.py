@@ -14,20 +14,20 @@ cores = min(64, num_cores - 2)
 
 def test_motiflets_scale_n(
         read_data,
-        length_range,
-        l, k_max,
+        n_range,  # Time Series length range
+        l_range,    # Motif length range
+        k_max,
         backends=["default", "pyattimo", "scalable"],
         delta = None,
         subsampling=None,
     ):
-    # timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
     df = pd.DataFrame(columns=['length', 'backend', 'time in s', 'memory in MB', "extent", "motiflet"])
 
     last_time = -1
     results = []
     for backend in backends:
         last_n = 0
-        for n in length_range:
+        for n in n_range:
             gc.collect()
 
             start = time.time()
@@ -49,87 +49,91 @@ def test_motiflets_scale_n(
 
             print("Size of TS: ", ts.shape)
 
-            l_new = l
-            if subsampling:
-                if isinstance(ts, pd.DataFrame):
-                    ts = ts.iloc[::subsampling]
-                elif isinstance(ts, pd.Series):
-                    print("Using Mean values")
-                    ts, _ = compute_paa(ts.to_numpy(), subsampling)
+            for l in l_range:
+                l_new = l
+                if subsampling:
+                    if isinstance(ts, pd.DataFrame):
+                        ts = ts.iloc[::subsampling]
+                    elif isinstance(ts, pd.Series):
+                        print("Using Mean values")
+                        ts, _ = compute_paa(ts.to_numpy(), subsampling)
+                    else:
+                        # ts = ts[::subsampling]
+                        print("Using Mean values")
+                        ts, _ = compute_paa(ts, subsampling)
+
+                    l_new = int(np.round(l / subsampling))
+                    print(f"Applying Subsampling, Old Size {ts_orig.shape} New Size {ts.shape}, New Window Size {l_new}")
+
+                print(f"Number of cores {cores}")
+                mm = Motiflets(
+                    ds_name,
+                    ts,
+                    backend=backend,
+                    n_jobs=cores,
+                    delta=delta)
+
+                dists, motiflets, _ = mm.fit_k_elbow(
+                    k_max,
+                    l_new,
+                    plot_elbows=False,
+                    plot_motifs_as_grid=False)
+
+                extent = dists[-1]
+                motiflet = motiflets[-1]
+
+                if subsampling:
+                    motiflet = np.array(motiflet) * subsampling   # scale up again
+
+                if backend == "pyattimo" or subsampling:
+                    # try to refine the positions of the motiflets
+                    new_motiflet, new_extent = stitch_and_refine(
+                        ts_orig,
+                        m=l,
+                        motiflet=motiflet,
+                        extent=np.inf if subsampling else extent,
+                        search_window=l * 4,  # search in a local neighborhood of 4 times the motif length
+                        # upper_bound=extent  # does not work with subsampling
+                    )
+
+                    if subsampling or new_extent < extent:
+                        print(f"Searching in local neighborhood. Found a better motif")
+                        motiflet = new_motiflet
+                        extent = new_extent
+
+                backend_name = backend
+                if backend == "pyattimo" and delta is not None:
+                    backend_name = f"{backend_name} (delta={delta}, v=0.6.4)"
+                elif backend == "pyattimo":
+                    backend_name = f"{backend_name} (v=0.6.4)"
+                elif subsampling:
+                    backend_name = f"{backend_name} (subsampling={subsampling})"
+
+                duration = time.time() - start
+                memory_usage = mm.memory_usage
+                current = [len(ts_orig), backend_name, duration, memory_usage, extent, motiflet]
+
+                results.append(current)
+                df.loc[len(df.index)] = current
+
+                if backend == "pyattimo":
+                    if delta:
+                        new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}_pyattimo_delta_{delta}.csv"
+                    else:
+                        new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}_pyattimo_delta_{delta}.csv"
+                elif subsampling:
+                    new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}_subs_{subsampling}.csv"
                 else:
-                    # ts = ts[::subsampling]
-                    print("Using Mean values")
-                    ts, _ = compute_paa(ts, subsampling)
+                    new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}.csv"
 
-                l_new = int(np.round(l / subsampling))
-                print(f"Applying Subsampling, Old Size {ts_orig.shape} New Size {ts.shape}, New Window Size {l_new}")
+                df.to_csv(new_filename, index=False)
+                print("\tDiscovered motiflets in", duration, "seconds")
+                print("\t", current[-1])
 
-            print(f"Number of cores {cores}")
-            mm = Motiflets(
-                ds_name,
-                ts,
-                backend=backend,
-                n_jobs=cores,
-                delta=delta)
+                gc.collect()
 
-            dists, motiflets, _ = mm.fit_k_elbow(
-                k_max,
-                l_new,
-                plot_elbows=False,
-                plot_motifs_as_grid=False)
-
-            extent = dists[-1]
-            motiflet = motiflets[-1]
-
-            if subsampling:
-                motiflet = np.array(motiflet) * subsampling   # scale up again
-
-            if backend == "pyattimo" or subsampling:
-                # try to refine the positions of the motiflets
-                new_motiflet, new_extent = stitch_and_refine(
-                    ts_orig,
-                    m=l,
-                    motiflet=motiflet,
-                    extent=np.inf if subsampling else extent,
-                    search_window=l * 4,  # search in a local neighborhood of 4 times the motif length
-                    # upper_bound=extent  # does not work with subsampling
-                )
-
-                if subsampling or new_extent < extent:
-                    print(f"Searching in local neighborhood. Found a better motif")
-                    motiflet = new_motiflet
-                    extent = new_extent
-
-            backend_name = backend
-            if backend == "pyattimo" and delta is not None:
-                backend_name = f"{backend_name} (delta={delta}, v=0.6.4)"
-            elif backend == "pyattimo":
-                backend_name = f"{backend_name} (v=0.6.4)"
-            elif subsampling:
-                backend_name = f"{backend_name} (subsampling={subsampling})"
-
-            duration = time.time() - start
-            memory_usage = mm.memory_usage
-            current = [len(ts_orig), backend_name, duration, memory_usage, extent, motiflet]
-
-            results.append(current)
-            df.loc[len(df.index)] = current
-
-            if delta:
-                new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}_delta_{delta}.csv"
-            elif subsampling:
-                new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}_subs_{subsampling}.csv"
-            else:
-                new_filename = f"results/scalability_n_{ds_name}_{l}_{k_max}.csv"
-
-            df.to_csv(new_filename, index=False)
-            print("\tDiscovered motiflets in", duration, "seconds")
-            print("\t", current[-1])
-
-            gc.collect()
-
-            last_n = len(ts_orig)
-            last_time = duration
+                last_n = len(ts_orig)
+                last_time = duration
 
 
     print(results)

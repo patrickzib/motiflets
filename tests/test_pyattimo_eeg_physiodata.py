@@ -51,7 +51,7 @@ def test_motiflets_scale_n(
     ut.test_motiflets_scale_n(
         read_eeg_data,
         length_range,
-        l, k_max,
+        [l], k_max,
         backends,
         delta=delta,
         subsampling=subsampling

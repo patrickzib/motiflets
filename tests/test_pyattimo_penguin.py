@@ -120,7 +120,7 @@ def test_motiflets_scale_n(
     ut.test_motiflets_scale_n(
         read_penguin_1m_channel0 if use_1m else read_penguin_3m,
         length_range,
-        l, k_max,
+        [l], k_max,
         backends,
         delta,
         subsampling
