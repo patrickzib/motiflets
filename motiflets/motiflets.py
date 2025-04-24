@@ -6,6 +6,7 @@
 
 __author__ = ["patrickzib"]
 
+import os
 import itertools
 from ast import literal_eval
 from os.path import exists
@@ -24,6 +25,7 @@ from tqdm.auto import tqdm
 from motiflets.distances import *
 
 import logging
+
 logging.basicConfig(level=logging.CRITICAL)
 pyattimo_logger = logging.getLogger('pyattimo')
 pyattimo_logger.setLevel(logging.CRITICAL)
@@ -77,6 +79,22 @@ def resample(data, sampling_factor=10000):
         factor = np.int32(len(data) / sampling_factor)
         data = data[::factor]
     return data, factor
+
+
+@njit(fastmath=True, cache=True)
+def compute_paa(ts, segment_size):
+    segments = np.int32(np.ceil(len(ts) / segment_size))
+
+    paa = np.zeros(segments, dtype=np.float64)
+    paa_segment_sizes = np.zeros(segments, dtype=np.int32)  # needed for lower bounding
+
+    for i in np.arange(0, segments, dtype=np.int32):
+        start = i * segment_size
+        end = min((i + 1) * segment_size, len(ts))
+        paa[i] = ts[start:end].mean()
+        paa_segment_sizes[i] = end - start
+
+    return paa, paa_segment_sizes
 
 
 def read_ground_truth(dataset):
@@ -332,6 +350,8 @@ def compute_distances_with_knns_full(
 
     """
     n = np.int32(ts.shape[0] - m + 1)
+    n_jobs = max(1, min(n // 8, n_jobs))  # Cannot use more jobs than length of the ts
+
     halve_m = 0
     if exclude_trivial_match:
         halve_m = int(m * slack)
@@ -339,11 +359,10 @@ def compute_distances_with_knns_full(
     D = np.zeros((n, n), dtype=np.float32)
     knns = np.zeros((n, k), dtype=np.int32)
 
-    # means, stds = _sliding_mean_std(ts, m)
     preprocessing = distance_preprocessing(ts, m)
 
     dot_first = _sliding_dot_product(ts[:m], ts)
-    bin_size = ts.shape[0] // n_jobs
+    bin_size = int(np.ceil(ts.shape[0] / n_jobs))
 
     for idx in prange(n_jobs):
         start = idx * bin_size
@@ -421,21 +440,23 @@ def compute_distances_with_knns_sparse(
 
     """
     n = np.int32(ts.shape[0] - m + 1)
+    n_jobs = max(1, min(n // 8, n_jobs))  # Cannot use more jobs than length of the ts
+
     halve_m = 0
     if exclude_trivial_match:
         halve_m = int(m * slack)
 
     D_knn, knns, bin_size, dot_first, preprocessing, halve_m \
         = compute_distances_with_knns(
-            ts,
-            m,
-            k,
-            exclude_trivial_match,
-            n_jobs,
-            slack,
-            distance,
-            distance_preprocessing
-        )
+        ts,
+        m,
+        k,
+        exclude_trivial_match,
+        n_jobs,
+        slack,
+        distance,
+        distance_preprocessing
+    )
 
     # TODO: no sparse matrix support in numba. Thus we use this hack
     D_bool = [Dict.empty(key_type=types.int32, value_type=types.bool_) for _ in
@@ -443,16 +464,16 @@ def compute_distances_with_knns_sparse(
 
     # Store an upper bound for each k-nn distance
     kth_extent = compute_upper_bound(
-       D_knn,
-       distance,
-       distance_preprocessing,
-       k, knns, m,
-       n_jobs, slack, ts)
+        D_knn,
+        distance,
+        distance_preprocessing,
+        k, knns, m,
+        n_jobs, slack, ts)
 
     # Store an upper bound for each k-nn distance
-    #kth_extent = np.zeros(k, dtype=np.float64)
-    #kth_extent[0] = np.inf
-    #for k in range(1, len(kth_extent)):
+    # kth_extent = np.zeros(k, dtype=np.float64)
+    # kth_extent[0] = np.inf
+    # for k in range(1, len(kth_extent)):
     #   kth_extent[k] = 4 * np.min(D_knn[:, k])  # diameter^2 = (2r)^2
 
     # FIXME: Parallelizm does not work, as Dict is not thread safe :(
@@ -516,6 +537,8 @@ def compute_distances_with_knns(
         distance_preprocessing
 ):
     n = np.int32(ts.shape[0] - m + 1)
+    n_jobs = max(1, min(n // 8, n_jobs))  # Cannot use more jobs than length of the ts
+
     halve_m = 0
     if exclude_trivial_match:
         halve_m = int(m * slack)
@@ -526,7 +549,7 @@ def compute_distances_with_knns(
     preprocessing = distance_preprocessing(ts, m)
 
     dot_first = _sliding_dot_product(ts[:m], ts)
-    bin_size = ts.shape[0] // n_jobs
+    bin_size = int(np.ceil(ts.shape[0] / n_jobs))
 
     # first pass, computing the k-nns
     for idx in prange(n_jobs):
@@ -569,7 +592,6 @@ def compute_upper_bound(
         n_jobs,
         slack,
         ts):
-
     kth_extent = np.zeros(k, dtype=np.float64)
     kth_extent[0] = np.inf
 
@@ -577,7 +599,7 @@ def compute_upper_bound(
         # kk is the kk-th NN
         # The motiflet candidate has thus kk+1 elements (including the query itself)
         best_knn_pos = np.argmin(D_knn[:, kk])
-        motiflet_candidate = knns[best_knn_pos, :kk+1]
+        motiflet_candidate = knns[best_knn_pos, :kk + 1]
 
         # stitch only the offsets needed
         parts_to_stitch = []
@@ -590,9 +612,10 @@ def compute_upper_bound(
 
         D_refine, _ = compute_distances_with_knns_full(
             np.array(parts_to_stitch), m,
-            2,  # k is actually not needed
+            k=2,  # k is actually not needed
             n_jobs=n_jobs,
             slack=slack,
+            exclude_trivial_match=False,
             distance=distance,
             distance_preprocessing=distance_preprocessing
         )
@@ -603,8 +626,12 @@ def compute_upper_bound(
 
         # extent must be within the diameter of the sphere
         minimum = D_knn[:, kk]
+
+        if extent > 4 * np.min(minimum) or extent < np.min(minimum):
+            print("Extent", motiflet_candidate, idx, extent, np.min(minimum))
+
         assert extent <= 4 * np.min(minimum)
-        assert np.min(minimum) <= extent
+        assert extent >= np.min(minimum)
 
     # print (kth_extent)
     return kth_extent
@@ -625,15 +652,15 @@ def compute_distances_with_knns_stitch(
         multivariate time series.
     """
     D_knn, knns, _, _, _, _ = compute_distances_with_knns(
-            ts,
-            m,
-            k,
-            exclude_trivial_match,
-            n_jobs,
-            slack,
-            distance,
-            distance_preprocessing
-        )
+        ts,
+        m,
+        k,
+        exclude_trivial_match,
+        n_jobs,
+        slack,
+        distance,
+        distance_preprocessing
+    )
 
     # Store an upper bound for each k-nn distance
     kth_extent = compute_upper_bound(
@@ -835,7 +862,7 @@ def _argknn(
     dists = np.copy(dist)
 
     # dist_pos = np.argsort(dist)
-    new_k = min(len(dist)-1, 2*k)
+    new_k = min(len(dist) - 1, 2 * k)
     dist_pos = np.argpartition(dist, new_k)[:new_k]
     dist_sort = dist[dist_pos]
 
@@ -1264,7 +1291,8 @@ def search_k_motiflets_elbow(
 
     # used memory
     memory_usage = 0
-    process = psutil.Process()
+    pid = os.getpid()
+    process = psutil.Process(pid)
 
     # auto motif size selection
     if motif_length == 'AU_EF' or motif_length == 'auto':
@@ -1604,8 +1632,8 @@ def stitch_and_refine(
 
     D_stitched, knns_stitched = compute_distances_with_knns_full(
         ts_stitched,
-        m,
-        k_max,
+        m=m,
+        k=k_max,
         n_jobs=n_jobs,
         slack=slack,
         distance=distance,
@@ -1621,15 +1649,17 @@ def stitch_and_refine(
         ts_stitched,
         m,
         cardinality,
-        D_stitched,
-        knns_stitched,
+        D=D_stitched,
+        knns=knns_stitched,
         upper_bound=upper_bound,
     )
 
     new_motiflet_pos = idx_stitched[candidate]
 
-    if candidate_extent < extent:
-        print (f"Improved extent. Old: {extent}, New: {candidate_extent}, Factor: {extent / candidate_extent}")
+    if (extent == np.inf) or (candidate_extent < extent):
+        print(f"Improved extent. Old: {extent}, " +
+              f"New: {candidate_extent}, " +
+              f"Factor: {extent / candidate_extent}")
         return new_motiflet_pos, candidate_extent
     else:
         return motiflet, extent

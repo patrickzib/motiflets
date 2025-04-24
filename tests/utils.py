@@ -53,18 +53,29 @@ def test_motiflets_scale_n(
             if subsampling:
                 if isinstance(ts, pd.DataFrame):
                     ts = ts.iloc[::subsampling]
+                elif isinstance(ts, pd.Series):
+                    print("Using Mean values")
+                    ts, _ = compute_paa(ts.to_numpy(), subsampling)
                 else:
-                    ts = ts[::subsampling]
+                    # ts = ts[::subsampling]
+                    print("Using Mean values")
+                    ts, _ = compute_paa(ts, subsampling)
 
-                l_new = int(l / subsampling)
-                print("Applying Subsampling, New Size:", l_new)
+                l_new = int(np.round(l / subsampling))
+                print(f"Applying Subsampling, Old Size {ts_orig.shape} New Size {ts.shape}, New Window Size {l_new}")
 
             print(f"Number of cores {cores}")
             mm = Motiflets(
-                ds_name, ts, backend=backend, n_jobs=cores, delta=delta)
+                ds_name,
+                ts,
+                backend=backend,
+                n_jobs=cores,
+                delta=delta)
 
             dists, motiflets, _ = mm.fit_k_elbow(
-                k_max, l_new, plot_elbows=False,
+                k_max,
+                l_new,
+                plot_elbows=False,
                 plot_motifs_as_grid=False)
 
             duration = time.time() - start
@@ -79,14 +90,14 @@ def test_motiflets_scale_n(
                 # try to refine the positions of the motiflets
                 new_motiflet, new_extent = stitch_and_refine(
                     ts_orig,
-                    l,
-                    motiflet,
-                    extent,
-                    l * 4,  # search in a local neighborhood of 4 times the motif length
+                    m=l,
+                    motiflet=motiflet,
+                    extent=np.inf if subsampling else extent,
+                    search_window=l * 4,  # search in a local neighborhood of 4 times the motif length
                     # upper_bound=extent  # does not work with subsampling
                 )
 
-                if new_extent < extent:
+                if subsampling or new_extent < extent:
                     print(f"Searching in local neighborhood. Found a better motif")
                     motiflet = new_motiflet
                     extent = new_extent
