@@ -631,9 +631,8 @@ def compute_upper_bound(
             print("Extent", motiflet_candidate, idx, extent, np.min(minimum))
 
         assert extent <= 4 * np.min(minimum)
-        assert extent >= np.min(minimum)
+        assert extent >= np.min(minimum) - 1e-6  # avoid floating point errors
 
-    # print (kth_extent)
     return kth_extent
 
 
@@ -1327,7 +1326,7 @@ def search_k_motiflets_elbow(
     # backend = "pyattimo"
     if backend == "pyattimo":
         if delta:
-            print(f"PyAttimo: Setting delta to {delta}")
+            print(f"\tPyAttimo: Setting delta to {delta}")
             m_iter = pyattimo.MotifletsIterator(
                 data_raw,
                 w=m,
@@ -1349,8 +1348,8 @@ def search_k_motiflets_elbow(
             )
         try:
             for mot in m_iter:
-                print("n:", n, "m", m, "k", k_max_, "support", mot.support, flush=True)
-                print(mot, flush=True)
+                print("\tn:", n, "m", m, "k", k_max_, "support", mot.support, flush=True)
+                print(f"\t{mot}", flush=True)
 
                 test_k = mot.support
                 if test_k < k_max_:
@@ -1435,6 +1434,11 @@ def search_k_motiflets_elbow(
             k_motiflet_distances[test_k] = candidate_dist
             k_motiflet_candidates[test_k] = candidate
             upper_bound = min(candidate_dist, upper_bound)
+
+
+        del D_full
+        del knns
+
     else:
         raise Exception(
             'Unknown backend: ' + backend + '. ' +
@@ -1626,9 +1630,9 @@ def stitch_and_refine(
 
     assert len(np.unique(idx_stitched)) == len(idx_stitched)
 
-    print("Motiflet", motiflet)
-    print("Window", search_window)
-    print("Parameters", len(ts_stitched), m, k_max, n_jobs, slack)
+    print(f"\tOld Motiflet {motiflet}")
+    print(f"\tSearch Window {search_window}")
+    print(f"\tParameters {len(ts_stitched)}, {m}, {k_max}, {n_jobs}, {slack}")
 
     D_stitched, knns_stitched = compute_distances_with_knns_full(
         ts_stitched,
@@ -1655,6 +1659,9 @@ def stitch_and_refine(
     )
 
     new_motiflet_pos = idx_stitched[candidate]
+
+    del D_stitched
+    del knns_stitched
 
     if (extent == np.inf) or (candidate_extent < extent):
         print(f"Improved extent. Old: {extent}, " +

@@ -31,14 +31,13 @@ def test_motiflets_scale_n(
             gc.collect()
 
             start = time.time()
-            print(backend, n)
+            print(f"\tUsing {backend} size of ts {n}")
 
             ds_name, ts = read_data()
             if isinstance(ts,pd.DataFrame):
                 ts = ts.iloc[:n]
             else:
                 ts = ts[:n]
-
             ts_orig = ts
 
             if (len(ts_orig) <= last_n
@@ -47,25 +46,24 @@ def test_motiflets_scale_n(
             ):
                 break
 
-            print("Size of TS: ", ts.shape)
+            # print("Size of TS: ", ts.shape)
 
             for l in l_range:
                 l_new = l
                 if subsampling:
-                    if isinstance(ts, pd.DataFrame):
-                        ts = ts.iloc[::subsampling]
-                    elif isinstance(ts, pd.Series):
-                        print("Using Mean values")
-                        ts, _ = compute_paa(ts.to_numpy(), subsampling)
+                    if isinstance(ts_orig, pd.DataFrame):
+                        ts = ts_orig.iloc[::subsampling]
+                    elif isinstance(ts_orig, pd.Series):
+                        ts, _ = compute_paa(ts_orig.to_numpy(), subsampling)
                     else:
-                        # ts = ts[::subsampling]
-                        print("Using Mean values")
-                        ts, _ = compute_paa(ts, subsampling)
+                        ts, _ = compute_paa(ts_orig, subsampling)
 
                     l_new = int(np.round(l / subsampling))
-                    print(f"Applying Subsampling, Old Size {ts_orig.shape} New Size {ts.shape}, New Window Size {l_new}")
+                    print(f"\tApplying Subsampling, Old Size {ts_orig.shape} " +
+                          f"New Size {ts.shape}, " +
+                          f"New Window Size {l_new}")
 
-                print(f"Number of cores {cores}")
+                print(f"\tNumber of cores {cores}")
                 mm = Motiflets(
                     ds_name,
                     ts,
@@ -130,10 +128,10 @@ def test_motiflets_scale_n(
                 print("\tDiscovered motiflets in", duration, "seconds")
                 print("\t", current[-1])
 
+                del mm  # free up memory
                 gc.collect()
 
                 last_n = len(ts_orig)
                 last_time = duration
 
-
-    print(results)
+    # print(results)

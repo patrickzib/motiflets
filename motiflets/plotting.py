@@ -791,7 +791,7 @@ def plot_elbow(k_max,
 
     """
     _, raw_data = ml.pd_series_to_numpy(data)
-    print("Data", len(raw_data))
+    # print("Data", len(raw_data))
 
     startTime = time.perf_counter()
     dists, candidates, elbow_points, m, memory_usage = ml.search_k_motiflets_elbow(
@@ -808,12 +808,12 @@ def plot_elbow(k_max,
         delta=delta)
     endTime = (time.perf_counter() - startTime)
 
-    print("Found motiflets in", np.round(endTime, 1), "s")
+    print(f"Found motiflets in {np.round(endTime, 1)} s")
 
     if filter:
         elbow_points = ml.filter_unique(elbow_points, candidates, motif_length)
 
-    print("Elbow Points", elbow_points)
+    print("\tElbow Points", elbow_points)
 
     if plot_elbows:
         _plot_elbow_points(ds_name, data, motif_length, elbow_points, candidates, dists)

@@ -1,7 +1,9 @@
 import traceback
 
+import numpy as np
 import pandas as pd
 import scipy.io as sio
+import scipy.stats
 
 import utils as ut
 
@@ -36,11 +38,17 @@ filenames = {
 
 
 def read_mat(filename):
-    print (f"Reading from {path + filename + '.mat'}")
+    print (f"\tReading from {path + filename + '.mat'}")
     data = sio.loadmat(path + filename + '.mat')
     key = list(data.keys())[3]
-    series = pd.DataFrame(data[key])
-    return series.to_numpy().flatten()
+    data = pd.DataFrame(data[key]).to_numpy().flatten()
+    # data = scipy.stats.zscore(data)
+
+    print(f"\tContains NaN", np.isnan(data).any(), np.isinf(data).any())
+    print(f"\tStats Mean {np.mean(data):0.3f}, Std {np.std(data):0.3f} " +
+          f"Min {np.min(data):0.3f} Max {np.max(data):0.3f}")
+
+    return data
 
 
 def test_motiflets_scale_n(
@@ -66,10 +74,12 @@ def test_motiflets_scale_n(
     )
 
 
-def run_safe(ds_name, series, l_range, k_max, backends, delta, subsampling=None):
+def run_safe(ds_name, series, l_range, k_max, backends, delta=None, subsampling=None):
     try:
-        # n = 10000  # len(series)
-        test_motiflets_scale_n(ds_name, series, n, l_range, k_max, backends=backends, delta=delta, subsampling=subsampling)
+        n = 10000  # len(series)
+        test_motiflets_scale_n(
+            ds_name, series, n,
+            l_range=l_range, k_max=k_max, backends=backends, delta=delta, subsampling=subsampling)
     except Exception as e:
         print(traceback.format_exc())
     except BaseException as e:
@@ -83,6 +93,7 @@ deltas = [None, 0.25]
 def main():
     for ds_name in filenames.keys():
         filename = filenames[ds_name]
+        print (f"Running: {ds_name}")
 
         backends = ["pyattimo"]
         for delta in deltas:
@@ -90,19 +101,15 @@ def main():
                 ds_name, read_mat(filename), l_range, 10, backends, delta
             )
 
-        backends = ["scalable"]
-        run_safe(
-            ds_name, read_mat(filename), l_range, 10, backends, delta
-        )
+        #backends = ["scalable"]
+        # run_safe(
+        #     ds_name, read_mat(filename), l_range, 10, backends
+        # )
 
-        backends = ["scalable"]
-        run_safe(
-            ds_name, read_mat(filename), l_range, 10, backends, delta
-        )
-
-        run_safe(
-            ds_name, read_mat(filename), l_range, 10, backends, delta, subsampling=16
-        )
+        #run_safe(
+        #    ds_name, read_mat(filename),
+        #    l_range=l_range, k_max=10, backends=backends, subsampling=16
+        #)
 
         # break
 
