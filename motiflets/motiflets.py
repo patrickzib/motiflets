@@ -6,14 +6,15 @@
 
 __author__ = ["patrickzib"]
 
-import os
 import itertools
+import logging
+import os
 from ast import literal_eval
 from os.path import exists
 
-import psutil
 import numpy.fft as fft
 import pandas as pd
+import psutil
 import pyattimo
 from joblib import Parallel, delayed
 from numba import prange, objmode, types
@@ -23,8 +24,6 @@ from scipy.stats import zscore
 from tqdm.auto import tqdm
 
 from motiflets.distances import *
-
-import logging
 
 logging.basicConfig(level=logging.CRITICAL)
 pyattimo_logger = logging.getLogger('pyattimo')
@@ -1348,14 +1347,16 @@ def search_k_motiflets_elbow(
             )
         try:
             for mot in m_iter:
-                print("\tn:", n, "m", m, "k", k_max_, "support", mot.support, flush=True)
-                print(f"\t{mot}", flush=True)
+                # print("\tn:", n, "m", m, "k", k_max_, "support", mot.support,
+                #      flush=True)
+                # print(f"\t{mot}", flush=True)
 
                 test_k = mot.support
                 if test_k < k_max_:
-                    # TODO cross-check extent??
                     k_motiflet_distances[test_k] = mot.extent ** 2
                     k_motiflet_candidates[test_k] = np.array(mot.indices)
+
+            print(f"\tMotiflet {k_motiflet_candidates[-1]} extent {k_motiflet_distances[test_k]}", flush=True)
 
             memory_usage = process.memory_info().rss / (1024 * 1024)  # MB
         except:
@@ -1434,7 +1435,6 @@ def search_k_motiflets_elbow(
             k_motiflet_distances[test_k] = candidate_dist
             k_motiflet_candidates[test_k] = candidate
             upper_bound = min(candidate_dist, upper_bound)
-
 
         del D_full
         del knns

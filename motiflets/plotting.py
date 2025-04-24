@@ -34,7 +34,7 @@ class Motiflets:
             slack=0.5,
             n_jobs=4,
             backend="pyattimo",
-            delta = None,
+            delta=None,
     ):
         """Computes the AU_EF plot to extract the best motif lengths
 
@@ -506,12 +506,12 @@ def plot_motifsets(
         #                              'height_ratios': [5, 5]})
 
         fig = plt.figure(constrained_layout=True,
-                         #sharey="row",
-                         #sharex=False,
+                         # sharey="row",
+                         # sharex=False,
                          figsize=(
-                                      max(40, 2 * len(motifsets)),
-                                      10
-                                  )
+                             max(40, 2 * len(motifsets)),
+                             10
+                         )
                          )
         gs = fig.add_gridspec(nrows=3, ncols=len(motifsets))
 
@@ -527,7 +527,8 @@ def plot_motifsets(
     data_raw_sampled, data_index_sampled = data_raw, data_index
 
     if data_raw.shape[0] > max_points:
-        data_index_sampled = MinMaxLTTBDownsampler().downsample(data_raw, n_out=max_points)
+        data_index_sampled = MinMaxLTTBDownsampler().downsample(data_raw,
+                                                                n_out=max_points)
         data_raw_sampled = data_raw[data_index_sampled]
 
     factor = max(1, len(data_raw) / len(data_raw_sampled))
@@ -553,7 +554,8 @@ def plot_motifsets(
                     # fig_ax.set_yticklabels([])
 
                 if factor > 1:
-                    motifset_sampled = np.array(np.array(motifset) // factor, dtype=np.int32)
+                    motifset_sampled = np.array(np.array(motifset) // factor,
+                                                dtype=np.int32)
                 else:
                     motifset_sampled = motifset
 
@@ -643,7 +645,6 @@ def plot_motifsets(
         rect_axes.set_ylim([-abs(len(motifsets)) + 1, 1])
         rect_axes.set_xlim(top_axes.get_xlim())
         rect_axes.set_title("Position of Motifsets", fontsize=20)
-
 
     if isinstance(data, pd.DataFrame):
         top_axes.set_yticklabels(data.index, fontsize=12)
@@ -739,7 +740,7 @@ def plot_elbow(k_max,
                distance=znormed_euclidean_distance,
                distance_preprocessing=sliding_mean_std,
                backend="pyattimo",
-               delta = None
+               delta=None
                ):
     """Plots the elbow-plot for k-Motiflets.
 

@@ -1,27 +1,29 @@
-from datetime import datetime
-
-from motiflets.plotting import *
-from motiflets.motiflets import *
-
-import multiprocessing
 import gc
+import multiprocessing
 import warnings
+
+from motiflets.motiflets import *
+from motiflets.plotting import *
+
 warnings.simplefilter("ignore")
 
 # setting for sonic / sone server
 num_cores = multiprocessing.cpu_count()
 cores = min(64, num_cores - 2)
 
+
 def test_motiflets_scale_n(
         read_data,
         n_range,  # Time Series length range
-        l_range,    # Motif length range
+        l_range,  # Motif length range
         k_max,
         backends=["default", "pyattimo", "scalable"],
-        delta = None,
+        delta=None,
         subsampling=None,
-    ):
-    df = pd.DataFrame(columns=['length', 'backend', 'time in s', 'memory in MB', "extent", "motiflet"])
+):
+    df = pd.DataFrame(
+        columns=['length', 'backend', 'time in s', 'memory in MB', "extent",
+                 "motiflet"])
 
     last_time = -1
     results = []
@@ -34,7 +36,7 @@ def test_motiflets_scale_n(
             print(f"\tUsing {backend} size of ts {n}")
 
             ds_name, ts = read_data()
-            if isinstance(ts,pd.DataFrame):
+            if isinstance(ts, pd.DataFrame):
                 ts = ts.iloc[:n]
             else:
                 ts = ts[:n]
@@ -42,7 +44,7 @@ def test_motiflets_scale_n(
 
             if (len(ts_orig) <= last_n
                     or (backend == "default" and len(ts) > 500_000) \
-                    or (last_time > 3600)     # larger than 2 hours
+                    or (last_time > 3600)  # larger than 2 hours
             ):
                 break
 
@@ -81,7 +83,7 @@ def test_motiflets_scale_n(
                 motiflet = motiflets[-1]
 
                 if subsampling:
-                    motiflet = np.array(motiflet) * subsampling   # scale up again
+                    motiflet = np.array(motiflet) * subsampling  # scale up again
 
                 if backend == "pyattimo" or subsampling:
                     # try to refine the positions of the motiflets
@@ -90,7 +92,8 @@ def test_motiflets_scale_n(
                         m=l,
                         motiflet=motiflet,
                         extent=np.inf if subsampling else extent,
-                        search_window=l * 4,  # search in a local neighborhood of 4 times the motif length
+                        search_window=l * 4,
+                        # search in a local neighborhood of 4 times the motif length
                         # upper_bound=extent  # does not work with subsampling
                     )
 
@@ -109,7 +112,8 @@ def test_motiflets_scale_n(
 
                 duration = time.time() - start
                 memory_usage = mm.memory_usage
-                current = [len(ts_orig), backend_name, duration, memory_usage, extent, motiflet]
+                current = [len(ts_orig), backend_name, duration, memory_usage, extent,
+                           motiflet]
 
                 results.append(current)
                 df.loc[len(df.index)] = current
@@ -133,5 +137,8 @@ def test_motiflets_scale_n(
 
                 last_n = len(ts_orig)
                 last_time = duration
+
+        del ts_orig
+        del ts
 
     # print(results)
