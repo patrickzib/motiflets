@@ -10,7 +10,7 @@ import utils as ut
 path = "../datasets/momp/"
 
 filenames = {
-    "Bird12": ["22.5 hours of Chicken data at 100 Hz", 16384, ""],
+    "Bird12-Week3_2018_1_10": ["22.5 hours of Chicken data at 100 Hz", 16384, ""],
     "BlackLeggedKittiwake": ["Flying Bird: Black‐legged Kittiwake", 8192, "?"],
     "Challenge2009Respiration500HZ": ["Challenge 2009 Respiration", 16384, "?"],
     "Challenge2009TestSetA_101a": ["Respiration", 4096, "?"],
@@ -38,12 +38,20 @@ filenames = {
 
 
 def read_mat(filename):
-    print (f"\tReading from {path + filename + '.mat'}")
+    print (f"\tReading {filename} from {path + filename + '.mat'}")
     data = sio.loadmat(path + filename + '.mat')
+
+    # extract data array
     key = list(data.keys())[3]
+
+    # flatten output
     data = pd.DataFrame(data[key]).to_numpy().flatten()
+
     # data = scipy.stats.zscore(data)
 
+    mb = (data.size * data.itemsize) / (1024 ** 2)
+
+    print(f"\tLength: {len(data)} {mb:0.2f} MB")
     print(f"\tContains NaN or Inf? {np.isnan(data).any()} {np.isinf(data).any()}")
     print(f"\tStats Mean {np.mean(data):0.3f}, Std {np.std(data):0.3f} " +
           f"Min {np.min(data):0.3f} Max {np.max(data):0.3f}")
@@ -100,15 +108,16 @@ l_range = [2**7, 2**8, 2**9, 2**10, 2**11, 2**12, 2**13, 2**14]
 deltas = [None, 0.5]
 
 def main():
-    for ds_name in filenames.keys():
-        filename = filenames[ds_name]
+    for filename in filenames.keys():
+        ds_name, length, meaning = filenames[filename]
         print (f"Running: {ds_name}")
+        data = read_mat(filename)
 
-        backends = ["pyattimo"]
-        for delta in deltas:
-            run_safe(
-                ds_name, read_mat(filename), l_range, 10, backends, delta
-            )
+        # backends = ["pyattimo"]
+        # for delta in deltas:
+        #     run_safe(
+        #         ds_name, read_mat(filename), l_range, 10, backends, delta
+        #     )
 
         #backends = ["scalable"]
         # run_safe(
