@@ -44,7 +44,7 @@ def read_mat(filename):
     data = pd.DataFrame(data[key]).to_numpy().flatten()
     # data = scipy.stats.zscore(data)
 
-    print(f"\tContains NaN", np.isnan(data).any(), np.isinf(data).any())
+    print(f"\tContains NaN or Inf? {np.isnan(data).any()} {np.isinf(data).any()}")
     print(f"\tStats Mean {np.mean(data):0.3f}, Std {np.std(data):0.3f} " +
           f"Min {np.min(data):0.3f} Max {np.max(data):0.3f}")
 
@@ -97,7 +97,7 @@ def run_safe(ds_name, series, l_range, k_max, backends, delta=None, subsampling=
 l_range = [2**7, 2**8, 2**9, 2**10, 2**11, 2**12, 2**13, 2**14]
 
 # ks = [5, 10, 20]
-deltas = [None, 0.25]
+deltas = [None, 0.5]
 
 def main():
     for ds_name in filenames.keys():
