@@ -113,7 +113,7 @@ def test_motiflets_scale_n(
         subsampling = None,
         use_1m=True
     ):
-    length_range = 50_000 * np.arange(1, 200, 1)
+    length_range = 100_000 * np.arange(1, 200, 1)
     l = 125  # 23
     k_max = 10  # 20
 

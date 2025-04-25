@@ -10,30 +10,30 @@ import utils as ut
 path = "../datasets/momp/"
 
 filenames = {
-    "Bird12": "Bird12-Week3_2018_1_10",
-    "BlackLeggedKittiwake": "BlackLeggedKittiwake",
-    "Challenge2009Respiration500HZ": "Challenge2009Respiration500HZ",
-    "Challenge2009TestSetA_101a": "Challenge2009TestSetA_101a",
-    "CinC_Challenge": "CinC_Challenge",
-    "EOG_one_hour_50_Hz": "EOG_one_hour_50_Hz",
-    "EOG_one_hour_400_Hz": "EOG_one_hour_400_Hz",
-    "FingerFlexionECoG": "FingerFlexionECoG",
-    "HAR_Ambient_Sensor_Data": "HAR_Ambient_Sensor_Data",
-    "house": "house",
-    "Lab_FD_061014": "Lab_FD_061014",
-    "Lab_K_060314": "Lab_K_060314",
-    "lorenzAttractorsLONG": "lorenzAttractorsLONG",
-    "MGHSleepElectromyography": "MGHSleepElectromyography",
-    "recorddata": "recorddata",
-    "solarwind": "solarwind",
-    "SpainishEnergyDataset": "SpainishEnergyDataset",
-    "SpainishEnergyDataset5sec": "SpainishEnergyDataset5sec",
-    "stator_winding": "stator_winding",
-    "swtAttack7": "swtAttack7",
-    "swtAttack38": "swtAttack38",
-    "SynchrophasorEventsLarge": "SynchrophasorEventsLarge",
-    "water": "water",
-    "WindTurbine": "WindTurbine"
+    "Bird12": ["22.5 hours of Chicken data at 100 Hz", 16384, ""],
+    "BlackLeggedKittiwake": ["Flying Bird: Black‐legged Kittiwake", 8192, "?"],
+    "Challenge2009Respiration500HZ": ["Challenge 2009 Respiration", 16384, "?"],
+    "Challenge2009TestSetA_101a": ["Respiration", 4096, "?"],
+    "CinC_Challenge": ["Electroencephalography C3-M2 Part 2", 8192, "Calibration"],
+    "EOG_one_hour_50_Hz": ["EOG_one_hour_50_Hz", 2048, "?"],
+    "EOG_one_hour_400_Hz": ["EOG_one_hour_400_Hz", 8192, "?"],
+    "FingerFlexionECoG": ["Finger Flexion ECoG electrocorticography", 16384, "?"],
+    "HAR_Ambient_Sensor_Data": ["Human Activity Recognition", 4096, "?"],
+    "house": ["Household Electrical Demand", 32768, "?"],
+    "Lab_FD_061014": ["Insect EPG - Flaming Dragon", 32768, "?"],
+    "Lab_K_060314": ["ACP on Kryder Citrus", 65536, ""],
+    "lorenzAttractorsLONG": ["Lorenz Attractors", 524288, "?"],
+    "MGHSleepElectromyography": ["MGH Sleep Electromyography 200 Hz", 32768, "?"],
+    "recorddata": ["EOG Example", 2048, "?"],
+    "solarwind": ["Solar Wind", 32768, "?"],
+    "SpainishEnergyDataset": ["SpainishEnergyDataset", np.nan, "?"],
+    "SpainishEnergyDataset5sec": ["Spainish Energy Dataset 5 sec", 524288, "?"],
+    "stator_winding": ["Electric Motor Temperature", 32768, "?"],
+    "swtAttack7": ["Swat Attack 7", 4 * 16 * 256, "?"],
+    "swtAttack38": ["Swat Attack 38", 16 * 256, "?"],
+    "SynchrophasorEventsLarge": ["Synchrophasor Events Large", 256 * 2 * 128, "?"],
+    "water": ["Water Demand", 8192, ""],
+    "WindTurbine": ["Wind Turbine R24VMON Rotating system", 32768, "Precursor Dropout"]
 }
 
 
@@ -47,6 +47,12 @@ def read_mat(filename):
     print(f"\tContains NaN", np.isnan(data).any(), np.isinf(data).any())
     print(f"\tStats Mean {np.mean(data):0.3f}, Std {np.std(data):0.3f} " +
           f"Min {np.min(data):0.3f} Max {np.max(data):0.3f}")
+
+    # remove NaNs
+    data = data[~np.isnan(data)]
+
+    # remove Infs
+    data = data[np.isfinite(data)]
 
     # np.savetxt(path + "/csv/" + filename + ".csv", data[:100000], delimiter=",")
     return data
@@ -87,7 +93,9 @@ def run_safe(ds_name, series, l_range, k_max, backends, delta=None, subsampling=
         print(f"Caught a panic: {e}")
 
 
-l_range = [128, 256, 512, 1024, 2048]
+# 128 to 8192
+l_range = [2**7, 2**8, 2**9, 2**10, 2**11, 2**12, 2**13, 2**14]
+
 # ks = [5, 10, 20]
 deltas = [None, 0.25]
 
