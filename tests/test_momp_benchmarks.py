@@ -108,6 +108,7 @@ l_range = [2**7, 2**8, 2**9, 2**10, 2**11, 2**12, 2**13, 2**14]
 deltas = [None, 0.5]
 
 def main():
+
     for filename in filenames.keys():
         ds_name, length, meaning = filenames[filename]
         print (f"Running: {ds_name}")

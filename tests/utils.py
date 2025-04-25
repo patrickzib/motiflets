@@ -73,7 +73,7 @@ def test_motiflets_scale_n(
                     n_jobs=cores,
                     delta=delta)
 
-                dists, motiflets, _ = mm.fit_k_elbow(
+                dists, motiflets, elbow_points = mm.fit_k_elbow(
                     k_max,
                     l_new,
                     plot_elbows=False,
@@ -112,8 +112,8 @@ def test_motiflets_scale_n(
 
                 duration = time.time() - start
                 memory_usage = mm.memory_usage
-                current = [len(ts_orig), backend_name, duration, memory_usage, extent,
-                           motiflet]
+                current = [len(ts_orig), backend_name, duration,
+                           memory_usage, extent, motiflet, elbow_points]
 
                 results.append(current)
                 df.loc[len(df.index)] = current
