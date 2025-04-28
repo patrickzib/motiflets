@@ -1332,6 +1332,7 @@ def search_k_motiflets_elbow(
                 support=k_max_ - 1,
                 exclusion_zone=exclusion_m,
                 delta=delta,
+                max_memory="20 GB",
                 stop_on_threshold=True,
                 fraction_threshold=np.log(n) / n
             )
@@ -1339,6 +1340,7 @@ def search_k_motiflets_elbow(
             m_iter = pyattimo.MotifletsIterator(
                 data_raw,
                 w=m,
+                max_memory="20 GB",
                 support=k_max_ - 1,
                 exclusion_zone=exclusion_m,
                 # delta=0.5,
