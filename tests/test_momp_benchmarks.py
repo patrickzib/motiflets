@@ -91,7 +91,7 @@ def test_motiflets_scale_n(
 
 def run_safe(ds_name, series, l_range, k_max, backends, delta=None, subsampling=None):
     try:
-        n = 10000  # len(series)
+        n = len(series)
         test_motiflets_scale_n(
             ds_name, series, n,
             l_range=l_range, k_max=k_max, backends=backends, delta=delta, subsampling=subsampling)
@@ -102,35 +102,39 @@ def run_safe(ds_name, series, l_range, k_max, backends, delta=None, subsampling=
 
 
 # 128 to 8192
-l_range = [2**7, 2**8, 2**9, 2**10, 2**11, 2**12, 2**13, 2**14]
+# 2**7,
+l_range = [2**8, 2**9, 2**10, 2**11, 2**12, 2**13, 2**14]
 
 # ks = [5, 10, 20]
 deltas = [None, 0.5]
+
+k_max = 10
 
 def main():
 
     for filename in filenames.keys():
         ds_name, length, meaning = filenames[filename]
         print (f"Running: {ds_name}")
-        data = read_mat(filename)
 
-        # backends = ["pyattimo"]
-        # for delta in deltas:
-        #     run_safe(
-        #         ds_name, read_mat(filename), l_range, 10, backends, delta
-        #     )
+        # pyattimo
+        backends = ["pyattimo"]
+        for delta in deltas:
+            run_safe(
+                filename, read_mat(filename), l_range, k_max, backends, delta
+            )
 
-        #backends = ["scalable"]
-        # run_safe(
-        #     ds_name, read_mat(filename), l_range, 10, backends
-        # )
+        # scalable
+        backends = ["scalable"]
+        run_safe(
+            filename, read_mat(filename), l_range, k_max, backends
+        )
 
-        #run_safe(
-        #    ds_name, read_mat(filename),
-        #    l_range=l_range, k_max=10, backends=backends, subsampling=16
-        #)
-
-        # break
+        # subsampling
+        for subsampling in [8, 16]:
+           run_safe(
+              filename, read_mat(filename),
+              l_range=l_range, k_max=k_max, backends=backends, subsampling=subsampling
+           )
 
 
 if __name__ == "__main__":
