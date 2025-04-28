@@ -102,8 +102,8 @@ def run_safe(ds_name, series, l_range, k_max, backends, delta=None, subsampling=
 
 
 # 128 to 8192
-# 2**7,
-l_range = [2**8, 2**9, 2**10, 2**11, 2**12, 2**13]
+#,
+l_range = [2**7, 2**8, 2**9, 2**10, 2**11, 2**12, 2**13]
 
 # ks = [5, 10, 20]
 deltas = [0.5]
@@ -114,7 +114,7 @@ def main():
 
     for filename in filenames.keys():
         ds_name, length, meaning = filenames[filename]
-        print (f"Running: {ds_name}")
+        print (f"Running: {filename, ds_name}")
 
         # pyattimo
         backends = ["pyattimo"]
@@ -124,10 +124,10 @@ def main():
             )
 
         # scalable
-        backends = ["scalable"]
-        run_safe(
-            filename, read_mat(filename), l_range, k_max, backends
-        )
+        # backends = ["scalable"]
+        # run_safe(
+        #    filename, read_mat(filename), l_range, k_max, backends
+        # )
 
         # # subsampling
         # backends = ["scalable"]
