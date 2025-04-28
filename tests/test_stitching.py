@@ -41,7 +41,7 @@ def test_discover_motiflets():
         motif_length,
         motiflet,
         extent,
-        motif_length * 4,
+        search_window=min(4*motif_length, 1024),
         upper_bound=extent
     )
     print(f"Original motiflet: {motiflet}, size {len(motiflet)} with extent {extent}")

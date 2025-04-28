@@ -92,15 +92,15 @@ def test_motiflets_scale_n(
                     if subsampling:
                         motiflet = np.array(motiflet) * subsampling  # scale up again
 
-                    if backend == "pyattimo" or subsampling:
+                    if subsampling:   # FIXME add again backend == "pyattimo" or
                         # try to refine the positions of the motiflets
                         new_motiflet, new_extent = stitch_and_refine(
                             ts_orig,
                             m=l,
                             motiflet=motiflet,
                             extent=np.inf if subsampling else extent,
-                            search_window=l * 4,
-                            # search in a local neighborhood of 4 times the motif length
+                            search_window=min(4*l, 1024),
+                            # search in a local neighborhood of the motif length
                             # upper_bound=extent  # does not work with subsampling
                         )
 

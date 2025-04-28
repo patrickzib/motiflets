@@ -1611,6 +1611,9 @@ def stitch_and_refine(
     """
     assert search_window > m
 
+    # avoid excessive memory
+    search_window = min(1024, search_window)
+
     _, data_raw = pd_series_to_numpy(data)
     k_max = len(motiflet) + 1
 
@@ -1636,6 +1639,12 @@ def stitch_and_refine(
     print(f"\tSearch Window {search_window}")
     print(f"\tParameters {len(ts_stitched)}, {m}, {k_max}, {n_jobs}, {slack}")
 
+    # avoid excessive memory consumption
+    assert len(ts_stitched) < 64_000   # FIXME?!
+    #    print(f"Stitch and Refine not possible. Avoiding excessive Memory")
+    #    return motiflet, extent
+
+    # TODO: change to sparse implementation???
     D_stitched, knns_stitched = compute_distances_with_knns_full(
         ts_stitched,
         m=m,
