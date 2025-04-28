@@ -10,7 +10,7 @@ import utils as ut
 path = "../datasets/momp/"
 
 filenames = {
-    # "Bird12-Week3_2018_1_10": ["22.5 hours of Chicken data at 100 Hz", 16384, ""],
+    "Bird12-Week3_2018_1_10": ["22.5 hours of Chicken data at 100 Hz", 16384, ""],
     "BlackLeggedKittiwake": ["Flying Bird: Black‐legged Kittiwake", 8192, "?"],
     "Challenge2009Respiration500HZ": ["Challenge 2009 Respiration", 16384, "?"],
     "Challenge2009TestSetA_101a": ["Respiration", 4096, "?"],
@@ -116,20 +116,21 @@ def main():
         ds_name, length, meaning = filenames[filename]
         print (f"Running: {ds_name}")
 
-        # pyattimo
-        backends = ["pyattimo"]
-        for delta in deltas:
-            run_safe(
-                filename, read_mat(filename), l_range, k_max, backends, delta
-            )
-
-        # scalable
-        backends = ["scalable"]
-        run_safe(
-            filename, read_mat(filename), l_range, k_max, backends
-        )
+        # # pyattimo
+        # backends = ["pyattimo"]
+        # for delta in deltas:
+        #     run_safe(
+        #         filename, read_mat(filename), l_range, k_max, backends, delta
+        #     )
+        #
+        # # scalable
+        # backends = ["scalable"]
+        # run_safe(
+        #     filename, read_mat(filename), l_range, k_max, backends
+        # )
 
         # subsampling
+        backends = ["scalable"]
         for subsampling in [8, 16]:
            run_safe(
               filename, read_mat(filename),
