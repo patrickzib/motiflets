@@ -10,7 +10,7 @@ import utils as ut
 path = "../datasets/momp/"
 
 filenames = {
-    "Bird12-Week3_2018_1_10": ["22.5 hours of Chicken data at 100 Hz", 16384, ""],
+    # "Bird12-Week3_2018_1_10": ["22.5 hours of Chicken data at 100 Hz", 16384, ""],
     "BlackLeggedKittiwake": ["Flying Bird: Black‐legged Kittiwake", 8192, "?"],
     "Challenge2009Respiration500HZ": ["Challenge 2009 Respiration", 16384, "?"],
     "Challenge2009TestSetA_101a": ["Respiration", 4096, "?"],
@@ -106,7 +106,7 @@ def run_safe(ds_name, series, l_range, k_max, backends, delta=None, subsampling=
 l_range = [2**8, 2**9, 2**10, 2**11, 2**12, 2**13, 2**14]
 
 # ks = [5, 10, 20]
-deltas = [None, 0.5]
+deltas = [0.5]
 
 k_max = 10
 
