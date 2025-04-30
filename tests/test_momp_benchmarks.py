@@ -10,15 +10,15 @@ import utils as ut
 path = "../datasets/momp/"
 
 filenames = {
-    "Bird12-Week3_2018_1_10": ["22.5 hours of Chicken data at 100 Hz", 16384, ""],
-    "BlackLeggedKittiwake": ["Flying Bird: Black‐legged Kittiwake", 8192, "?"],
-    "Challenge2009Respiration500HZ": ["Challenge 2009 Respiration", 16384, "?"],
-    "Challenge2009TestSetA_101a": ["Respiration", 4096, "?"],
-    "CinC_Challenge": ["Electroencephalography C3-M2 Part 2", 8192, "Calibration"],
-    "EOG_one_hour_50_Hz": ["EOG_one_hour_50_Hz", 2048, "?"],
-    "EOG_one_hour_400_Hz": ["EOG_one_hour_400_Hz", 8192, "?"],
-    "FingerFlexionECoG": ["Finger Flexion ECoG electrocorticography", 16384, "?"],
-    "HAR_Ambient_Sensor_Data": ["Human Activity Recognition", 4096, "?"],
+    # "Bird12-Week3_2018_1_10": ["22.5 hours of Chicken data at 100 Hz", 16384, ""],
+    # "BlackLeggedKittiwake": ["Flying Bird: Black‐legged Kittiwake", 8192, "?"],
+    # "Challenge2009Respiration500HZ": ["Challenge 2009 Respiration", 16384, "?"],
+    # "Challenge2009TestSetA_101a": ["Respiration", 4096, "?"],
+    # "CinC_Challenge": ["Electroencephalography C3-M2 Part 2", 8192, "Calibration"],
+    # "EOG_one_hour_50_Hz": ["EOG_one_hour_50_Hz", 2048, "?"],
+    # "EOG_one_hour_400_Hz": ["EOG_one_hour_400_Hz", 8192, "?"],
+    #"FingerFlexionECoG": ["Finger Flexion ECoG electrocorticography", 16384, "?"],
+    #"HAR_Ambient_Sensor_Data": ["Human Activity Recognition", 4096, "?"],
     "house": ["Household Electrical Demand", 32768, "?"],
     "Lab_FD_061014": ["Insect EPG - Flaming Dragon", 32768, "?"],
     "Lab_K_060314": ["ACP on Kryder Citrus", 65536, ""],
@@ -102,8 +102,8 @@ def run_safe(ds_name, series, l_range, k_max, backends, delta=None, subsampling=
 
 
 # 128 to 8192
-#,
-l_range = [2**7, 2**8, 2**9, 2**10, 2**11, 2**12, 2**13]
+#, 2**9, 2**10, 2**11,
+l_range = [2**12, 2**13]
 
 # ks = [5, 10, 20]
 deltas = [0.5]
