@@ -4,6 +4,8 @@
 
 __author__ = ["patrickzib"]
 
+from unittest.mock import inplace
+
 import numpy as np
 from numba import njit
 
@@ -141,7 +143,7 @@ def sliding_mean_std(ts, m):
 
     # avoid dividing by too small std, like 0
     moving_std = np.sqrt(np.clip(segSumSq / m - (segSum / m) ** 2, 0, None))
-    moving_std = np.where(np.abs(moving_std) < 0.1, 1, moving_std)
+    moving_std = np.where(moving_std < 1e-4, 0.1, moving_std)
 
     return [moving_mean, moving_std]
 
@@ -152,6 +154,7 @@ def znormed_euclidean_distance(dot_rolled, n, m, preprocessing, order, halve_m):
     means, stds = preprocessing
     dist = 2 * m * (1 - (dot_rolled - m * means * means[order]) / (
             m * stds * stds[order]))
+    dist = np.maximum(dist, 0)
 
     # self-join: exclusion zone
     trivialMatchRange = (max(0, order - halve_m), min(order + halve_m, n))
