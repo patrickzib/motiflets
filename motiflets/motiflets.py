@@ -465,16 +465,8 @@ def compute_distances_with_knns_sparse(
     # Store an upper bound for each k-nn distance
     kth_extent = compute_upper_bound(
         D_knn,
-        distance,
-        distance_preprocessing,
-        k, knns, m,
-        n_jobs, slack, ts)
-
-    # Store an upper bound for each k-nn distance
-    # kth_extent = np.zeros(k, dtype=np.float64)
-    # kth_extent[0] = np.inf
-    # for k in range(1, len(kth_extent)):
-    #   kth_extent[k] = 4 * np.min(D_knn[:, k])  # diameter^2 = (2r)^2
+        True,  # FIXME
+        k, knns, m, ts)
 
     # FIXME: Parallelizm does not work, as Dict is not thread safe :(
     for order in np.arange(0, n):
@@ -584,63 +576,54 @@ def compute_distances_with_knns(
 @njit(fastmath=True, cache=True)
 def compute_upper_bound(
         D_knn,
-        distance,
-        distance_preprocessing,
+        z_normed_dist,
         k,
         knns,
         m,
-        n_jobs,
-        slack,
         ts):
     kth_extent = np.zeros(k, dtype=np.float64)
     kth_extent[0] = np.inf
 
     for kk in range(1, len(kth_extent)):
-        # kk is the kk-th NN
-        # The motiflet candidate has thus kk+1 elements (including the query itself)
-        best_knn_pos = np.argmin(D_knn[:, kk])
-        motiflet_candidate = knns[best_knn_pos, :kk + 1]
+        if z_normed_dist:
+            # kk is the kk-th NN
+            # The motiflet candidate has thus kk+1 elements (including the query itself)
+            best_knn_pos = np.argmin(D_knn[:, kk])
+            motiflet_candidate = knns[best_knn_pos, :kk + 1]
 
-        # stitch only the offsets needed
-        parts_to_stitch = []
-        for pos in np.sort(motiflet_candidate):
-            start = pos
-            end = pos + m
-            parts_to_stitch.extend(ts[start:end])
+            extent = np.float64(0.0)
 
-        extent = np.float64(0.0)
+            # compute the mean and std of the motiflet candidate
+            means, stds = sliding_mean_std(ts, m)
 
-        # compute the mean and std of the motiflet candidate
-        means, stds = sliding_mean_std(ts, m)
+            for i in np.arange(len(motiflet_candidate) - 1):
+                A = ts[motiflet_candidate[i]:motiflet_candidate[i] + m]
+                mean_A = means[motiflet_candidate[i]]
+                std_A = stds[motiflet_candidate[i]]
 
-        for i in np.arange(len(motiflet_candidate) - 1):
-            A = ts[motiflet_candidate[i]:motiflet_candidate[i] + m]
-            mean_A = means[motiflet_candidate[i]]
-            std_A = stds[motiflet_candidate[i]]
+                for j in np.arange(i + 1, len(motiflet_candidate)):
+                    B = ts[motiflet_candidate[j]:motiflet_candidate[j] + m]
+                    mean_B = means[motiflet_candidate[j]]
+                    std_B = stds[motiflet_candidate[j]]
 
-            for j in np.arange(i + 1, len(motiflet_candidate)):
-                B = ts[motiflet_candidate[j]:motiflet_candidate[j] + m]
-                mean_B = means[motiflet_candidate[j]]
-                std_B = stds[motiflet_candidate[j]]
+                    # TODO this does not work with TS with a std close to 1e-4 (cutoff value)
+                    # z_dist = ((A - mean_A) / std_A) - ((B - mean_B) / std_B)
+                    # z_dist = z_dist @ z_dist
 
-                # TODO this does not work with TS with a std close to 1e-4 (cutoff value)
-                #z_dist = ((A - mean_A) / std_A) - ((B - mean_B) / std_B)
-                #z_dist = z_dist @ z_dist
+                    z_dist = 2 * m * (1 - (np.dot(A, B) - m * mean_A * mean_B) / (
+                                m * std_A * std_B))
+                    extent = max(z_dist, extent)
+            kth_extent[kk] = extent
 
-                z_dist = 2 * m * (1 - (np.dot(A, B) - m * mean_A * mean_B) / (m * std_A * std_B))
-                extent = max(z_dist, extent)
-        kth_extent[kk] = extent
+            # extent must be within the diameter of the sphere
+            kth_nn_min = np.min(D_knn[:, kk])
+            if kth_extent[kk] > 4 * kth_nn_min or kth_extent[kk] < kth_nn_min:
+                kth_extent[kk] = kth_nn_min
 
-        # extent must be within the diameter of the sphere
-        minimum = D_knn[:, kk]
-
-        kth_nn_min = np.min(minimum)
-        if kth_extent[kk] > 4 * kth_nn_min or kth_extent[kk] < kth_nn_min:
-            kth_extent[kk] = kth_nn_min
-
-        # TODO this does not work with TS with a std close to 1e-4 (cutoff value)
-        assert kth_extent[kk] <= 4 * kth_nn_min
-        assert kth_extent[kk] >= kth_nn_min
+            assert kth_extent[kk] <= 4 * kth_nn_min
+            assert kth_extent[kk] >= kth_nn_min
+        else:
+            kth_extent[kk] = 4 * np.min(D_knn[:, kk])
 
     return kth_extent
 
@@ -683,10 +666,8 @@ def compute_distances_with_knns_stitch(
     # Store an upper bound for each k-nn distance
     kth_extent = compute_upper_bound(
         D_knn,
-        distance,
-        distance_preprocessing,
-        k, knns, m,
-        n_jobs, slack, ts)
+        True,  # FIXME
+        k, knns, m, ts)
 
     # compute potential offsets to use from k-NNs
     idx_stitched, ts_stitched = extract_stitched_time_series(
@@ -738,6 +719,7 @@ def extract_stitched_time_series(
                 for pos in knns[order, :kk + 1]:
                     stitch_offsets[pos: pos + m] = True
                 break
+
     # Stitching offsets, and computing the distance matrix on stitched parts
     idx_stitched = np.arange(len(ts), dtype=np.int32)[stitch_offsets]
     ts_stitched = ts[stitch_offsets]
@@ -1349,11 +1331,11 @@ def search_k_motiflets_elbow(
             stop_on_threshold = True
             fraction_threshold = np.log(n) / n
             support = k_max_ - 1
-            print(f"\tPyAttimo: Setting "+
-                  f"\n\t\tdelta={delta}, "+
+            print(f"\tPyAttimo: Setting " +
+                  f"\n\t\tdelta={delta}, " +
                   f"\n\t\tsupport={support}, " +
-                  f"\n\t\tmax_memory={max_memory}, "+
-                  f"\n\t\tstop_on_threshold={stop_on_threshold}, "+
+                  f"\n\t\tmax_memory={max_memory}, " +
+                  f"\n\t\tstop_on_threshold={stop_on_threshold}, " +
                   f"\n\t\tfraction_threshold={fraction_threshold}")
             m_iter = pyattimo.MotifletsIterator(
                 data_raw,
@@ -1414,6 +1396,7 @@ def search_k_motiflets_elbow(
 
             """
             elements = 0
+            for A in D_full:
             for A in D_full:
                 elements += len(A)
             n = (data_raw.shape[0] - m + 1)
