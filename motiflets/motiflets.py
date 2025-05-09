@@ -12,6 +12,7 @@ import os
 from ast import literal_eval
 from os.path import exists
 
+import numpy as np
 import numpy.fft as fft
 import pandas as pd
 import psutil
@@ -607,32 +608,51 @@ def compute_upper_bound(
             end = pos + m
             parts_to_stitch.extend(ts[start:end])
 
-        idx = np.arange(0, len(motiflet_candidate)) * m
+        extent = np.float64(0.0)
 
-        D_refine, _ = compute_distances_with_knns_full(
-            np.array(parts_to_stitch), m,
-            k=2,  # k is actually not needed
-            n_jobs=n_jobs,
-            slack=slack,
-            exclude_trivial_match=False,
-            distance=distance,
-            distance_preprocessing=distance_preprocessing
-        )
+        # compute the mean and std of the motiflet candidate
+        means, stds = sliding_mean_std(ts, m)
 
-        # compute extent
-        extent = get_pairwise_extent(D_refine, idx, np.inf)
+        for i in np.arange(len(motiflet_candidate) - 1):
+            A = ts[motiflet_candidate[i]:motiflet_candidate[i] + m]
+            mean_A = means[motiflet_candidate[i]]
+            std_A = stds[motiflet_candidate[i]]
+
+            for j in np.arange(i + 1, len(motiflet_candidate)):
+                B = ts[motiflet_candidate[j]:motiflet_candidate[j] + m]
+                mean_B = means[motiflet_candidate[j]]
+                std_B = stds[motiflet_candidate[j]]
+
+                # TODO this does not work with TS with a std close to 1e-4 (cutoff value)
+                #z_dist = ((A - mean_A) / std_A) - ((B - mean_B) / std_B)
+                #z_dist = z_dist @ z_dist
+
+                z_dist = 2 * m * (1 - (np.dot(A, B) - m * mean_A * mean_B) / (m * std_A * std_B))
+                extent = max(z_dist, extent)
         kth_extent[kk] = extent
 
         # extent must be within the diameter of the sphere
         minimum = D_knn[:, kk]
 
-        if extent > 4 * np.min(minimum) or extent < np.min(minimum):
-            print("Extent", motiflet_candidate, idx, extent, np.min(minimum))
+        kth_nn_min = np.min(minimum)
+        if kth_extent[kk] > 4 * kth_nn_min or kth_extent[kk] < kth_nn_min:
+            kth_extent[kk] = kth_nn_min
 
-        assert extent <= 4 * np.min(minimum)
-        assert extent >= np.min(minimum) - 1e-6  # avoid floating point errors
+        # TODO this does not work with TS with a std close to 1e-4 (cutoff value)
+        assert kth_extent[kk] <= 4 * kth_nn_min
+        assert kth_extent[kk] >= kth_nn_min
 
     return kth_extent
+
+
+@njit(fastmath=True, cache=True)
+def my_ceil(a, precision=0):
+    return np.round(a + 0.5 * 10 ** (-precision), precision)
+
+
+@njit(fastmath=True, cache=True)
+def my_floor(a, precision=0):
+    return np.round(a - 0.5 * 10 ** (-precision), precision)
 
 
 @njit(fastmath=True, cache=True, parallel=True)
@@ -1332,7 +1352,7 @@ def search_k_motiflets_elbow(
                 support=k_max_ - 1,
                 exclusion_zone=exclusion_m,
                 delta=delta,
-                max_memory="20 GB",
+                max_memory="1 GB",
                 stop_on_threshold=True,
                 fraction_threshold=np.log(n) / n
             )
@@ -1340,7 +1360,7 @@ def search_k_motiflets_elbow(
             m_iter = pyattimo.MotifletsIterator(
                 data_raw,
                 w=m,
-                max_memory="20 GB",
+                max_memory="1 GB",
                 support=k_max_ - 1,
                 exclusion_zone=exclusion_m,
                 # delta=0.5,
@@ -1358,7 +1378,9 @@ def search_k_motiflets_elbow(
                     k_motiflet_distances[test_k] = mot.extent ** 2
                     k_motiflet_candidates[test_k] = np.array(mot.indices)
 
-            print(f"\tMotiflet {k_motiflet_candidates[-1]} extent {k_motiflet_distances[test_k]}", flush=True)
+            print(
+                f"\tMotiflet {k_motiflet_candidates[-1]} extent {k_motiflet_distances[test_k]}",
+                flush=True)
 
             memory_usage = process.memory_info().rss / (1024 * 1024)  # MB
         except:
@@ -1640,7 +1662,7 @@ def stitch_and_refine(
     print(f"\tParameters {len(ts_stitched)}, {m}, {k_max}, {n_jobs}, {slack}")
 
     # avoid excessive memory consumption
-    assert len(ts_stitched) < 64_000   # FIXME?!
+    assert len(ts_stitched) < 64_000  # FIXME?!
     #    print(f"Stitch and Refine not possible. Avoiding excessive Memory")
     #    return motiflet, extent
 
