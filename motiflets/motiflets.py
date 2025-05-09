@@ -1345,22 +1345,31 @@ def search_k_motiflets_elbow(
     # backend = "pyattimo"
     if backend == "pyattimo":
         if delta:
-            print(f"\tPyAttimo: Setting delta to {delta}")
+            max_memory = "20 GB"
+            stop_on_threshold = True
+            fraction_threshold = np.log(n) / n
+            support = k_max_ - 1
+            print(f"\tPyAttimo: Setting "+
+                  f"\n\t\tdelta={delta}, "+
+                  f"\n\t\tsupport={support}, " +
+                  f"\n\t\tmax_memory={max_memory}, "+
+                  f"\n\t\tstop_on_threshold={stop_on_threshold}, "+
+                  f"\n\t\tfraction_threshold={fraction_threshold}")
             m_iter = pyattimo.MotifletsIterator(
                 data_raw,
                 w=m,
-                support=k_max_ - 1,
+                support=support,
                 exclusion_zone=exclusion_m,
                 delta=delta,
-                max_memory="1 GB",
-                stop_on_threshold=True,
-                fraction_threshold=np.log(n) / n
+                max_memory=max_memory,
+                stop_on_threshold=stop_on_threshold,
+                fraction_threshold=fraction_threshold
             )
         else:
             m_iter = pyattimo.MotifletsIterator(
                 data_raw,
                 w=m,
-                max_memory="1 GB",
+                max_memory="20 GB",
                 support=k_max_ - 1,
                 exclusion_zone=exclusion_m,
                 # delta=0.5,
