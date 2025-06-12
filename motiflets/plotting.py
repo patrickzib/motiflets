@@ -66,10 +66,12 @@ class Motiflets:
             n_jobs : int
                 Number of jobs to be used.
             backend : String, default="pyattimo"
-                The backend to use. As of now 'pyattimo', 'scalable', 'stitch',
-                and 'default' are supported.
-                Use 'default' for the original exact implementation, and 'pyattimo'
-                for a fast, scalable but approximate implementation.
+                The backend to use. 'pyattimo', 'sparse', 'scalable', 'stitch', and
+                'default' are supported.
+
+                Use 'default' for the original, exact implementation,
+                scalable' for a memory-scalable, exact implementation, and
+                'pyattimo' for a fast, scalable but approximate implementation.
             delta : float
                 Delta parameter for pyattimo.
 

@@ -123,7 +123,7 @@ def main():
         #    )
 
         # scalable
-        backends = ["scalable2"]   #"scalable",
+        backends = ["scalable"]
         run_safe(
            filename, read_mat(filename), l_range, k_max, backends
         )

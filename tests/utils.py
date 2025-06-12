@@ -18,7 +18,7 @@ def test_motiflets_scale_n(
         n_range,  # Time Series length range
         l_range,  # Motif length range
         k_max,
-        backends=["default", "pyattimo", "scalable"],
+        backends=["default", "pyattimo", "scalable", "sparse"],
         delta=None,
         subsampling=None,
 ):

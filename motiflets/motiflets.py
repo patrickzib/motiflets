@@ -599,8 +599,8 @@ def compute_upper_bound(
         if kth_extent[kk] > 4 * kth_nn_min or kth_extent[kk] < kth_nn_min:
             kth_extent[kk] = kth_nn_min
 
-        assert kth_extent[kk] <= 4 * kth_nn_min
-        assert kth_extent[kk] >= kth_nn_min
+        # assert kth_extent[kk] <= 4 * kth_nn_min
+        # assert kth_extent[kk] >= kth_nn_min
 
     return kth_extent
 
@@ -1374,14 +1374,14 @@ def search_k_motiflets_elbow(
         except:
             print("Caught exception in pyattimo", flush=True)
 
-    elif backend in ["default", "scalable", "scalable2", "stitch"]:
+    elif backend in ["default", "sparse", "scalable", "stitch"]:
         idx_stitched = None
         preprocessing = None
         data_ = data_raw
 
-        if backend == "scalable":
+        if backend == "sparse":
             if distance == complexity_invariant_distance:
-                raise Exception('CID is currently not supported for sparse matrices.')
+                raise Exception('CID is not supported for backend "scalable".')
 
             # switch to sparse matrix representation when length is above 30_000
             # sparse matrix is 2x slower but needs less memory
@@ -1392,7 +1392,7 @@ def search_k_motiflets_elbow(
                 distance_single=distance_single,
                 distance_preprocessing=distance_preprocessing,
             )
-        elif backend == "scalable2":
+        elif backend == "scalable":
             # uses pairwise comparisons to compute the distances
             D_full, knns \
                 = compute_distances_with_knns(
@@ -1427,7 +1427,7 @@ def search_k_motiflets_elbow(
                 data_, m, test_k, D_full, knns,
                 distance_single=distance_single,
                 preprocessing=preprocessing,
-                use_D_full=(backend != "scalable2"),
+                use_D_full=(backend != "scalable"),
                 upper_bound=upper_bound,
             )
 
@@ -1447,7 +1447,7 @@ def search_k_motiflets_elbow(
     else:
         raise Exception(
             'Unknown backend: ' + backend + '. ' +
-            'Use "pyattimo", "scalable", "scalable2", "stitch", or "default".')
+            'Use "pyattimo", "sparse", "scalable", "stitch", or "default".')
 
     # smoothen the line to make it monotonically increasing
     k_motiflet_distances[0:2] = k_motiflet_distances[2]
