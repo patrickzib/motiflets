@@ -358,6 +358,7 @@ def compute_distances_with_knns_full(
 
     D = np.zeros((n, n), dtype=np.float32)
     knns = np.zeros((n, k), dtype=np.int32)
+    knns[:] = -1
 
     preprocessing = distance_preprocessing(ts, m)
 
@@ -385,7 +386,6 @@ def compute_distances_with_knns_full(
 
             knn = _argknn(D[order], k, m, slack=slack)
             knns[order, :len(knn)] = knn
-            knns[order, len(knn):] = -1
 
     return D, knns
 
@@ -399,6 +399,7 @@ def compute_distances_with_knns_sparse(
         n_jobs=4,
         slack=0.5,
         distance=znormed_euclidean_distance,
+        distance_single=znormed_euclidean_distance_single,
         distance_preprocessing=sliding_mean_std
 ):
     """ Compute the full Distance Matrix between all pairs of subsequences of a
@@ -446,8 +447,7 @@ def compute_distances_with_knns_sparse(
     if exclude_trivial_match:
         halve_m = int(m * slack)
 
-    D_knn, knns, bin_size, dot_first, preprocessing, halve_m \
-        = compute_distances_with_knns(
+    D_knn, knns = compute_distances_with_knns(
         ts,
         m,
         k,
@@ -462,11 +462,15 @@ def compute_distances_with_knns_sparse(
     D_bool = [Dict.empty(key_type=types.int32, value_type=types.bool_) for _ in
               range(n)]
 
+    dot_first = _sliding_dot_product(ts[:m], ts)
+    bin_size = int(np.ceil(ts.shape[0] / n_jobs))
+    preprocessing = distance_preprocessing(ts, m)
+
     # Store an upper bound for each k-nn distance
     kth_extent = compute_upper_bound(
-        D_knn,
-        True,  # FIXME
-        k, knns, m, ts)
+        ts, D_knn, knns, k, m,
+        distance_single, preprocessing=distance_preprocessing(ts, m)
+    )
 
     # FIXME: Parallelizm does not work, as Dict is not thread safe :(
     for order in np.arange(0, n):
@@ -570,60 +574,33 @@ def compute_distances_with_knns(
             D_knn[order, :len(dist[knn])] = dist[knn]
             knns[order, :len(knn)] = knn
 
-    return D_knn, knns, bin_size, dot_first, preprocessing, halve_m
+    return D_knn, knns
 
 
 @njit(fastmath=True, cache=True)
 def compute_upper_bound(
-        D_knn,
-        z_normed_dist,
-        k,
-        knns,
-        m,
-        ts):
+        ts, D_knn, knns, k, m,
+        distance_single, preprocessing,
+):
     kth_extent = np.zeros(k, dtype=np.float64)
     kth_extent[0] = np.inf
 
     for kk in range(1, len(kth_extent)):
-        if z_normed_dist:
-            # kk is the kk-th NN
-            # The motiflet candidate has thus kk+1 elements (including the query itself)
-            best_knn_pos = np.argmin(D_knn[:, kk])
-            motiflet_candidate = knns[best_knn_pos, :kk + 1]
+        # kk is the kk-th NN
+        # The motiflet candidate has thus kk+1 elements (including the query itself)
+        best_knn_pos = np.argmin(D_knn[:, kk])
+        candidate = knns[best_knn_pos, :kk + 1]
+        kth_extent[kk] = get_pairwise_extent_raw(
+            ts, candidate, m,
+            distance_single, preprocessing)
 
-            extent = np.float64(0.0)
+        # extent must be within the diameter of the sphere
+        kth_nn_min = np.min(D_knn[:, kk])
+        if kth_extent[kk] > 4 * kth_nn_min or kth_extent[kk] < kth_nn_min:
+            kth_extent[kk] = kth_nn_min
 
-            # compute the mean and std of the motiflet candidate
-            means, stds = sliding_mean_std(ts, m)
-
-            for i in np.arange(len(motiflet_candidate) - 1):
-                A = ts[motiflet_candidate[i]:motiflet_candidate[i] + m]
-                mean_A = means[motiflet_candidate[i]]
-                std_A = stds[motiflet_candidate[i]]
-
-                for j in np.arange(i + 1, len(motiflet_candidate)):
-                    B = ts[motiflet_candidate[j]:motiflet_candidate[j] + m]
-                    mean_B = means[motiflet_candidate[j]]
-                    std_B = stds[motiflet_candidate[j]]
-
-                    # TODO this does not work with TS with a std close to 1e-4 (cutoff value)
-                    # z_dist = ((A - mean_A) / std_A) - ((B - mean_B) / std_B)
-                    # z_dist = z_dist @ z_dist
-
-                    z_dist = 2 * m * (1 - (np.dot(A, B) - m * mean_A * mean_B) / (
-                            m * std_A * std_B))
-                    extent = max(z_dist, extent)
-            kth_extent[kk] = extent
-
-            # extent must be within the diameter of the sphere
-            kth_nn_min = np.min(D_knn[:, kk])
-            if kth_extent[kk] > 4 * kth_nn_min or kth_extent[kk] < kth_nn_min:
-                kth_extent[kk] = kth_nn_min
-
-            assert kth_extent[kk] <= 4 * kth_nn_min
-            assert kth_extent[kk] >= kth_nn_min
-        else:
-            kth_extent[kk] = 4 * np.min(D_knn[:, kk])
+        assert kth_extent[kk] <= 4 * kth_nn_min
+        assert kth_extent[kk] >= kth_nn_min
 
     return kth_extent
 
@@ -637,12 +614,13 @@ def compute_distances_with_knns_stitch(
         n_jobs=4,
         slack=0.5,
         distance=znormed_euclidean_distance,
+        distance_single=znormed_euclidean_distance_single,
         distance_preprocessing=sliding_mean_std
 ):
     """ Compute the full Distance Matrix between all pairs of subsequences of a
         multivariate time series.
     """
-    D_knn, knns, _, _, _, _ = compute_distances_with_knns(
+    D_knn, knns = compute_distances_with_knns(
         ts,
         m,
         k,
@@ -655,9 +633,10 @@ def compute_distances_with_knns_stitch(
 
     # Store an upper bound for each k-nn distance
     kth_extent = compute_upper_bound(
-        D_knn,
-        True,  # FIXME
-        k, knns, m, ts)
+        ts, D_knn, knns, k, m,
+        distance_single,
+        distance_preprocessing(ts, m),
+    )
 
     # compute potential offsets to use from k-NNs
     idx_stitched, ts_stitched = extract_stitched_time_series(
@@ -786,8 +765,8 @@ def get_pairwise_extent(D_full, motifset_pos, upperbound=np.inf):
 
 @njit(fastmath=True, cache=True)
 def get_pairwise_extent_raw(
-        series, motifset_pos,
-        distance_single, preprocessing, motif_length, upperbound=np.inf):
+        series, motifset_pos, motif_length,
+        distance_single, preprocessing, upperbound=np.inf):
     """Computes the extent of the motifset via pairwise comparisons.
 
     Parameters
@@ -940,9 +919,7 @@ def get_approximate_k_motiflet(
     motiflet_candidate = None
 
     motiflet_all_candidates = np.zeros((n, k), dtype=np.int32)
-    motiflet_all_candidates[:] = -1  # initialize with -1
-
-    means, stds = preprocessing
+    motiflet_all_candidates[:] = -1  # initialize all with -1
 
     # allow subsequence itself
     # Fill diagonal with 0
@@ -972,8 +949,7 @@ def get_approximate_k_motiflet(
                 else:
                     # get_pairwise_extent_raw does pairwise comparisons
                     motiflet_extent = get_pairwise_extent_raw(
-                        ts, idx[:k],
-                        distance_single, preprocessing, m, motiflet_dist)
+                        ts, idx[:k], m, distance_single, preprocessing, motiflet_dist)
 
                 if motiflet_extent <= motiflet_dist:
                     motiflet_dist = motiflet_extent
@@ -1352,12 +1328,12 @@ def search_k_motiflets_elbow(
             stop_on_threshold = True
             fraction_threshold = np.log(n) / n
             support = k_max_ - 1
-            print(f"\tPyAttimo: Setting "+
-                  f"\n\t\tw={m}, "+
-                  f"\n\t\tdelta={delta}, "+
+            print(f"\tPyAttimo: Setting " +
+                  f"\n\t\tw={m}, " +
+                  f"\n\t\tdelta={delta}, " +
                   f"\n\t\tsupport={support}, " +
-                  f"\n\t\tmax_memory={max_memory}, "+
-                  f"\n\t\texclusion_zone={exclusion_m}, "+
+                  f"\n\t\tmax_memory={max_memory}, " +
+                  f"\n\t\texclusion_zone={exclusion_m}, " +
                   f"\n\t\tstop_on_threshold={stop_on_threshold}, " +
                   f"\n\t\tfraction_threshold=log(n)/n")
             m_iter = pyattimo.MotifletsIterator(
@@ -1413,15 +1389,12 @@ def search_k_motiflets_elbow(
                 = compute_distances_with_knns_sparse(
                 data_raw, m, k_max_, n_jobs=n_jobs, slack=slack,
                 distance=distance,
+                distance_single=distance_single,
                 distance_preprocessing=distance_preprocessing,
             )
         elif backend == "scalable2":
             # uses pairwise comparisons to compute the distances
-            if distance != znormed_euclidean_distance:
-                raise Exception(
-                    f'Only z-ED is supported with scalable2 backend for now.')
-
-            D_full, knns, bin_size, dot_first, _, halve_m \
+            D_full, knns \
                 = compute_distances_with_knns(
                 data_raw, m, k_max_, n_jobs=n_jobs, slack=slack,
                 distance=distance,
@@ -1432,6 +1405,7 @@ def search_k_motiflets_elbow(
                 = compute_distances_with_knns_stitch(
                 data_raw, m, k_max_, n_jobs=n_jobs, slack=slack,
                 distance=distance,
+                distance_single=distance_single,
                 distance_preprocessing=distance_preprocessing,
             )
             data_ = data_stiched
