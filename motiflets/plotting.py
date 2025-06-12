@@ -66,7 +66,7 @@ class Motiflets:
             n_jobs : int
                 Number of jobs to be used.
             backend : String, default="pyattimo"
-                The backend to use. 'pyattimo', 'sparse', 'scalable', 'stitch', and
+                The backend to use. 'pyattimo', 'sparse', 'scalable', and
                 'default' are supported.
 
                 Use 'default' for the original, exact implementation,
@@ -813,7 +813,7 @@ def plot_elbow(k_max,
         distance_single=distance_single,
         distance_preprocessing=distance_preprocessing,
         backend=backend,
-        delta=delta)
+        pyattimo_delta=delta)
     endTime = (time.perf_counter() - startTime)
 
     print(f"Found motiflets in {np.round(endTime, 1)} s")

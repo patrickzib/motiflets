@@ -643,6 +643,7 @@ def compute_distances_with_knns_stitch(
         ts, m, D_knn, knns, kth_extent)
 
     print(f"TS length reduced from {len(ts)} to {len(ts_stitched)}")
+    assert len(ts_stitched) < 64_000
 
     # compute distances and knns from stitched time series
     D_stitched, knns_stitched = compute_distances_with_knns_full(
@@ -913,6 +914,9 @@ def get_approximate_k_motiflet(
             The (approximate) best motiflet found
         motiflet_dist:
             The extent of the motiflet found
+        motiflet_all_candidates : np.array
+            All candidates found during the search, with k-NNs for each subsequence
+            in the time series. The first k elements are the k-NNs, the rest is -1.
     """
     n = len(ts) - m + 1
     motiflet_dist = upper_bound
@@ -1171,7 +1175,7 @@ def find_au_ef_motif_length(
                 distance_single=distance_single,
                 distance_preprocessing=distance_preprocessing,
                 backend=backend,
-                delta=delta)
+                pyattimo_delta=delta)
 
             dists_ = dist[(~np.isinf(dist)) & (~np.isnan(dist))]
             if dists_.max() - dists_.min() == 0:
@@ -1225,7 +1229,7 @@ def search_k_motiflets_elbow(
         distance_single=znormed_euclidean_distance_single,
         distance_preprocessing=sliding_mean_std,
         backend="pyattimo",
-        delta=None
+        pyattimo_delta=None
 ):
     """Computes the elbow-function.
 
@@ -1271,6 +1275,10 @@ def search_k_motiflets_elbow(
         The backend to use. As of now 'pyattimo' and 'default' are supported.
         Use default for the original exact implementation, and pyattimo for a
         fast, scalable but approximate implementation.
+    pyattimo_delta : float, default=None
+        If set, uses the delta parameter of pyattimo to compute the motiflets.
+        If None, uses the default delta of 0.5.
+
 
     Returns
     -------
@@ -1303,7 +1311,7 @@ def search_k_motiflets_elbow(
             elbow_deviation=elbow_deviation,
             slack=slack,
             backend=backend,
-            delta=delta)
+            delta=pyattimo_delta)
         m = np.int32(m)
     elif isinstance(motif_length, int) or \
             isinstance(motif_length, np.int32) or \
@@ -1323,43 +1331,34 @@ def search_k_motiflets_elbow(
     exclusion_m = int(m * slack)
 
     if backend == "pyattimo":
-        if delta:
-            max_memory = "20 GB"
-            stop_on_threshold = True
-            fraction_threshold = np.log(n) / n
-            support = k_max_ - 1
-            print(f"\tPyAttimo: Setting " +
-                  f"\n\t\tw={m}, " +
-                  f"\n\t\tdelta={delta}, " +
-                  f"\n\t\tsupport={support}, " +
-                  f"\n\t\tmax_memory={max_memory}, " +
-                  f"\n\t\texclusion_zone={exclusion_m}, " +
-                  f"\n\t\tstop_on_threshold={stop_on_threshold}, " +
+        # Prepare common arguments
+        attimo_args = {
+            'data_raw': data_raw,
+            'w': m,
+            'support': k_max_ - 1,
+            'exclusion_zone': exclusion_m,
+            'max_memory': "20 GB"
+        }
+
+        if pyattimo_delta:
+            attimo_args.update({
+                'delta': pyattimo_delta,
+                'stop_on_threshold': True,
+                'fraction_threshold': np.log(n) / n,
+            })
+            print(f"\tPyAttimo: Setting "
+                  f"\n\t\tw={m}, "
+                  f"\n\t\tdelta={pyattimo_delta}, "
+                  f"\n\t\tsupport={attimo_args['support']}, "
+                  f"\n\t\tmax_memory={attimo_args['max_memory']}, "
+                  f"\n\t\texclusion_zone={attimo_args['exclusion_zone']}, "
+                  f"\n\t\tstop_on_threshold={attimo_args['stop_on_threshold']}, "
                   f"\n\t\tfraction_threshold=log(n)/n")
-            m_iter = pyattimo.MotifletsIterator(
-                data_raw,
-                w=m,
-                support=support,
-                exclusion_zone=exclusion_m,
-                delta=delta,
-                max_memory=max_memory,
-                stop_on_threshold=stop_on_threshold,
-                fraction_threshold=fraction_threshold
-            )
-        else:
-            m_iter = pyattimo.MotifletsIterator(
-                data_raw,
-                w=m,
-                max_memory="20 GB",
-                support=k_max_ - 1,
-                exclusion_zone=exclusion_m,
-                # delta=0.5,
-                # stop_on_threshold=True,
-                # fraction_threshold=np.log(n) / n,
-            )
+
+        m_iter = pyattimo.MotifletsIterator(**attimo_args)
+
         try:
             for mot in m_iter:
-                # print("\t\tn:", n, "m", m, "k", k_max_, "support", mot.support, flush=True)
                 print(f"\t\t{mot}", flush=True)
                 test_k = mot.support
                 if test_k < k_max_:
@@ -1376,42 +1375,32 @@ def search_k_motiflets_elbow(
 
     elif backend in ["default", "sparse", "scalable", "stitch"]:
         idx_stitched = None
-        preprocessing = None
         data_ = data_raw
 
-        if backend == "sparse":
-            if distance == complexity_invariant_distance:
-                raise Exception('CID is not supported for backend "scalable".')
-
-            # switch to sparse matrix representation when length is above 30_000
-            # sparse matrix is 2x slower but needs less memory
-            D_full, knns \
-                = compute_distances_with_knns_sparse(
-                data_raw, m, k_max_, n_jobs=n_jobs, slack=slack,
-                distance=distance,
-                distance_single=distance_single,
-                distance_preprocessing=distance_preprocessing,
-            )
-        elif backend == "scalable":
-            # uses pairwise comparisons to compute the distances
-            D_full, knns \
-                = compute_distances_with_knns(
-                data_raw, m, k_max_, n_jobs=n_jobs, slack=slack,
-                distance=distance,
-                distance_preprocessing=distance_preprocessing
-            )
-        elif backend == "stitch":
+        if backend == "stitch":
             D_full, knns, data_stiched, idx_stitched \
                 = compute_distances_with_knns_stitch(
-                data_raw, m, k_max_, n_jobs=n_jobs, slack=slack,
+                ts=data_raw, m=m, k=k_max_, n_jobs=n_jobs, slack=slack,
                 distance=distance,
                 distance_single=distance_single,
                 distance_preprocessing=distance_preprocessing,
             )
             data_ = data_stiched
         else:
-            D_full, knns \
-                = compute_distances_with_knns_full(
+            if backend == "sparse":
+                if distance == complexity_invariant_distance:
+                    raise Exception('CID is not supported for backend "scalable".')
+                # switch to sparse matrix representation
+                # sparse matrix is 2x slower but needs less memory
+                call_to_distances = compute_distances_with_knns_sparse
+            elif backend == "scalable":
+                # uses pairwise comparisons to compute the distances
+                call_to_distances = compute_distances_with_knns
+            else:
+                # computes the full matrix
+                call_to_distances = compute_distances_with_knns_full
+
+            D_full, knns = call_to_distances(
                 data_raw, m, k_max_, n_jobs=n_jobs, slack=slack,
                 distance=distance,
                 distance_preprocessing=distance_preprocessing
