@@ -80,11 +80,11 @@ def sliding_csum_dcsum(ts, m):
 
 @njit(fastmath=True, cache=True)
 def complexity_invariant_distance(dot_rolled, n, m, preprocessing, order, halve_m):
-    """ Implementation of z-normalized Euclidean distance """
+    """ Implementation of the complexity invariant distance (CID) """
     csumsq, ce = preprocessing
 
     ed = -2 * dot_rolled + csumsq + csumsq[order]
-    cf = np.maximum(ce, ce[order]) / np.minimum(ce, ce[order]) ** 2
+    cf = np.maximum(ce, ce[order]) / np.minimum(ce, ce[order])
     dist = ed * cf
 
     # self-join: exclusion zone
@@ -165,14 +165,71 @@ def znormed_euclidean_distance(dot_rolled, n, m, preprocessing, order, halve_m):
     return dist
 
 
+@njit(fastmath=True, cache=True)
+def znormed_euclidean_distance_single(a, b, a_i, b_j, preprocessing):
+    """ Implementation of z-normalized Euclidean distance """
+    means, stds = preprocessing
+    m = len(a)
+    return 2 * m * (1 - (np.dot(a, b) - m * means[a_i] * means[b_j]) / (
+             m * stds[a_i] * stds[b_j]))
+
+
+@njit(fastmath=True, cache=True)
+def euclidean_distance_single(a, b, *args):
+    """ Implementation of the Euclidean distance """
+    diff = (a - b)
+    return np.dot(diff, diff)
+
+
+@njit(fastmath=True, cache=True)
+def cosine_distance_single(a, b, a_i, b_j, preprocessing):
+    dist = 1 - np.dot(a, b) / (preprocessing[a_i] + preprocessing[b_j])
+    return dist
+
+
+@njit(fastmath=True, cache=True)
+def complexity_invariant_distance_single(a, b, a_i, b_j, preprocessing):
+    """ Implementation of the Complexity Invariant Distance (CID) """
+    _, ce = preprocessing
+
+    diff = (a - b)
+    ed = np.dot(diff, diff)
+
+    cf = max(ce[a_i], ce[b_j]) / min(ce[a_i], ce[b_j])
+    dist = ed * cf
+
+    return dist
+
+
 _DISTANCE_MAPPING = {
-    "znormed_euclidean": (sliding_mean_std, znormed_euclidean_distance),
-    "znormed_ed": (sliding_mean_std, znormed_euclidean_distance),
-    "ed": (sliding_csum, euclidean_distance),
-    "euclidean": (sliding_csum, euclidean_distance),
-    "cosine": (sliding_csum, cosine_distance),
-    "CID": (sliding_csum_dcsum, complexity_invariant_distance),
-    "cid": (sliding_csum_dcsum, complexity_invariant_distance)
+    # z-normed Euclidean Distance
+    "znormed_euclidean": (
+        sliding_mean_std,
+        znormed_euclidean_distance, znormed_euclidean_distance_single),
+    "znormed_ed": (
+        sliding_mean_std,
+        znormed_euclidean_distance, znormed_euclidean_distance_single),
+
+    # Euclidean Distance
+    "ed": (
+        sliding_csum,
+        euclidean_distance, euclidean_distance_single),
+    "euclidean": (
+        sliding_csum,
+        euclidean_distance, euclidean_distance_single),
+
+    # Cosine Distance
+    "cosine": (
+        sliding_csum,
+        cosine_distance, cosine_distance_single),
+
+    # Complexity Invariant Distance
+    "CID": (
+        sliding_csum_dcsum,
+        complexity_invariant_distance, complexity_invariant_distance_single),
+    "cid": (
+        sliding_csum_dcsum,
+        complexity_invariant_distance, complexity_invariant_distance_single)
 }
 
 

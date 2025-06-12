@@ -27,14 +27,15 @@ def test_motiflets_scale_n(
                  "motiflet", "elbows"])
 
     last_time = -1
-    results = []
     for backend in backends:
+        results = []
+
         last_n = 0
         for n in n_range:
             gc.collect()
 
-            print(f"\tUsing {backend} size of ts {n} and l_ranges {l_range}")
-            print(f"\tNumber of cores {cores}")
+            print(f"\n\nUsing {backend} size of ts {n} and l_ranges {l_range}")
+            print(f"Number of cores {cores}")
 
             ds_name, ts = read_data()
             if isinstance(ts, pd.DataFrame):
@@ -63,7 +64,7 @@ def test_motiflets_scale_n(
                 start = time.time()
                 duration = start
 
-                print(f"\tUsing motif length {l}")
+                print(f"\n\nRunning: {ds_name}, motif length: {l}, n: {n}")
                 l_new = l
 
                 if subsampling:
@@ -92,35 +93,37 @@ def test_motiflets_scale_n(
                     if subsampling:
                         motiflet = np.array(motiflet) * subsampling  # scale up again
 
-                    if subsampling:   # FIXME add again backend == "pyattimo" or
-                        # try to refine the positions of the motiflets
-                        new_motiflet, new_extent = stitch_and_refine(
-                            ts_orig,
-                            m=l,
-                            motiflet=motiflet,
-                            extent=np.inf if subsampling else extent,
-                            search_window=min(4*l, 1024),
-                            # search in a local neighborhood of the motif length
-                            # upper_bound=extent  # does not work with subsampling
-                        )
-
-                        if subsampling or new_extent < extent:
-                            print(f"Searching in local neighborhood. Found a better motif")
-                            motiflet = new_motiflet
-                            extent = new_extent
+                    # FIXME ...
+                    # if (backend != "pyattimo") and subsampling:    # FIXME add again backend == "pyattimo" or
+                    #     # try to refine the positions of the motiflets
+                    #     new_motiflet, new_extent = stitch_and_refine(
+                    #         ts_orig,
+                    #         m=l,
+                    #         motiflet=motiflet,
+                    #         extent=np.inf if subsampling else extent,
+                    #         search_window=min(4*l, 1024),
+                    #         # search in a local neighborhood of the motif length
+                    #         # upper_bound=extent  # does not work with subsampling
+                    #     )
+                    #
+                    #     if subsampling or new_extent < extent:
+                    #         print(f"Searching in local neighborhood. Found a better motif")
+                    #         motiflet = new_motiflet
+                    #         extent = new_extent
 
                     backend_name = backend
                     if backend == "pyattimo" and delta is not None:
-                        backend_name = f"{backend_name} (delta={delta}, v=0.6.4)"
-                    elif backend == "pyattimo":
-                        backend_name = f"{backend_name} (v=0.6.4)"
+                        backend_name = f"{backend_name} (delta={delta})"
                     elif subsampling:
                         backend_name = f"{backend_name} (subsampling={subsampling})"
 
                     duration = time.time() - start
                     memory_usage = mm.memory_usage
                     current = [len(ts_orig), l, backend_name, duration,
-                               memory_usage, extent, motiflet, elbow_points]
+                               memory_usage,
+                               float(extent),
+                               motiflet,
+                               elbow_points]
 
                     results.append(current)
                     df.loc[len(df.index)] = current
@@ -134,7 +137,7 @@ def test_motiflets_scale_n(
 
                     df.to_csv(new_filename, index=False)
                     print(f"\tDiscovered motiflets in {duration:0.2f} seconds")
-                    print(f"\tCurrent Entry:", current)
+                    print(f"\t{current}")
 
                     del mm  # free up memory
                 except Exception as e:

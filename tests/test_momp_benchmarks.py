@@ -10,8 +10,8 @@ import utils as ut
 path = "../datasets/momp/"
 
 filenames = {
-    # "Bird12-Week3_2018_1_10": ["22.5 hours of Chicken data at 100 Hz", 16384, ""],
-    # "BlackLeggedKittiwake": ["Flying Bird: Black‐legged Kittiwake", 8192, "?"],
+    "Bird12-Week3_2018_1_10": ["22.5 hours of Chicken data at 100 Hz", 16384, ""],
+    "BlackLeggedKittiwake": ["Flying Bird: Black‐legged Kittiwake", 8192, "?"],
     # "Challenge2009Respiration500HZ": ["Challenge 2009 Respiration", 16384, "?"],
     # "Challenge2009TestSetA_101a": ["Respiration", 4096, "?"],
     # "CinC_Challenge": ["Electroencephalography C3-M2 Part 2", 8192, "Calibration"],
@@ -22,7 +22,7 @@ filenames = {
     # "house": ["Household Electrical Demand", 32768, "?"],
     # "Lab_FD_061014": ["Insect EPG - Flaming Dragon", 32768, "?"],
     # "Lab_K_060314": ["ACP on Kryder Citrus", 65536, ""],
-    "lorenzAttractorsLONG": ["Lorenz Attractors", 524288, "?"],
+    # "lorenzAttractorsLONG": ["Lorenz Attractors", 524288, "?"],
     # "MGHSleepElectromyography": ["MGH Sleep Electromyography 200 Hz", 32768, "?"],
     # "recorddata": ["EOG Example", 2048, "?"],
     # "solarwind": ["Solar Wind", 32768, "?"],
@@ -91,7 +91,7 @@ def test_motiflets_scale_n(
 
 def run_safe(ds_name, series, l_range, k_max, backends, delta=None, subsampling=None):
     try:
-        n = 50_000  # len(series)
+        n = 10_000  # len(series)
         test_motiflets_scale_n(
             ds_name, series, n,
             l_range=l_range, k_max=k_max, backends=backends, delta=delta, subsampling=subsampling)
@@ -102,7 +102,7 @@ def run_safe(ds_name, series, l_range, k_max, backends, delta=None, subsampling=
 
 
 # 512 to 8192
-l_range = [2**9, 2**10, 2**11, 2**12, 2**13]
+l_range = [2**9, 2**10, 2**11]   # , 2**12, 2**13
 
 # ks = [5, 10, 20]
 deltas = [0.5]
@@ -123,7 +123,7 @@ def main():
         #    )
 
         # scalable
-        backends = ["scalable"]
+        backends = ["scalable2"]   #"scalable",
         run_safe(
            filename, read_mat(filename), l_range, k_max, backends
         )

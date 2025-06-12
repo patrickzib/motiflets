@@ -87,7 +87,8 @@ class Motiflets:
         self.n_jobs = n_jobs
 
         # distance function used
-        self.distance_preprocessing, self.distance = map_distances(distance)
+        self.distance_preprocessing, self.distance, self.distance_single \
+            = map_distances(distance)
         self.backend = backend
 
         self.motif_length_range = None
@@ -149,6 +150,7 @@ class Motiflets:
             subsample=subsample,
             n_jobs=self.n_jobs,
             distance=self.distance,
+            distance_single=self.distance_single,
             distance_preprocessing=self.distance_preprocessing,
             backend=self.backend,
             delta=self.delta
@@ -218,6 +220,7 @@ class Motiflets:
             elbow_deviation=self.elbow_deviation,
             slack=self.slack,
             distance=self.distance,
+            distance_single=self.distance_single,
             distance_preprocessing=self.distance_preprocessing,
             backend=self.backend,
             delta=self.delta
@@ -738,6 +741,7 @@ def plot_elbow(k_max,
                elbow_deviation=1.00,
                slack=0.5,
                distance=znormed_euclidean_distance,
+               distance_single=znormed_euclidean_distance_single,
                distance_preprocessing=sliding_mean_std,
                backend="pyattimo",
                delta=None
@@ -804,6 +808,7 @@ def plot_elbow(k_max,
         elbow_deviation=elbow_deviation,
         slack=slack,
         distance=distance,
+        distance_single=distance_single,
         distance_preprocessing=distance_preprocessing,
         backend=backend,
         delta=delta)
@@ -838,6 +843,7 @@ def plot_motif_length_selection(
         slack=0.5,
         subsample=2,
         distance=znormed_euclidean_distance,
+        distance_single=znormed_euclidean_distance_single,
         distance_preprocessing=sliding_mean_std,
         backend="pyattimo", delta=None
 ):
@@ -902,6 +908,7 @@ def plot_motif_length_selection(
             slack=slack,
             subsample=subsample,
             distance=distance,
+            distance_single=distance_single,
             distance_preprocessing=distance_preprocessing,
             backend=backend,
             delta=delta)
