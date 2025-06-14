@@ -338,6 +338,11 @@ def compute_distances_with_knns_full(
             dot_prev = dot_rolled
 
             knn = _argknn(dist, k, m, slack=slack)
+            # knn = optimized_argknn(dist, k, m, slack=slack)
+            #if knn != knn2:
+            #    print("Warning: knn != knn2", knn, knn2)
+            #    assert False
+
             D[order, :] = dist
             knns[order, :len(knn)] = knn
 
@@ -621,7 +626,6 @@ def get_pairwise_extent_raw(
             b = series[j:j + motif_length]
 
             dist = distance_single(a, b, i, j, preprocessing)
-
             motifset_extent = max(motifset_extent, dist)
             if motifset_extent > upperbound:
                 return np.inf
@@ -629,9 +633,60 @@ def get_pairwise_extent_raw(
     return motifset_extent
 
 
-@njit(fastmath=True, cache=True)
-def _argknn(
-        dist, k, m, lowest_dist=np.inf, slack=0.5):
+@njit(nogil=True, fastmath=True)
+def optimized_argknn(dist, k, m, slack=0.5, lowest_dist=np.inf):
+    n = len(dist)
+    halve_m = int(m * slack)
+    dists = dist.copy()  # Work on copy to preserve original
+
+    # Preallocate results array
+    idx = np.full(k, -1, dtype=np.int32)
+
+    # First pass: process top 2k candidates efficiently
+    new_k = min(n - 1, 2 * k)
+
+    # Get and sort top candidates
+    candidates = np.argpartition(dist, new_k - 1)[:new_k]
+    sorted_idx = np.argsort(dist[candidates])
+    sorted_candidates = candidates[sorted_idx]
+
+    count = 0
+    for pos in sorted_candidates:
+        if count >= k:
+            break
+
+        if dist[pos] > lowest_dist:
+            continue  # Early exit as sorted
+
+        if np.isfinite(dist[pos]):
+            # Record valid candidate
+            idx[count] = pos
+            count += 1
+
+            # Exclude neighborhood
+            start = max(0, pos - halve_m)
+            end = min(pos + halve_m + 1, n)
+            dists[start:end] = np.inf
+
+    # Second pass: find remaining candidates
+    while count < k:
+        pos = np.argmin(dists)
+        if np.isfinite(dists[pos]) and dists[pos] <= lowest_dist:
+            idx[count] = pos
+            count += 1
+
+            # Exclude neighborhood
+            start = max(0, pos - halve_m)
+            end = min(pos + halve_m + 1, n)
+            dists[start:end] = np.inf
+        else:
+            break
+
+    return idx[:count]
+
+
+@njit(nogil=True, fastmath=True, cache=True)
+def _argknn(dist, k, m, lowest_dist=np.inf, slack=0.5):
     """Finds the closest k-NN non-overlapping subsequences in candidates.
 
     Parameters
@@ -656,11 +711,12 @@ def _argknn(
     halve_m = int(m * slack)
     dists = np.copy(dist)
 
-    new_k = min(len(dist) - 1, 2 * k)
-    dist_pos = np.argpartition(dist, new_k)[:new_k]
-    dist_sort = dist[dist_pos]
+    new_k = min(len(dists) - 1, 2 * k)
+    dist_pos = np.argpartition(dists, new_k)[:new_k]
+    dist_sort = dists[dist_pos]
 
-    idx = []  # there may be less than k, thus use a list
+    idx = np.full(k, -1, dtype=np.int32)
+    count = 0
 
     # go through the partitioned list
     for i in range(len(dist_sort)):
@@ -668,31 +724,31 @@ def _argknn(
         pos = dist_pos[p]
         dist_sort[p] = np.inf
 
-        if (not np.isnan(dists[pos])) \
-                and (not np.isinf(dists[pos])) \
-                and (dists[pos] <= lowest_dist):
-            idx.append(pos)
+        d = dists[pos]
+        if (not np.isnan(d)) and (not np.isinf(d)) and (d <= lowest_dist):
+            idx[count] = pos
+            count = count + 1
 
             # exclude all trivial matches and itself
             dists[max(0, pos - halve_m): min(pos + halve_m, len(dists))] = np.inf
 
-        if len(idx) == k:
+        if count == k:
             break
 
     # if not enough elements found, go through the rest
-    for i in range(len(idx), k):
+    while count < k:
         pos = np.argmin(dists)
-        if (not np.isnan(dists[pos])) \
-                and (not np.isinf(dists[pos])) \
-                and (dists[pos] <= lowest_dist):
-            idx.append(pos)
+        d = dists[pos]
+        if (not np.isnan(d)) and (not np.isinf(d)) and (d <= lowest_dist):
+            idx[count] = pos
+            count = count + 1
 
             # exclude all trivial matches
             dists[max(0, pos - halve_m): min(pos + halve_m, len(dists))] = np.inf
         else:
             break
 
-    return np.array(idx, dtype=np.int32)
+    return idx
 
 
 @njit(fastmath=True, cache=True, nogil=True)
