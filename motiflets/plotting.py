@@ -66,7 +66,7 @@ class Motiflets:
             n_jobs : int
                 Number of jobs to be used.
             backend : String, default="pyattimo"
-                The backend to use. 'pyattimo', 'sparse', 'scalable', and
+                The backend to use. 'pyattimo', 'scalable', and
                 'default' are supported.
 
                 Use 'default' for the original, exact implementation,
