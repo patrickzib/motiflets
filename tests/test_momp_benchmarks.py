@@ -91,7 +91,7 @@ def test_motiflets_scale_n(
 
 def run_safe(ds_name, series, l_range, k_max, backends, delta=None, subsampling=None):
     try:
-        n = 30_000  # len(series)
+        n = 50_000  # len(series)
         test_motiflets_scale_n(
             ds_name, series, n,
             l_range=l_range, k_max=k_max, backends=backends, delta=delta, subsampling=subsampling)
