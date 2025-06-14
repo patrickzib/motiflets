@@ -18,57 +18,33 @@ def read_penguin_data():
     return ds_name, series
 
 
-def read_penguin_data_short():
-    test = sio.loadmat(path + 'penguinshort.mat')
-    series = pd.DataFrame(test["penguinshort"]).T
-    ds_name = "Penguins (Snippet)"
-    return ds_name, series
-
-
 def test_motiflets():
     ds_name, T = read_penguin_data()
     n = 2_000
-    series = T.iloc[497699:497699 + n, [0, 1, 2]].T.to_numpy()
-    print("Dimensionality", series.shape)
+    series = T.iloc[497699:497699 + n, [0]].T.to_numpy()
     ml = Motiflets(ds_name, series, backend="scalable")
     ks = 20
     motif_length = 22
-    _ = ml.fit_k_elbow(ks, motif_length)
+    _ = ml.fit_k_elbow(ks, motif_length, plot_motifs_as_grid=False)
 
 
-def test_motiflets_sparse():
+def test_motiflets_scalable():
     ds_name, T = read_penguin_data()
     n = 10_000
     series = T.iloc[497699:497699 + n, [0, 1, 2]].T.to_numpy()
 
-    ml = Motiflets(ds_name, series)
+    ml = Motiflets(ds_name, series, backend="scalable")
     ks = 20
-    motif_length = 100
-    _ = ml.fit_k_elbow(ks, motif_length)
+    motif_length = 22
+    _ = ml.fit_k_elbow(ks, motif_length, plot_motifs_as_grid=False)
 
 
-def test_sparse_matrix():
-    ds_name, T = read_penguin_data()
-    n = 10_001
-    series = T.iloc[497699:497699 + n, [0, 1, 2]].T.to_numpy()
-
-    m = 22
-    k = 10
-    D_sparse, knns = ml.compute_distances_with_knns_sparse(series, m=m, k=k)
-
-    elements = 0
-    for A in D_sparse:
-        elements += len(A)
-
-    n = (series.shape[0] - m + 1)
-    print(elements, n ** 2, str(elements * 100 / n ** 2) + "%")
-
-
-def test_full_matrix():
+def test_motiflets_default():
     ds_name, T = read_penguin_data()
     n = 10_000
     series = T.iloc[497699:497699 + n, [0, 1, 2]].T.to_numpy()
 
-    m = 1000
-    k = 10
-    _, _ = ml.compute_distances_with_knns(series, m=m, k=k)
+    ml = Motiflets(ds_name, series, backend="default")
+    ks = 20
+    motif_length = 22
+    _ = ml.fit_k_elbow(ks, motif_length, plot_motifs_as_grid=False)
