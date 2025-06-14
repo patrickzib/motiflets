@@ -28,10 +28,9 @@ def read_penguin_data_short():
 def test_motiflets():
     ds_name, T = read_penguin_data()
     n = 2_000
-    series = T.iloc[497699:497699 + n, 0].T.to_numpy()
-
-    ml = Motiflets(ds_name, series)
-
+    series = T.iloc[497699:497699 + n, [0, 1, 2]].T.to_numpy()
+    print("Dimensionality", series.shape)
+    ml = Motiflets(ds_name, series, backend="scalable")
     ks = 20
     motif_length = 22
     _ = ml.fit_k_elbow(ks, motif_length)
@@ -39,8 +38,8 @@ def test_motiflets():
 
 def test_motiflets_sparse():
     ds_name, T = read_penguin_data()
-    n = 100_000
-    series = T.iloc[497699:497699 + n, 0].T.to_numpy()
+    n = 10_000
+    series = T.iloc[497699:497699 + n, [0, 1, 2]].T.to_numpy()
 
     ml = Motiflets(ds_name, series)
     ks = 20
@@ -51,8 +50,7 @@ def test_motiflets_sparse():
 def test_sparse_matrix():
     ds_name, T = read_penguin_data()
     n = 10_001
-    series = T.iloc[497699:497699 + n, 0].T.to_numpy()
-    series = series.reshape((1, -1))   # make it 2D
+    series = T.iloc[497699:497699 + n, [0, 1, 2]].T.to_numpy()
 
     m = 22
     k = 10
@@ -69,8 +67,7 @@ def test_sparse_matrix():
 def test_full_matrix():
     ds_name, T = read_penguin_data()
     n = 10_000
-    series = T.iloc[497699:497699 + n, 0].T.to_numpy()
-    series = series.reshape((1, -1))  # make it 2D
+    series = T.iloc[497699:497699 + n, [0, 1, 2]].T.to_numpy()
 
     m = 1000
     k = 10

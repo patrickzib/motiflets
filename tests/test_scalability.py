@@ -26,13 +26,17 @@ def read_penguin_data():
 
 
 def test_motiflets():
-    lengths = [1_000,
-               # 5_000,
-               #10_000, 30_000,
-               #50_000, 100_000,
-               #150_000, 200_000,
-               #250_000
-               ]
+    lengths = [
+        1_000,
+        5_000,
+        10_000,
+        # 30_000,
+        # 50_000
+        #, 100_000,
+        # 150_000,
+        # 200_000,
+        # 250_000
+    ]
 
     ds_name, B = read_penguin_data()
     time_s = np.zeros(len(lengths))
@@ -41,25 +45,31 @@ def test_motiflets():
         print("Current", length)
         series = B.iloc[:length,0].T
 
-        ml = Motiflets(ds_name, series,
-                       n_jobs=8,
-                       )
+        ml = Motiflets(
+            ds_name,
+            series,
+            n_jobs=8,
+            # backend="scalable"
+        )
 
         k_max = 5
 
         t_before = time.time()
-        _ = ml.fit_k_elbow(
+        dists, motiflets, elbow_points = ml.fit_k_elbow(
             k_max,
             22,
             plot_elbows=False,
-            plot_motifs_as_grid=True
+            plot_motifs_as_grid=False
         )
         t_after = time.time()
         time_s[i] = t_after - t_before
-        print("Time:", time_s[i])
+        print("\tTotal Time:", time_s[i])
+        print("\tElbow points:", elbow_points)
+        print("\tMotiflets:", motiflets)
+        print("\tDistances:", dists)
 
         dict = time_s
         df = pd.DataFrame(data=dict, columns=['Time'], index=lengths)
         df["Method"] = "Motiflets (one-dim)"
         df.index.name = "Lengths"
-        df.to_csv('csv/scalability_univ_motiflets_k5.csv')
+        # df.to_csv('csv/scalability_univ_motiflets_k5.csv')

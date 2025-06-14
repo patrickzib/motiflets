@@ -32,7 +32,8 @@ class Motiflets:
             elbow_deviation=1.00,
             distance="znormed_ed",
             slack=0.5,
-            n_jobs=4
+            n_jobs=4,
+            backend="scalable"
     ):
         """Computes the AU_EF plot to extract the best motif lengths
 
@@ -63,6 +64,11 @@ class Motiflets:
                 Defined as percentage of m. E.g. 0.5 is equal to half the window length.
             n_jobs : int
                 Number of jobs to be used.
+            backend : String, default="scalable"
+                The backend to use.  'scalable', and 'default' are supported.
+
+                Use 'default' for the original, exact implementation,
+                'scalable' for a memory-scalable, exact implementation, and
 
             Returns
             -------
@@ -78,7 +84,9 @@ class Motiflets:
         self.n_jobs = n_jobs
 
         # distance function used
-        self.distance_preprocessing, self.distance = map_distances(distance)
+        self.distance_preprocessing, self.distance, self.distance_single \
+            = map_distances(distance)
+        self.backend = backend
 
         self.motif_length_range = None
         self.motif_length = 0
@@ -88,6 +96,7 @@ class Motiflets:
         self.all_dists = []
 
         self.motif_length = 0
+        self.memory_usage = 0
         self.k_max = 0
         self.dists = []
         self.motiflets = []
@@ -97,7 +106,11 @@ class Motiflets:
             self,
             k_max,
             motif_length_range,
-            subsample=2
+            subsample=2,
+            # plot=True,
+            # plot_elbows=False,
+            # plot_motifs_as_grid=True,
+            # plot_best_only=True
     ):
         """Computes the AU_EF plot to extract the best motif lengths
 
@@ -135,7 +148,10 @@ class Motiflets:
             subsample=subsample,
             n_jobs=self.n_jobs,
             distance=self.distance,
-            distance_preprocessing=self.distance_preprocessing
+            distance_single=self.distance_single,
+            distance_preprocessing=self.distance_preprocessing,
+            backend=self.backend
+
         )
 
         return self.motif_length
@@ -184,7 +200,7 @@ class Motiflets:
         else:
             self.motif_length = motif_length
 
-        self.dists, self.motiflets, self.elbow_points = plot_elbow(
+        self.dists, self.motiflets, self.elbow_points, self.memory_usage = plot_elbow(
             k_max,
             self.series,
             ds_name=self.ds_name,
@@ -198,7 +214,9 @@ class Motiflets:
             elbow_deviation=self.elbow_deviation,
             slack=self.slack,
             distance=self.distance,
-            distance_preprocessing=self.distance_preprocessing
+            distance_single=self.distance_single,
+            distance_preprocessing=self.distance_preprocessing,
+            backend=self.backend,
         )
 
         return self.dists, self.motiflets, self.elbow_points
@@ -403,20 +421,17 @@ def plot_motifset(
     data_raw_sampled, data_index_sampled = data_raw, data_index
 
     factor = 1
-    if data_raw.shape[0] > 1000:
-        data_raw_sampled = np.zeros((data_raw.shape[0], 1000))
+    if data_raw.shape[-1] > 2_000:
+        data_raw_sampled = np.zeros((data_raw.shape[0], 2_000))
         for i in range(data_raw.shape[0]):
             index = MinMaxLTTBDownsampler().downsample(
-                np.ascontiguousarray(data_raw[i]), n_out=1000)
+                np.ascontiguousarray(data_raw[i]), n_out=2_000)
             data_raw_sampled[i] = data_raw[i, index]
 
         data_index_sampled = data_index[index]
         factor = max(1, data_raw.shape[-1] / data_raw_sampled.shape[-1])
         if motifsets is not None:
-            motifsets_sampled = np.array(
-                list(map(lambda x: (x // factor) if x is not None else x, motifsets)),
-                dtype=np.object_)
-
+            motifsets_sampled = list(map(lambda x: np.int32(x // factor), motifsets))
     else:
         motifsets_sampled = motifsets
 
@@ -431,62 +446,65 @@ def plot_motifset(
         offset -= 1.2 * (np.max(dim_raw_sampled) - np.min(dim_raw_sampled))
         tick_offsets.append(offset)
 
-        _ = sns.lineplot(x=data_index_sampled,
-                         y=dim_raw_sampled + offset,
-                         ax=axes[0, 0],
-                         linewidth=0.5,
-                         color="gray",
-                         errorbar=("ci", None),
-                         estimator=None
-                         )
+        _ = sns.lineplot(
+            x=data_index_sampled,
+            y=dim_raw_sampled + offset,
+            ax=axes[0, 0],
+            linewidth=0.5,
+            color="gray",
+            errorbar=("ci", None),
+            estimator=None
+        )
         sns.despine()
 
         if motifsets is not None:
             for i, motifset in enumerate(motifsets_sampled):
-                motif_length_sampled = np.int32(max(2, motif_length // factor))
-                for a, pos in enumerate(motifset):
-                    _ = sns.lineplot(ax=axes[0, 0],
-                                     x=data_index_sampled[
-                                       pos: pos + motif_length_sampled],
-                                     y=dim_raw_sampled[
-                                       pos: pos + motif_length_sampled] + offset,
-                                     linewidth=3,
-                                     color=sns.color_palette("tab10")[
-                                         (color_offset + i) % len(
-                                             sns.color_palette("tab10"))],
-                                     errorbar=("ci", None),
-                                     estimator=None)
+                if motifset is not None:
+                    motif_length_sampled = np.int32(max(2, motif_length // factor))
+                    for a, pos in enumerate(motifset):
+                        _ = sns.lineplot(
+                            ax=axes[0, 0],
+                            x=data_index_sampled[
+                              pos: pos + motif_length_sampled],
+                            y=dim_raw_sampled[
+                              pos: pos + motif_length_sampled] + offset,
+                            linewidth=3,
+                            color=sns.color_palette("tab10")[
+                                (color_offset + i) % len(
+                                    sns.color_palette("tab10"))],
+                            errorbar=("ci", None),
+                            estimator=None)
 
-                    motif_length_disp = motif_length
+                        motif_length_disp = motif_length
 
-                    axes[0, 1 + i].set_title(
-                        ("Motif Set " + str(i + 1)) + "\n" +
-                        "k=" + str(len(motifset)) +
-                        ", l=" + str(motif_length_disp),
-                        fontsize=18)
+                        axes[0, 1 + i].set_title(
+                            ("Motif Set " + str(i + 1)) + "\n" +
+                            "k=" + str(len(motifset)) +
+                            ", l=" + str(motif_length_disp),
+                            fontsize=18)
 
-                    df = pd.DataFrame()
-                    df["time"] = range(0, motif_length_disp, 1)
+                        df = pd.DataFrame()
+                        df["time"] = range(0, motif_length_disp, 1)
 
-                    for aa, pos in enumerate(motifsets[i]):
-                        values = np.zeros(len(df["time"]), dtype=np.float32)
-                        value = dim_raw[pos:pos + motif_length_disp:1]
-                        values[:len(value)] = value
+                        for aa, pos in enumerate(motifsets[i]):
+                            values = np.zeros(len(df["time"]), dtype=np.float32)
+                            value = dim_raw[pos:pos + motif_length_disp:1]
+                            values[:len(value)] = value
 
-                        df[str(aa)] = (values - values.mean()) / (
-                                values.std() + 1e-4) + offset
+                            df[str(aa)] = (values - values.mean()) / (
+                                    values.std() + 1e-4) + offset
 
-                    df_melt = pd.melt(df, id_vars="time")
-                    _ = sns.lineplot(
-                        ax=axes[0, 1 + i],
-                        data=df_melt,
-                        errorbar=("ci", 99),
-                        n_boot=1,
-                        lw=1,
-                        color=sns.color_palette("tab10")[
-                            (color_offset + i) % len(sns.color_palette("tab10"))],
-                        x="time",
-                        y="value")
+                        df_melt = pd.melt(df, id_vars="time")
+                        _ = sns.lineplot(
+                            ax=axes[0, 1 + i],
+                            data=df_melt,
+                            errorbar=("ci", 99),
+                            n_boot=1,
+                            lw=1,
+                            color=sns.color_palette("tab10")[
+                                (color_offset + i) % len(sns.color_palette("tab10"))],
+                            x="time",
+                            y="value")
 
         gt_count = 0
         y_labels = []
@@ -527,29 +545,31 @@ def plot_motifset(
 
         if motifsets is not None:
             for i, motif_set in enumerate(motifsets_sampled):
-                motif_length_sampled = np.int32(max(2, motif_length // factor))
+                if motif_set is not None:
+                    motif_length_sampled = np.int32(max(2, motif_length // factor))
 
-                for pos in motif_set:
-                    if pos + motif_length_sampled - 1 < dim_raw_sampled.shape[0]:
-                        ratio = 0.8
-                        rect = Rectangle(
-                            (data_index_sampled[pos], -i - gt_count),
-                            data_index_sampled[pos + motif_length_sampled - 1] -
-                            data_index_sampled[pos],
-                            ratio,
-                            facecolor=sns.color_palette("tab10")[
-                                (color_offset + i) % len(sns.color_palette("tab10"))],
-                            alpha=0.7
-                        )
-                        axes[1, 0].add_patch(rect)
+                    for pos in motif_set:
+                        if pos + motif_length_sampled - 1 < dim_raw_sampled.shape[0]:
+                            ratio = 0.8
+                            rect = Rectangle(
+                                (data_index_sampled[pos], -i - gt_count),
+                                data_index_sampled[pos + motif_length_sampled - 1] -
+                                data_index_sampled[pos],
+                                ratio,
+                                facecolor=sns.color_palette("tab10")[
+                                    (color_offset + i) % len(sns.color_palette("tab10"))],
+                                alpha=0.7
+                            )
+                            axes[1, 0].add_patch(rect)
 
-                # label = (("Motif Set " + str(i + 1)))
-                if dist is not None:
-                    label = "Motif Set, k=" + str(len(motifsets)) + ", d=" + str(np.round(dist, 2))
-                else:
-                    label = "Motif Set, k=" + str(len(motifsets))
+                    # label = (("Motif Set " + str(i + 1)))
+                    if dist is not None:
+                        label = "Motif Set, k=" + str(len(motifsets)) + ", d=" + str(
+                            np.round(dist, 2))
+                    else:
+                        label = "Motif Set, k=" + str(len(motifsets))
 
-                    y_labels.append(label)
+                        y_labels.append(label)
 
     if len(y_labels) > 0:
         axes[1, 0].set_yticks(-np.arange(len(y_labels)) + 0.5)
@@ -666,7 +686,9 @@ def plot_elbow(
         elbow_deviation=1.00,
         slack=0.5,
         distance=znormed_euclidean_distance,
-        distance_preprocessing=sliding_mean_std
+        distance_single=znormed_euclidean_distance_single,
+        distance_preprocessing=sliding_mean_std,
+        backend="scalable"
 ):
     """Plots the elbow-plot for k-Motiflets.
 
@@ -703,6 +725,11 @@ def plot_elbow(
         The distance function to be computed.
     distance_preprocessing: callable (default=sliding_mean_std)
         The distance preprocessing function to be computed.
+    backend : String, default="scalable"
+        The backend to use. As of now 'scalable' and 'default'
+        are supported.
+        Use 'default' for the original exact implementation, and 'scalable' for a
+        fast, scalable but approximate implementation.
 
     Returns
     -------
@@ -722,26 +749,26 @@ def plot_elbow(
     _, raw_data = ml.pd_series_to_numpy(data)
 
     startTime = time.perf_counter()
-    dists, candidates, elbow_points, m \
-        = ml.search_k_motiflets_elbow(
-            k_max,
-            raw_data,
-            motif_length,
-            n_jobs=n_jobs,
-            exclusion=exclusion,
-            elbow_deviation=elbow_deviation,
-            slack=slack,
-            distance=distance,
-            distance_preprocessing=distance_preprocessing
-        )
+    dists, candidates, elbow_points, m, memory_usage = ml.search_k_motiflets_elbow(
+        k_max,
+        raw_data,
+        motif_length,
+        n_jobs=n_jobs,
+        exclusion=exclusion,
+        elbow_deviation=elbow_deviation,
+        slack=slack,
+        distance=distance,
+        distance_single=distance_single,
+        distance_preprocessing=distance_preprocessing,
+        backend=backend)
     endTime = (time.perf_counter() - startTime)
 
-    print("Chosen window-size:", m, "in", np.round(endTime, 1), "s")
+    print(f"Found motiflets in {np.round(endTime, 1)} s")
 
     if filter:
-        elbow_points = ml._filter_unique(elbow_points, candidates, motif_length)
+        elbow_points = ml.filter_unique(elbow_points, candidates, motif_length)
 
-    print("Elbow Points", elbow_points)
+    print("\tElbow Points", elbow_points)
 
     if plot_elbows:
         _plot_elbow_points(
@@ -771,7 +798,7 @@ def plot_elbow(
                 ground_truth=ground_truth,
                 show=True)
 
-    return dists, candidates, elbow_points
+    return dists, candidates, elbow_points, memory_usage
 
 
 def plot_motif_length_selection(
@@ -784,7 +811,9 @@ def plot_motif_length_selection(
         slack=0.5,
         subsample=2,
         distance=znormed_euclidean_distance,
-        distance_preprocessing=sliding_mean_std
+        distance_single=znormed_euclidean_distance_single,
+        distance_preprocessing=sliding_mean_std,
+        backend="scalable"
 ):
     """Computes the AU_EF plot to extract the best motif lengths
 
@@ -818,6 +847,11 @@ def plot_motif_length_selection(
         The distance function to be computed.
     distance_preprocessing: callable (default=sliding_mean_std)
         The distance preprocessing function to be computed.
+    backend : String, default="scalable"
+        The backend to use. As of now 'scalable' and 'default'
+        are supported.
+        Use 'default' for the original exact implementation, and 'scalable' for a
+        fast, scalable but approximate implementation.
 
     Returns
     -------
@@ -845,8 +879,9 @@ def plot_motif_length_selection(
             slack=slack,
             subsample=subsample,
             distance=distance,
-            distance_preprocessing=distance_preprocessing
-        )
+            distance_single=distance_single,
+            distance_preprocessing=distance_preprocessing,
+            backend=backend)
     endTime = (time.perf_counter() - startTime)
     print("\tTime", np.round(endTime, 1), "s")
     indices = ~np.isinf(au_ef)
@@ -962,11 +997,11 @@ def plot_grid_motiflets(
     data_raw_sampled, data_index_sampled = data_raw, data_index
 
     factor = 1
-    if data_raw.shape[-1] > 1000:
-        data_raw_sampled = np.zeros((data_raw.shape[0], 1000))
+    if data_raw.shape[-1] > 2_000:
+        data_raw_sampled = np.zeros((data_raw.shape[0], 2_000))
         for i in range(data_raw.shape[0]):
             index = MinMaxLTTBDownsampler().downsample(
-                np.ascontiguousarray(data_raw[i]), n_out=1000)
+                np.ascontiguousarray(data_raw[i]), n_out=2_000)
             data_raw_sampled[i] = data_raw[i, index]
 
         data_index_sampled = data_index[index]
@@ -1258,7 +1293,7 @@ def plot_competitors(
     elbow_points = np.arange(len(motifsets_filtered))
 
     if filter:
-        elbow_points = ml._filter_unique(elbow_points, motifsets_filtered, motif_length)
+        elbow_points = ml.filter_unique(elbow_points, motifsets_filtered, motif_length)
 
     dists = [ml.get_pairwise_extent(D_full, motiflet_pos, upperbound=np.inf)
              for motiflet_pos in motifsets_filtered]
