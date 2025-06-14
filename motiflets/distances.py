@@ -10,7 +10,7 @@ import numpy as np
 from numba import njit
 
 
-@njit(fastmath=True, cache=True)
+@njit(fastmath=True, cache=True, nogil=True)
 def sliding_csum(ts, m):
     """
     Computes the sliding cumulative sum of squares of a time series with a
@@ -35,20 +35,20 @@ def sliding_csum(ts, m):
     return csumsq[m:] - csumsq[:-m]
 
 
-@njit(fastmath=True, cache=True)
+@njit(fastmath=True, cache=True, nogil=True)
 def euclidean_distance(dot_rolled, n, m, csumsq, order, halve_m):
     dist = -2 * dot_rolled + csumsq + csumsq[order]
 
     # self-join: exclusion zone
-    trivialMatchRange = (max(0, order - halve_m), min(order + halve_m, n))
-    dist[trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
+    start, end = (max(0, order - halve_m), min(order + halve_m, n))
+    dist[start:end] = np.inf
 
     # allow subsequence itself to be in result
     dist[order] = 0
     return dist
 
 
-@njit(fastmath=True, cache=True)
+@njit(fastmath=True, cache=True, nogil=True)
 def sliding_csum_dcsum(ts, m):
     """
     Computes the sliding cumulative sum of squares of a time series with a
@@ -78,7 +78,7 @@ def sliding_csum_dcsum(ts, m):
     return csum[m:] - csum[:-m], dcsum[m:] - dcsum[:-m]
 
 
-@njit(fastmath=True, cache=True)
+@njit(fastmath=True, cache=True, nogil=True)
 def complexity_invariant_distance(dot_rolled, n, m, preprocessing, order, halve_m):
     """ Implementation of the complexity invariant distance (CID) """
     csumsq, ce = preprocessing
@@ -88,28 +88,28 @@ def complexity_invariant_distance(dot_rolled, n, m, preprocessing, order, halve_
     dist = ed * cf
 
     # self-join: exclusion zone
-    trivialMatchRange = (max(0, order - halve_m), min(order + halve_m, n))
-    dist[trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
+    start, end = (max(0, order - halve_m), min(order + halve_m, n))
+    dist[start:end] = np.inf
 
     # allow subsequence itself to be in result
     dist[order] = 0
     return dist
 
 
-@njit(fastmath=True, cache=True)
+@njit(fastmath=True, cache=True, nogil=True)
 def cosine_distance(dot_rolled, n, m, csumsq, order, halve_m):
     dist = 1 - dot_rolled / (csumsq + csumsq[order])
 
     # self-join: exclusion zone
-    trivialMatchRange = (max(0, order - halve_m), min(order + halve_m, n))
-    dist[trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
+    start, end = (max(0, order - halve_m), min(order + halve_m, n))
+    dist[start:end] = np.inf
 
     # allow subsequence itself to be in result
     dist[order] = 0
     return dist
 
 
-@njit(fastmath=True, cache=True)
+@njit(fastmath=True, cache=True, nogil=True)
 def sliding_mean_std(ts, m):
     """Computes the incremental mean, std, given a time series and windows of length m.
 
@@ -132,8 +132,6 @@ def sliding_mean_std(ts, m):
         moving_std : array-like
             The n-m+1 std values
     """
-    # if isinstance(ts, pd.Series):
-    #     ts = ts.to_numpy()
     s = np.concatenate((np.zeros(1, dtype=np.float64), np.cumsum(ts)))
     sSq = np.concatenate((np.zeros(1, dtype=np.float64), np.cumsum(ts ** 2)))
     segSum = s[m:] - s[:-m]
@@ -148,24 +146,24 @@ def sliding_mean_std(ts, m):
     return [moving_mean, moving_std]
 
 
-@njit(fastmath=True, cache=True)
+@njit(fastmath=True, cache=True, nogil=True)
 def znormed_euclidean_distance(dot_rolled, n, m, preprocessing, order, halve_m):
     """ Implementation of z-normalized Euclidean distance """
     means, stds = preprocessing
     dist = 2 * m * (1 - (dot_rolled - m * means * means[order]) / (
             m * stds * stds[order]))
-    dist = np.maximum(dist, 0)
+    dist = np.maximum(dist, 0.0)
 
     # self-join: exclusion zone
-    trivialMatchRange = (max(0, order - halve_m), min(order + halve_m, n))
-    dist[trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
+    start, end = (max(0, order - halve_m), min(order + halve_m, n))
+    dist[start:end] = np.inf
 
     # allow subsequence itself to be in result
     dist[order] = 0
     return dist
 
 
-@njit(fastmath=True, cache=True)
+@njit(fastmath=True, cache=True, nogil=True)
 def znormed_euclidean_distance_single(a, b, a_i, b_j, preprocessing):
     """ Implementation of z-normalized Euclidean distance """
     means, stds = preprocessing
@@ -174,20 +172,20 @@ def znormed_euclidean_distance_single(a, b, a_i, b_j, preprocessing):
              m * stds[a_i] * stds[b_j]))
 
 
-@njit(fastmath=True, cache=True)
+@njit(fastmath=True, cache=True, nogil=True)
 def euclidean_distance_single(a, b, *args):
     """ Implementation of the Euclidean distance """
     diff = (a - b)
     return np.dot(diff, diff)
 
 
-@njit(fastmath=True, cache=True)
+@njit(fastmath=True, cache=True, nogil=True)
 def cosine_distance_single(a, b, a_i, b_j, preprocessing):
     dist = 1 - np.dot(a, b) / (preprocessing[a_i] + preprocessing[b_j])
     return dist
 
 
-@njit(fastmath=True, cache=True)
+@njit(fastmath=True, cache=True, nogil=True)
 def complexity_invariant_distance_single(a, b, a_i, b_j, preprocessing):
     """ Implementation of the Complexity Invariant Distance (CID) """
     _, ce = preprocessing

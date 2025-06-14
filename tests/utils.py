@@ -133,7 +133,7 @@ def test_motiflets_scale_n(
                     elif subsampling:
                         new_filename = f"results/scalability_n_{ds_name}_{k_max}_{backend}_subs_{subsampling}.csv"
                     else:
-                        new_filename = f"results/scalability_n_{ds_name}_{backend}_{k_max}.csv"
+                        new_filename = f"results/scalability_n_{ds_name}_{k_max}_{backend}.csv"
 
                     df.to_csv(new_filename, index=False)
                     print(f"\tDiscovered motiflets in {duration:0.2f} seconds")

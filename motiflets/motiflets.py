@@ -236,69 +236,23 @@ def _sliding_dot_product(query, time_series):
     dot_product : array-like
         The result of the sliding dot-product
     """
-
     m = len(query)
     n = len(time_series)
 
-    time_series_add = 0
-    if n % 2 == 1:
-        time_series = np.concatenate((np.array([0]), time_series))
-        time_series_add = 1
+    ts_padded = np.zeros(n + (n % 2))
+    ts_padded[:n] = time_series
 
-    q_add = 0
-    if m % 2 == 1:
-        query = np.concatenate((np.array([0]), query))
-        q_add = 1
+    q_padded = np.zeros(m + (m % 2))
+    q_padded[:m] = query[::-1]  # Reverse once here
 
-    query = query[::-1]
-
-    query = np.concatenate((query, np.zeros(n - m + time_series_add - q_add)))
-
-    trim = m - 1 + time_series_add
+    fft_len = n + (n % 2) - (m + (m % 2))
+    q_padded = np.concatenate((q_padded, np.zeros(fft_len)))
 
     with objmode(dot_product="float64[:]"):
-        dot_product = fft.irfft(fft.rfft(time_series) * fft.rfft(query))
+        dot_product = fft.irfft(fft.rfft(ts_padded) * fft.rfft(q_padded))
 
+    trim = m - 1 + (n % 2)
     return dot_product[trim:]
-
-
-@njit(fastmath=True, cache=True)
-def _sliding_mean_std(ts, m):
-    """Computes the incremental mean, std, given a time series and windows of length m.
-
-    Computes a total of n-m+1 sliding mean and std-values.
-
-    This implementation is efficient and in O(n), given TS length n.
-
-    Parameters
-    ----------
-    ts : array-like
-        The time series
-    m : int
-        The length of the sliding window to compute std and mean over.
-
-    Returns
-    -------
-    Tuple
-        movmean : array-like
-            The n-m+1 mean values
-        movstd : array-like
-            The n-m+1 std values
-    """
-    # if isinstance(ts, pd.Series):
-    #     ts = ts.to_numpy()
-    s = np.concatenate((np.zeros(1, dtype=np.float64), np.cumsum(ts)))
-    sSq = np.concatenate((np.zeros(1, dtype=np.float64), np.cumsum(ts ** 2)))
-    segSum = s[m:] - s[:-m]
-    segSumSq = sSq[m:] - sSq[:-m]
-
-    movmean = segSum / m
-
-    # avoid dividing by too small std, like 0
-    movstd = np.sqrt(np.clip(segSumSq / m - (segSum / m) ** 2, 0, None))
-    movstd = np.where(np.abs(movstd) < 0.1, 1, movstd)
-
-    return [movmean, movstd]
 
 
 @njit(fastmath=True, cache=True, parallel=True)
@@ -357,13 +311,12 @@ def compute_distances_with_knns_full(
         halve_m = int(m * slack)
 
     D = np.zeros((n, n), dtype=np.float32)
-    knns = np.zeros((n, k), dtype=np.int32)
-    knns[:] = -1
+    knns = np.full((n, k), -1, dtype=np.int32)
 
     preprocessing = distance_preprocessing(ts, m)
 
     dot_first = _sliding_dot_product(ts[:m], ts)
-    bin_size = int(np.ceil(ts.shape[0] / n_jobs))
+    bin_size = max(1, n // (n_jobs * 4))
 
     for idx in prange(n_jobs):
         start = idx * bin_size
@@ -463,7 +416,8 @@ def compute_distances_with_knns_sparse(
               range(n)]
 
     dot_first = _sliding_dot_product(ts[:m], ts)
-    bin_size = int(np.ceil(ts.shape[0] / n_jobs))
+    bin_size = max(1, n // (n_jobs * 4))
+
     preprocessing = distance_preprocessing(ts, m)
 
     # Store an upper bound for each k-nn distance
@@ -521,7 +475,7 @@ def compute_distances_with_knns_sparse(
     return D_sparse, knns
 
 
-@njit(fastmath=True, cache=True, parallel=True)
+@njit(nogil=True, fastmath=True, cache=True, parallel=True)
 def compute_distances_with_knns(
         ts,
         m,
@@ -532,25 +486,27 @@ def compute_distances_with_knns(
         distance=znormed_euclidean_distance,
         distance_preprocessing=sliding_mean_std
 ):
-    n = np.int32(ts.shape[0] - m + 1)
+    n = np.int32(ts.size - m + 1)
     n_jobs = max(1, min(n // 8, n_jobs))  # Cannot use more jobs than length of the ts
+
+    ts = ts.astype(np.float32)
 
     halve_m = 0
     if exclude_trivial_match:
         halve_m = int(m * slack)
 
     D_knn = np.zeros((n, k), dtype=np.float32)
-    knns = np.zeros((n, k), dtype=np.int32)
+    knns = np.full((n, k), -1, dtype=np.int32)
 
     preprocessing = distance_preprocessing(ts, m)
 
     dot_first = _sliding_dot_product(ts[:m], ts)
-    bin_size = int(np.ceil(ts.shape[0] / n_jobs))
+    bin_size = max(1, n // (n_jobs * 4))
 
     # first pass, computing the k-nns
     for idx in prange(n_jobs):
         start = idx * bin_size
-        end = min((idx + 1) * bin_size, n)
+        end = min(start + bin_size, n)
 
         dot_prev = None
         for order in np.arange(start, end):
@@ -569,7 +525,6 @@ def compute_distances_with_knns(
 
             knn = _argknn(dist, k, m, slack=slack)
             D_knn[order, :] = dist[knn[-1]]  # in case too little knns are returned
-            knns[order, :] = knn[-1]
 
             D_knn[order, :len(dist[knn])] = dist[knn]
             knns[order, :len(knn)] = knn
@@ -643,7 +598,7 @@ def compute_distances_with_knns_stitch(
         ts, m, D_knn, knns, kth_extent)
 
     print(f"TS length reduced from {len(ts)} to {len(ts_stitched)}")
-    assert len(ts_stitched) < 64_000
+    assert len(ts_stitched) < 64_000  # FIXME?!
 
     # compute distances and knns from stitched time series
     D_stitched, knns_stitched = compute_distances_with_knns_full(
@@ -726,7 +681,7 @@ def get_radius(D_full, motifset_pos):
     return motiflet_radius
 
 
-@njit(fastmath=True, cache=True)
+@njit(fastmath=True, cache=True, nogil=True)
 def get_pairwise_extent(D_full, motifset_pos, upperbound=np.inf):
     """Computes the extent of the motifset using pre-computed distances.
 
@@ -764,7 +719,7 @@ def get_pairwise_extent(D_full, motifset_pos, upperbound=np.inf):
     return motifset_extent
 
 
-@njit(fastmath=True, cache=True)
+@njit(fastmath=True, cache=True, nogil=True)
 def get_pairwise_extent_raw(
         series, motifset_pos, motif_length,
         distance_single, preprocessing, upperbound=np.inf):
@@ -877,7 +832,7 @@ def _argknn(
     return np.array(idx, dtype=np.int32)
 
 
-@njit(fastmath=True, cache=True)
+@njit(fastmath=True, cache=True, nogil=True)
 def get_approximate_k_motiflet(
         ts, m, k, D, knns,
         distance_single=None,
@@ -922,8 +877,7 @@ def get_approximate_k_motiflet(
     motiflet_dist = upper_bound
     motiflet_candidate = None
 
-    motiflet_all_candidates = np.zeros((n, k), dtype=np.int32)
-    motiflet_all_candidates[:] = -1  # initialize all with -1
+    motiflet_all_candidates = np.full((n, k), -1, dtype=np.int32)
 
     # allow subsequence itself
     # Fill diagonal with 0
@@ -940,24 +894,23 @@ def get_approximate_k_motiflet(
     # order by increasing k-nn distance
     best_order = np.argsort(knn_distances)
 
-    # TODO: parallelize??
     for i, order in enumerate(best_order):
-        idx = knns[order]
-        motiflet_all_candidates[i, :min(k, len(idx))] = idx[:k]
+        idx = knns[order][:k]
+        motiflet_all_candidates[i, :min(k, len(idx))] = idx
 
-        if len(idx) >= k and idx[k - 1] >= 0:
+        if len(idx) >= k and idx[-1] >= 0:
             if knn_distances[order] <= motiflet_dist:
                 if use_D_full:
                     # get_pairwise_extent requires the full distance matrix
-                    motiflet_extent = get_pairwise_extent(D, idx[:k], motiflet_dist)
+                    motiflet_extent = get_pairwise_extent(D, idx, motiflet_dist)
                 else:
                     # get_pairwise_extent_raw does pairwise comparisons
                     motiflet_extent = get_pairwise_extent_raw(
-                        ts, idx[:k], m, distance_single, preprocessing, motiflet_dist)
+                        ts, idx, m, distance_single, preprocessing, motiflet_dist)
 
                 if motiflet_extent <= motiflet_dist:
                     motiflet_dist = motiflet_extent
-                    motiflet_candidate = idx[:k]
+                    motiflet_candidate = idx
             else:
                 # There is no point in continuing, as the distances are sorted
                 # and the next k-NN will have a larger distance.
@@ -1154,8 +1107,7 @@ def find_au_ef_motif_length(
         data = data[::subsample]
 
     # in reverse order
-    au_efs = np.zeros(len(motif_length_range), dtype=object)
-    au_efs.fill(np.inf)
+    au_efs = np.full(len(motif_length_range), np.inf, dtype=object)
     elbows = np.zeros(len(motif_length_range), dtype=object)
     top_motiflets = np.zeros(len(motif_length_range), dtype=object)
     dists = np.zeros(len(motif_length_range), dtype=object)
