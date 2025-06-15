@@ -862,8 +862,8 @@ def get_approximate_k_motiflet(
 
     # allow subsequence itself
     # Fill diagonal with 0
+    knn_distances = np.zeros(n, dtype=np.float64)
     if use_D_full:
-        knn_distances = np.zeros(n, dtype=np.float64)
         for i in range(len(D)):
             D[i][i] = 0
         for i in np.arange(n):
@@ -1322,14 +1322,16 @@ def search_k_motiflets_elbow(
             'Unknown backend: ' + backend + '. ' +
             'Use "scalable" , "sparse", or "default".')
 
+    print(f"Memory usage: {memory_usage:.2f} MB")
+
     # smoothen the line to make it monotonically increasing
     k_motiflet_distances[0:2] = k_motiflet_distances[2]
     for i in range(len(k_motiflet_distances), 2):
         k_motiflet_distances[i - 1] = min(k_motiflet_distances[i],
                                           k_motiflet_distances[i - 1])
 
-    elbow_points = find_elbow_points(k_motiflet_distances,
-                                     elbow_deviation=elbow_deviation)
+    elbow_points = find_elbow_points(
+        k_motiflet_distances, elbow_deviation=elbow_deviation)
 
     if filter:
         elbow_points = filter_unique(
