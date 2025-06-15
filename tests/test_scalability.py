@@ -30,9 +30,9 @@ def test_motiflets():
         1_000,
         5_000,
         10_000,
-        # 30_000,
+        30_000,
         # 50_000
-        #, 100_000,
+        # 100_000,
         # 150_000,
         # 200_000,
         # 250_000
@@ -49,7 +49,7 @@ def test_motiflets():
             ds_name,
             series,
             n_jobs=8,
-            # backend="scalable"
+            backend="default"
         )
 
         k_max = 5
