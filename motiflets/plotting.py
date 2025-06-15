@@ -35,46 +35,45 @@ class Motiflets:
             n_jobs=4,
             backend="scalable"
     ):
-    """Computes the AU_EF plot to extract the best motif lengths
+        """Computes the AU_EF plot to extract the best motif lengths
 
-        This is the method to find and plot the characteristic motif-lengths, for k in
-        [2...k_max], using the area AU-EF plot.
+            This is the method to find and plot the characteristic motif-lengths, for k in
+            [2...k_max], using the area AU-EF plot.
 
-        Details are given within the paper 5.2 Learning Motif Length l.
+            Details are given within the paper 5.2 Learning Motif Length l.
 
-        Parameters
-        ----------
-        ds_name: String
-            Name of the time series for displaying
-        series: array-like
-            the TS
-        ground_truth: pd.Series
-            Ground-truth information as pd.Series.
-        elbow_deviation : float, default=1.00
-            The minimal absolute deviation needed to detect an elbow.
-            It measures the absolute change in deviation from k to k+1.
-            1.05 corresponds to 5% increase in deviation.
-        distance: str (default="znormed_ed")
-            The name of the distance function to be computed.
-            Available options are:
-                - 'znormed_ed' or 'znormed_euclidean' for z-normalized ED
-                - 'ed' or 'euclidean' for the "normal" ED.
-        slack: float
-            Defines an exclusion zone around each subsequence to avoid trivial matches.
-            Defined as percentage of m. E.g. 0.5 is equal to half the window length.
-        n_jobs : int
-            Number of jobs to be used.
-        backend : String, default="scalable"
-            The backend to use. As of now 'scalable', 'sparse' and 'default' are supported.
-            Use 'default' for the original exact implementation with excessive memory,
-            Use 'scalable' for a scalable, exact implementation with less memory,
-            Use 'sparse' for a scalable, exact implementation with more memory.
+            Parameters
+            ----------
+            ds_name: String
+                Name of the time series for displaying
+            series: array-like
+                the TS
+            ground_truth: pd.Series
+                Ground-truth information as pd.Series.
+            elbow_deviation : float, default=1.00
+                The minimal absolute deviation needed to detect an elbow.
+                It measures the absolute change in deviation from k to k+1.
+                1.05 corresponds to 5% increase in deviation.
+            distance: str (default="znormed_ed")
+                The name of the distance function to be computed.
+                Available options are:
+                    - 'znormed_ed' or 'znormed_euclidean' for z-normalized ED
+                    - 'ed' or 'euclidean' for the "normal" ED.
+            slack: float
+                Defines an exclusion zone around each subsequence to avoid trivial matches.
+                Defined as percentage of m. E.g. 0.5 is equal to half the window length.
+            n_jobs : int
+                Number of jobs to be used.
+            backend : String, default="scalable"
+                The backend to use. As of now 'scalable', 'sparse' and 'default' are supported.
+                Use 'default' for the original exact implementation with excessive memory,
+                Use 'scalable' for a scalable, exact implementation with less memory,
+                Use 'sparse' for a scalable, exact implementation with more memory.
 
-        Returns
-        -------
-        best_motif_length: int
-            The motif length that maximizes the AU-EF.
-
+            Returns
+            -------
+            best_motif_length: int
+                The motif length that maximizes the AU-EF.
         """
         self.ds_name = ds_name
         self.series = series
