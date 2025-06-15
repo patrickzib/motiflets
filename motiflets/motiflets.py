@@ -1322,7 +1322,7 @@ def search_k_motiflets_elbow(
             'Unknown backend: ' + backend + '. ' +
             'Use "scalable" , "sparse", or "default".')
 
-    print(f"Memory usage: {memory_usage:.2f} MB")
+    print(f"\tMemory usage: {memory_usage:.2f} MB")
 
     # smoothen the line to make it monotonically increasing
     k_motiflet_distances[0:2] = k_motiflet_distances[2]
