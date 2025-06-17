@@ -10,8 +10,8 @@ import utils as ut
 path = "../datasets/momp/"
 
 filenames = {
-    "Bird12-Week3_2018_1_10": ["22.5 hours of Chicken data at 100 Hz", 16384, ""],
-    "BlackLeggedKittiwake": ["Flying Bird: Black‐legged Kittiwake", 8192, "?"],
+    # "Bird12-Week3_2018_1_10": ["22.5 hours of Chicken data at 100 Hz", 16384, ""],
+    # "BlackLeggedKittiwake": ["Flying Bird: Black‐legged Kittiwake", 8192, "?"],
     # "Challenge2009Respiration500HZ": ["Challenge 2009 Respiration", 16384, "?"],
     # "Challenge2009TestSetA_101a": ["Respiration", 4096, "?"],
     # "CinC_Challenge": ["Electroencephalography C3-M2 Part 2", 8192, "Calibration"],
@@ -20,7 +20,7 @@ filenames = {
     # "FingerFlexionECoG": ["Finger Flexion ECoG electrocorticography", 16384, "?"],
     # "HAR_Ambient_Sensor_Data": ["Human Activity Recognition", 4096, "?"],
     # "house": ["Household Electrical Demand", 32768, "?"],
-    # "Lab_FD_061014": ["Insect EPG - Flaming Dragon", 32768, "?"],
+    "Lab_FD_061014": ["Insect EPG - Flaming Dragon", 32768, "?"],
     # "Lab_K_060314": ["ACP on Kryder Citrus", 65536, ""],
     # "lorenzAttractorsLONG": ["Lorenz Attractors", 524288, "?"],
     # "MGHSleepElectromyography": ["MGH Sleep Electromyography 200 Hz", 32768, "?"],
@@ -42,16 +42,27 @@ def read_mat(filename):
     data = sio.loadmat(path + filename + '.mat')
 
     # extract data array
-    key = list(data.keys())[3]
+    key = filename
+    try:
+        data = data[key]
+    except KeyError:
+        # try to find the first key that is not a meta key
+        for k in data.keys():
+            if ((not k.startswith("__"))
+                    and (data[k].dtype in [np.float32, np.float64])):
+                key = k
+                data = data[k]
+                print("\tFound key:", key, "with type", data.dtype)
+                break
 
     # flatten output
-    data = pd.DataFrame(data[key]).to_numpy().flatten()
-
+    data = pd.DataFrame(data).to_numpy().flatten()
     # data = scipy.stats.zscore(data)
 
     mb = (data.size * data.itemsize) / (1024 ** 2)
 
     print(f"\tLength: {len(data)} {mb:0.2f} MB")
+    print(f"\tType: {data.dtype}")
     print(f"\tContains NaN or Inf? {np.isnan(data).any()} {np.isinf(data).any()}")
     print(f"\tStats Mean {np.mean(data):0.3f}, Std {np.std(data):0.3f} " +
           f"Min {np.min(data):0.3f} Max {np.max(data):0.3f}")

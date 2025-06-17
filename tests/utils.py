@@ -53,7 +53,7 @@ def test_motiflets_scale_n(
 
             if subsampling:
                 if isinstance(ts_orig, pd.DataFrame):
-                    ts = ts_orig.iloc[::subsampling]
+                    ts = ts_orig.iloc[::subsampling]   # FIXME why?
                 elif isinstance(ts_orig, pd.Series):
                     ts, _ = compute_paa(ts_orig.to_numpy(), subsampling)
                 else:
