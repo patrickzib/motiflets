@@ -69,7 +69,7 @@ def test_motiflets_scale_n(
 
                 if subsampling:
                     l_new = int(np.round(l / subsampling))
-                    print(f"\tApplying Subsampling, Old Size {ts_orig.shape} " +
+                    print(f"\tApplying Subsampling {subsampling}, Old Size {ts_orig.shape} " +
                           f"New Size {ts.shape}, " +
                           f"New Window Size {l_new}")
 
@@ -77,7 +77,6 @@ def test_motiflets_scale_n(
                     mm = Motiflets(
                         ds_name,
                         ts,
-                        # distance="euclidean",
                         backend=backend,
                         n_jobs=cores,
                         delta=delta)
@@ -93,6 +92,11 @@ def test_motiflets_scale_n(
 
                     if subsampling:
                         motiflet = np.array(motiflet) * subsampling  # scale up again
+                        preprocessing = mm.distance_preprocessing(ts_orig, l)
+                        extent = get_pairwise_extent_raw(
+                            ts_orig, motiflet, l,
+                            distance_single=mm.distance_single,
+                            preprocessing=preprocessing)
 
                     # FIXME ...
                     # if (backend != "pyattimo") and subsampling:    # FIXME add again backend == "pyattimo" or

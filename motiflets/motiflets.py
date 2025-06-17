@@ -338,10 +338,6 @@ def compute_distances_with_knns_full(
             dot_prev = dot_rolled
 
             knn = _argknn(dist, k, m, slack=slack)
-            # knn = optimized_argknn(dist, k, m, slack=slack)
-            #if knn != knn2:
-            #    print("Warning: knn != knn2", knn, knn2)
-            #    assert False
 
             D[order, :] = dist
             knns[order, :len(knn)] = knn
@@ -633,58 +629,6 @@ def get_pairwise_extent_raw(
     return motifset_extent
 
 
-@njit(nogil=True, fastmath=True)
-def optimized_argknn(dist, k, m, slack=0.5, lowest_dist=np.inf):
-    n = len(dist)
-    halve_m = int(m * slack)
-    dists = dist.copy()  # Work on copy to preserve original
-
-    # Preallocate results array
-    idx = np.full(k, -1, dtype=np.int32)
-
-    # First pass: process top 2k candidates efficiently
-    new_k = min(n - 1, 2 * k)
-
-    # Get and sort top candidates
-    candidates = np.argpartition(dist, new_k - 1)[:new_k]
-    sorted_idx = np.argsort(dist[candidates])
-    sorted_candidates = candidates[sorted_idx]
-
-    count = 0
-    for pos in sorted_candidates:
-        if count >= k:
-            break
-
-        if dist[pos] > lowest_dist:
-            continue  # Early exit as sorted
-
-        if np.isfinite(dist[pos]):
-            # Record valid candidate
-            idx[count] = pos
-            count += 1
-
-            # Exclude neighborhood
-            start = max(0, pos - halve_m)
-            end = min(pos + halve_m + 1, n)
-            dists[start:end] = np.inf
-
-    # Second pass: find remaining candidates
-    while count < k:
-        pos = np.argmin(dists)
-        if np.isfinite(dists[pos]) and dists[pos] <= lowest_dist:
-            idx[count] = pos
-            count += 1
-
-            # Exclude neighborhood
-            start = max(0, pos - halve_m)
-            end = min(pos + halve_m + 1, n)
-            dists[start:end] = np.inf
-        else:
-            break
-
-    return idx[:count]
-
-
 @njit(nogil=True, fastmath=True, cache=True)
 def _argknn(dist, k, m, lowest_dist=np.inf, slack=0.5):
     """Finds the closest k-NN non-overlapping subsequences in candidates.
@@ -831,9 +775,9 @@ def get_approximate_k_motiflet(
                     motiflet_dist = motiflet_extent
                     motiflet_candidate = idx
             else:
-               # There is no point in continuing, as the distances are sorted
-               # and the next k-NN will have a larger distance.
-               break
+                # There is no point in continuing, as the distances are sorted
+                # and the next k-NN will have a larger distance.
+                break
 
     return motiflet_candidate, motiflet_dist, motiflet_all_candidates
 
@@ -1204,7 +1148,7 @@ def search_k_motiflets_elbow(
     if backend == "pyattimo":
         # Prepare common arguments
         attimo_args = {
-            'data_raw': data_raw,
+            'ts': data_raw,
             'w': m,
             'support': k_max_ - 1,
             'exclusion_zone': exclusion_m,

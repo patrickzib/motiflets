@@ -125,7 +125,7 @@ def main():
         # scalable
         backends = ["scalable"]
         run_safe(
-           filename, read_mat(filename), l_range, k_max, backends
+           filename, read_mat(filename), l_range, k_max, backends, subsampling=10
         )
 
         # # subsampling
