@@ -4,8 +4,6 @@
 
 __author__ = ["patrickzib"]
 
-from unittest.mock import inplace
-
 import numpy as np
 from numba import njit
 
