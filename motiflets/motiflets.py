@@ -11,16 +11,14 @@ import os
 from ast import literal_eval
 from os.path import exists
 
-import numpy as np
 import numpy.fft as fft
 import pandas as pd
 import psutil
 from joblib import Parallel, delayed
-from numba import njit, prange, objmode, types
+from numba import prange, objmode, types
 from numba.typed import Dict, List
 from scipy.signal import argrelextrema
 from scipy.stats import zscore
-from tqdm.auto import tqdm
 
 from motiflets.distances import *
 
