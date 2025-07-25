@@ -15,7 +15,8 @@ import numpy.fft as fft
 import pandas as pd
 import psutil
 from joblib import Parallel, delayed
-from numba import prange, objmode, types
+from numba import set_num_threads, objmode, prange, get_num_threads
+from numba import types
 from numba.typed import Dict, List
 from scipy.signal import argrelextrema
 from scipy.stats import zscore
@@ -1223,6 +1224,10 @@ def search_k_motiflets_elbow(
         m : int
             best motif length
     """
+    n_jobs = os.cpu_count() if n_jobs < 1 else n_jobs
+    previous_jobs = get_num_threads()
+    set_num_threads(n_jobs)
+
     # convert to numpy array
     _, data_raw = pd_series_to_numpy(data)
 
@@ -1334,6 +1339,8 @@ def search_k_motiflets_elbow(
     if filter:
         elbow_points = filter_unique(
             elbow_points, k_motiflet_candidates, m)
+
+    set_num_threads(previous_jobs)
 
     return k_motiflet_distances, k_motiflet_candidates, elbow_points, m, memory_usage
 

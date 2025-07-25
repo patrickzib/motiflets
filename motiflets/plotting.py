@@ -4,6 +4,7 @@
 
 __author__ = ["patrickzib"]
 
+import os
 import time
 
 import matplotlib
@@ -80,6 +81,8 @@ class Motiflets:
         self.elbow_deviation = elbow_deviation
         self.slack = slack
         self.ground_truth = ground_truth
+
+        n_jobs = os.cpu_count() if n_jobs < 1 else n_jobs
         self.n_jobs = n_jobs
 
         # distance function used
