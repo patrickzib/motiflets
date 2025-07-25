@@ -139,7 +139,7 @@ def sliding_mean_std(ts, m):
 
     # avoid dividing by too small std, like 0
     moving_std = np.sqrt(np.clip(segSumSq / m - (segSum / m) ** 2, 0, None))
-    moving_std = np.where(np.abs(moving_std) < 0.1, 1, moving_std)
+    moving_std = np.where(moving_std < 1e-4, 0.1, moving_std)
 
     return [moving_mean, moving_std]
 
