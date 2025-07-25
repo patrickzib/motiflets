@@ -244,7 +244,7 @@ class Motiflets:
         fig, ax = plot_motifset(
             self.ds_name,
             self.series,
-            motifset=self.motiflets[elbow_point],
+            motifsets=self.motiflets[elbow_point],
             dist=self.dists[elbow_point],
             motif_length=self.motif_length,
             show=path is None)
