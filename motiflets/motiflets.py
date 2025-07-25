@@ -864,7 +864,7 @@ def get_approximate_k_motiflet(
     knn_distances = np.zeros(n, dtype=np.float64)
     if use_D_full:
         for i in range(len(D)):
-            D[i][i] = 0
+            D[i][i] = 0.0
         for i in np.arange(n):
             knn_distances[i] = D[i][knns[i, k - 1]]
     else:
@@ -1347,7 +1347,7 @@ def search_k_motiflets_elbow(
 
 @njit(fastmath=True, cache=True)
 def candidate_dist(D_full, pool, upperbound, m, slack=0.5):
-    motiflet_candidate_dist = 0
+    motiflet_candidate_dist = 0.0
     m_half = int(m * slack)
     for i in pool:
         for j in pool:
