@@ -747,7 +747,7 @@ def plot_elbow(
         if isinstance(data, pd.Series):
             data = data.to_frame().T
         elif isinstance(data, (np.ndarray, np.generic)):
-            data = np.arange(data.shape[-1])
+            data = data.reshape(1, -1)
 
     _, raw_data = ml.pd_series_to_numpy(data)
 
@@ -994,7 +994,7 @@ def plot_grid_motiflets(
         if isinstance(data, pd.Series):
             data = data.to_frame().T
         elif isinstance(data, (np.ndarray, np.generic)):
-            data = np.arange(data.shape[-1])
+            data = data.reshape(1, -1)
 
     data_index, data_raw = ml.pd_series_to_numpy(data)
     data_raw_sampled, data_index_sampled = data_raw, data_index
