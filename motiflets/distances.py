@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Distances used in LAMA
+"""Distances used in motiflets.
 """
 
 __author__ = ["patrickzib"]
