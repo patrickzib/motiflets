@@ -162,7 +162,6 @@ class Motiflets:
             self,
             k_max,
             motif_length=None,  # if None, use best_motif_length
-            exclusion=None,
             filter=True,
             plot_elbows=True,
             plot_motifs_as_grid=True,
@@ -180,8 +179,6 @@ class Motiflets:
                 use [2...k_max] to compute the elbow plot (user parameter).
             motif_length: int
                 the length of the motif (user parameter)
-            exclusion: 2d-array
-                exclusion zone - use when searching for the TOP-2 motiflets
             filter: bool, default=True
                 filters overlapping motiflets from the result,
             plot_elbows: bool, default=False
@@ -207,7 +204,6 @@ class Motiflets:
             self.series,
             ds_name=self.ds_name,
             motif_length=motif_length,
-            exclusion=exclusion,
             plot_elbows=plot_elbows,
             plot_grid=plot_motifs_as_grid,
             ground_truth=self.ground_truth,
@@ -679,7 +675,6 @@ def plot_elbow(
         data,
         ds_name,
         motif_length,
-        exclusion=None,
         plot_elbows=False,
         plot_grid=True,
         ground_truth=None,
@@ -710,8 +705,6 @@ def plot_elbow(
         the name of the dataset
     motif_length: int
         the length of the motif (user parameter)
-    exclusion: 2d-array (default=None)
-        exclusion zone - use when searching for the TOP-2 motiflets
     plot_elbows: bool (default=False)
         plots the elbow points into the plot
     ground_truth: pd.Series (default=None)
@@ -757,7 +750,6 @@ def plot_elbow(
         raw_data,
         motif_length,
         n_jobs=n_jobs,
-        exclusion=exclusion,
         elbow_deviation=elbow_deviation,
         slack=slack,
         distance=distance,
@@ -766,12 +758,12 @@ def plot_elbow(
         backend=backend)
     endTime = (time.perf_counter() - startTime)
 
-    print(f"Found motiflets in {np.round(endTime, 1)} s")
+    # print(f"Found motiflets in {np.round(endTime, 1)} s")
 
     if filter:
         elbow_points = ml.filter_unique(elbow_points, candidates, motif_length)
 
-    print("\tElbow Points", elbow_points)
+    # print("\tElbow Points", elbow_points)
 
     if plot_elbows:
         _plot_elbow_points(

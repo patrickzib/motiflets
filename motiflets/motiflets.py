@@ -1028,7 +1028,6 @@ def find_au_ef_motif_length(
         data,
         k_max,
         motif_length_range,
-        exclusion=None,
         n_jobs=4,
         elbow_deviation=1.00,
         slack=0.5,
@@ -1048,8 +1047,6 @@ def find_au_ef_motif_length(
         The interval of k's to compute the area of a single AU_EF.
     motif_length_range : array-like
         The range of lengths to compute the AU-EF.
-    exclusion : 2d-array
-        exclusion zone - use when searching for the TOP-2 motiflets
     n_jobs : int
         Number of jobs to be used.
     elbow_deviation : float, default=1.00
@@ -1105,7 +1102,6 @@ def find_au_ef_motif_length(
                 data,
                 m // subsample,
                 n_jobs=n_jobs,
-                exclusion=exclusion,
                 elbow_deviation=elbow_deviation,
                 slack=slack,
                 distance=distance,
@@ -1156,7 +1152,6 @@ def search_k_motiflets_elbow(
         data,
         motif_length='auto',
         motif_length_range=None,
-        exclusion=None,
         elbow_deviation=1.00,
         filter=True,
         slack=0.5,
@@ -1186,8 +1181,6 @@ def search_k_motiflets_elbow(
         Can be used to determine to length of the motif set automatically.
         If a range is passed and `motif_length == 'auto'`, the best window length
         is first determined, prior to computing the elbow-plot.
-    exclusion : 2d-array (default=None)
-        exclusion zone - use when searching for the TOP-2 motiflets
     approximate_motiflet_pos : array-like (default=None)
         An initial estimate of the positions of the k-Motiflets for each k in the
         given range [2...k_max]. Will be used for bounding distance computations.

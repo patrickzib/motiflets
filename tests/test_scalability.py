@@ -1,15 +1,8 @@
-from motiflets.plotting import *
-
-matplotlib.rcParams['pdf.fonttype'] = 42
-matplotlib.rcParams['ps.fonttype'] = 42
-
 import warnings
 
+from motiflets.plotting import *
+
 warnings.simplefilter("ignore")
-
-import matplotlib as mpl
-
-mpl.rcParams['figure.dpi'] = 150
 
 path = "../datasets/experiments/"
 
@@ -31,7 +24,7 @@ def test_motiflets():
         5_000,
         10_000,
         30_000,
-        # 50_000
+        50_000
         # 100_000,
         # 150_000,
         # 200_000,
@@ -43,16 +36,16 @@ def test_motiflets():
 
     for i, length in enumerate(lengths):
         print("Current", length)
-        series = B.iloc[:length,0].T
+        series = B.iloc[:length, 0].T.values
 
         ml = Motiflets(
             ds_name,
             series,
             n_jobs=8,
-            backend="default"
+            backend="sparse"
         )
 
-        k_max = 5
+        k_max = 10
 
         t_before = time.time()
         dists, motiflets, elbow_points = ml.fit_k_elbow(
@@ -68,8 +61,8 @@ def test_motiflets():
         print("\tMotiflets:", motiflets)
         print("\tDistances:", dists)
 
-        dict = time_s
-        df = pd.DataFrame(data=dict, columns=['Time'], index=lengths)
-        df["Method"] = "Motiflets (one-dim)"
-        df.index.name = "Lengths"
+        #dict = time_s
+        #df = pd.DataFrame(data=dict, columns=['Time'], index=lengths)
+        #df["Method"] = "Motiflets (one-dim)"
+        #df.index.name = "Lengths"
         # df.to_csv('csv/scalability_univ_motiflets_k5.csv')
