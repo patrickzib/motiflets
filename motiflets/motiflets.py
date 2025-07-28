@@ -6,6 +6,7 @@
 
 __author__ = ["patrickzib"]
 
+import warnings
 import itertools
 import os
 from ast import literal_eval
@@ -377,7 +378,7 @@ def compute_upper_bound(
     return kth_extent
 
 
-@njit(fastmath=True, cache=True)
+@njit(fastmath=True, cache=True, nogil=True)
 def compute_distances_with_knns_sparse(
         time_series,
         m,
@@ -457,7 +458,7 @@ def compute_distances_with_knns_sparse(
         dot_first.append(_sliding_dot_product(time_series[dim, :m], time_series[dim]))
 
     # TODO no sparse matrix support in numba. Thus we use this hack
-    D_bool = [Dict.empty(key_type=types.int32, value_type=types.bool_) for _ in
+    D_bool = [Dict.empty(key_type=types.int32, value_type=types.uint16) for _ in
               range(n)]
 
     # Store an upper bound for each k-nn distance
@@ -466,7 +467,7 @@ def compute_distances_with_knns_sparse(
         distance_single, preprocessing,
     )
 
-    # TODO Parallelizm does not work, as Dict is not thread safe :(
+    # Parallelizm does not work, as Dict is not thread safe :/
     for order in np.arange(0, n):
         # memorize which pairs are needed
         for ks, dist in zip(knns[order], D_knn[order]):
@@ -746,7 +747,7 @@ def get_pairwise_extent_raw(
     return motifset_extent
 
 
-@njit(fastmath=True, cache=True)
+@njit(nogil=True, fastmath=True, cache=True)
 def _argknn(
         dist, k, m, lowest_dist=np.inf, slack=0.5):
     """Finds the closest k-NN non-overlapping subsequences in candidates.
@@ -1258,6 +1259,7 @@ def search_k_motiflets_elbow(
     k_motiflet_candidates = np.empty(k_max_, dtype=object)
 
     if backend in ["default", "scalable", "sparse"]:
+
         if backend == "default":
             # switch to scalable matrix representation when length is >25000 or 4 GB
             if data_raw.ndim == 1:
@@ -1276,6 +1278,13 @@ def search_k_motiflets_elbow(
             # uses pairwise comparisons to compute the distances
             call_to_distances = compute_distances_with_knns
         elif backend == "sparse":
+            warnings.warn(
+                "Backend 'sparse' is deprecated and will be removed in a "
+                "future version. Use backend 'scalable' instead.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+
             # uses sparse backend with sparse matrix
             call_to_distances = compute_distances_with_knns_sparse
         else:
@@ -1318,7 +1327,7 @@ def search_k_motiflets_elbow(
             'Unknown backend: ' + backend + '. ' +
             'Use "scalable" , "sparse", or "default".')
 
-    print(f"\tMemory usage: {memory_usage:.2f} MB")
+    # print(f"\tMemory usage: {memory_usage:.2f} MB")
 
     # smoothen the line to make it monotonically increasing
     k_motiflet_distances[0:2] = k_motiflet_distances[2]

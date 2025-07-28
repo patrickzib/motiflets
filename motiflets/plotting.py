@@ -33,7 +33,7 @@ class Motiflets:
             elbow_deviation=1.00,
             distance="znormed_ed",
             slack=0.5,
-            n_jobs=4,
+            n_jobs=-1,
             backend="scalable"
     ):
         """Computes the AU_EF plot to extract the best motif lengths
