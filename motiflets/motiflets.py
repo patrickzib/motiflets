@@ -26,7 +26,7 @@ from motiflets.distances import *
 
 
 def as_series(data, index_range, index_name):
-    """Coverts a time series to a series with an index.
+    """Converts a time series to a series with an index.
 
     Parameters
     ----------
