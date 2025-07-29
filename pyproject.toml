@@ -1,12 +1,12 @@
 [project]
 name = "motiflets"
 
-version = "0.6.1"
+version = "0.6.2"
 
 description = "Motiflets - Simple and Accurate Detection of Motifs in Time Series"
 readme = "README.md"
 authors = [
-    {name = "patrickzib", email = "void@void.com"}
+    {name = "patrickzib", email = "patrick.schaefer@hu-berlin.de"}
 ]
 keywords = [
     "machine-learning",

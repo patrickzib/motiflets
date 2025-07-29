@@ -10,8 +10,8 @@ from pathlib import Path
 pyproject = toml.load("pyproject.toml")
 
 this_directory = Path(__file__).parent
-long_description = (this_directory / "README.md").read_text("UTF-8")
-    
+long_description = (this_directory / "README.md").read_text("utf-8")
+
 """Set up package."""
 setup(
     author_email=pyproject["project"]["authors"][0]["email"],
@@ -42,7 +42,6 @@ setup(
     ),
     project_urls=pyproject["project"]["urls"],
     python_requires=pyproject["project"]["requires-python"],
-    setup_requires=pyproject["build-system"]["requires"],
     url=pyproject["project"]["urls"]["repository"],
     version=pyproject["project"]["version"],
     zip_safe=False,
