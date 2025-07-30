@@ -237,20 +237,20 @@ def _sliding_dot_product(query, time_series):
     m = len(query)
     n = len(time_series)
 
-    pad_len = n + m - 1
-    fft_len = pad_len
-
-    ts_padded = np.zeros(fft_len)
+    ts_padded = np.zeros(n + (n % 2))
     ts_padded[:n] = time_series
 
-    q_padded = np.zeros(fft_len)
+    q_padded = np.zeros(m + (m % 2))
     q_padded[:m] = query[::-1]  # Reverse once here
+
+    fft_len = n + (n % 2) - (m + (m % 2))
+    q_padded = np.concatenate((q_padded, np.zeros(fft_len)))
 
     with objmode(dot_product="float64[:]"):
         dot_product = fft.irfft(fft.rfft(ts_padded) * fft.rfft(q_padded))
 
-    trim = m - 1
-    return dot_product[trim:trim + n - m + 1]
+    trim = m - 1 + (n % 2)
+    return dot_product[trim:]
 
 
 @njit(nogil=True, fastmath=True, cache=True, parallel=True)
