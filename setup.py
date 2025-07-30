@@ -26,7 +26,7 @@ setup(
     long_description_content_type='text/markdown',
     name=pyproject["project"]["name"],
     package_data={
-        "weasel": [
+        "motiflets": [
             "*.csv",
             "*.csv.gz",
             "*.arff",
