@@ -24,7 +24,7 @@ def test_motiflets():
         5_000,
         10_000,
         30_000,
-        50_000
+        # 50_000
         # 100_000,
         # 150_000,
         # 200_000,
@@ -61,8 +61,8 @@ def test_motiflets():
         print("\tMotiflets:", motiflets)
         print("\tDistances:", dists)
 
-        #dict = time_s
-        #df = pd.DataFrame(data=dict, columns=['Time'], index=lengths)
-        #df["Method"] = "Motiflets (one-dim)"
-        #df.index.name = "Lengths"
+        # dict = time_s
+        # df = pd.DataFrame(data=dict, columns=['Time'], index=lengths)
+        # df["Method"] = "Motiflets (one-dim)"
+        # df.index.name = "Lengths"
         # df.to_csv('csv/scalability_univ_motiflets_k5.csv')

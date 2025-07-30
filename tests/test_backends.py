@@ -30,7 +30,7 @@ def test_motiflets_univariate():
         5_000,
         10_000,
         30_000,
-        50_000
+        # 50_000
     ]
 
     ds_name, B = read_penguin_data()

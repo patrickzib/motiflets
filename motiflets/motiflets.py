@@ -6,13 +6,13 @@
 
 __author__ = ["patrickzib"]
 
-import warnings
 import itertools
+import math
 import os
+import warnings
 from ast import literal_eval
 from os.path import exists
 
-import numpy.fft as fft
 import pandas as pd
 import psutil
 from joblib import Parallel, delayed
@@ -236,21 +236,26 @@ def _sliding_dot_product(query, time_series):
     """
     m = len(query)
     n = len(time_series)
+    if m > n:
+        raise ValueError("query longer than time_series")
 
-    ts_padded = np.zeros(n + (n % 2))
-    ts_padded[:n] = time_series
+    # Reverse query for cross-correlation and cast to float64
+    q_rev = query[::-1]
+    t = time_series
 
-    q_padded = np.zeros(m + (m % 2))
-    q_padded[:m] = query[::-1]  # Reverse once here
+    # Next power-of-two ≥ n + m  (good for FFT speed)
+    total = n + m
+    exponent = math.ceil(math.log2(total))
 
-    fft_len = n + (n % 2) - (m + (m % 2))
-    q_padded = np.concatenate((q_padded, np.zeros(fft_len)))
+    L = 1 << exponent
+    q_pad = np.concatenate((q_rev, np.zeros(L - m, dtype=q_rev.dtype)))
+    t_pad = np.concatenate((t, np.zeros(L - n, dtype=t.dtype)))
 
-    with objmode(dot_product="float64[:]"):
-        dot_product = fft.irfft(fft.rfft(ts_padded) * fft.rfft(q_padded))
+    with objmode(conv='float64[:]'):
+        conv = np.fft.irfft(np.fft.rfft(q_pad) * np.fft.rfft(t_pad))
 
-    trim = m - 1 + (n % 2)
-    return dot_product[trim:]
+    # Trim to the valid sliding-dot range
+    return conv[m - 1: n]
 
 
 @njit(nogil=True, fastmath=True, cache=True, parallel=True)
