@@ -237,20 +237,20 @@ def _sliding_dot_product(query, time_series):
     m = len(query)
     n = len(time_series)
 
-    ts_padded = np.zeros(n + (n % 2))
+    pad_len = n + m - 1
+    fft_len = pad_len
+
+    ts_padded = np.zeros(fft_len)
     ts_padded[:n] = time_series
 
-    q_padded = np.zeros(m + (m % 2))
+    q_padded = np.zeros(fft_len)
     q_padded[:m] = query[::-1]  # Reverse once here
-
-    fft_len = n + (n % 2) - (m + (m % 2))
-    q_padded = np.concatenate((q_padded, np.zeros(fft_len)))
 
     with objmode(dot_product="float64[:]"):
         dot_product = fft.irfft(fft.rfft(ts_padded) * fft.rfft(q_padded))
 
-    trim = m - 1 + (n % 2)
-    return dot_product[trim:]
+    trim = m - 1
+    return dot_product[trim:trim + n - m + 1]
 
 
 @njit(nogil=True, fastmath=True, cache=True, parallel=True)
@@ -618,8 +618,6 @@ def compute_distances_with_knns(
                 dists = distance(dot_rolled[d], n, m, preprocessing[d], order, halve_m)
                 for i in range(len(dists)):
                     dist[i] += dists[i]
-                # FIXME: does not work with numba???
-                #  dist += dists
                 dot_prev[d] = dot_rolled[d]
 
             knn = _argknn(dist, k, m, slack=slack)
