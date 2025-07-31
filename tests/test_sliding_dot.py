@@ -72,7 +72,7 @@ def test_sliding_dot_product_implementations():
         10_000,
         10_001
     ]
-    window_sizes = [1000, 1001]
+    window_sizes = [100, 101]
 
     ds_name, B = read_penguin_data()
     times = np.zeros(3, dtype=np.float64)
@@ -104,8 +104,8 @@ def test_sliding_dot_product_implementations():
                 assert (dot1.shape == dot2.shape), f"'Padding is wrong"
                 assert (np.allclose(dot1, dot2)), f"Padding is wrong {dot1, dot2}"
 
-                assert (dot1.shape == dot3.shape), f"'Motiflets' is wrong"
-                assert (np.allclose(dot1, dot3)), f"'Motiflets' is wrong"
+                assert (dot1.shape == dot3.shape), f"'Exponential Window' is wrong"
+                assert (np.allclose(dot1, dot3)), f"'Exponential Window' is wrong"
 
     print("\n-----------------")
     print(f"'Naive' Sliding Dot Product Time {times[0]:0.1f}")
