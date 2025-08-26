@@ -1182,7 +1182,7 @@ def search_k_motiflets_elbow(
 
             print(f"\t{len(k_motiflet_candidates[-1])}-Motiflet"
                   f"\n\t\tPos: {k_motiflet_candidates[-1]} "
-                  f"\n\t\tExtent: {k_motiflet_distances[test_k]}", flush=True)
+                  f"\n\t\tExtent: {k_motiflet_distances[-1]}", flush=True)
             memory_usage = process.memory_info().rss / (1024 * 1024)  # MB
 
         except:
