@@ -255,22 +255,6 @@ class Motiflets:
         return fig, ax
 
 
-def convert_to_2d(
-        series
-):
-    if series.ndim == 1:
-        # print('Warning: The input dimension must be 2d.')
-        if isinstance(series, pd.Series):
-            series = series.to_frame().T
-        elif isinstance(series, (np.ndarray, np.generic)):
-            series = np.arange(series.shape[-1])
-    if series.shape[0] > series.shape[1]:
-        raise ('Warning: The input shape is wrong. Dimensions should be on rows. '
-               'Try transposing the input.')
-
-    return series
-
-
 def as_series(data, index_range, index_name):
     """Coverts a time series to a series with an index.
 
@@ -382,7 +366,7 @@ def plot_motifset(
     sns.set_style("white")
 
     # turn into 2d array
-    data = convert_to_2d(data)
+    data = ml.convert_to_2d(data)
 
     if motifsets is not None:
         git_ratio = [4]
@@ -736,12 +720,7 @@ def plot_elbow(
 
     """
     # turn into 2d array
-    if data.ndim == 1:
-        if isinstance(data, pd.Series):
-            data = data.to_frame().T
-        elif isinstance(data, (np.ndarray, np.generic)):
-            data = data.reshape(1, -1)
-
+    data = ml.convert_to_2d(data)
     _, raw_data = ml.pd_series_to_numpy(data)
 
     startTime = time.perf_counter()
@@ -855,7 +834,6 @@ def plot_motif_length_selection(
 
     """
     # turn into 2d array
-    data = convert_to_2d(data)
     index, data_raw = ml.pd_series_to_numpy(data)
 
     header = " in " + data.index.name if isinstance(

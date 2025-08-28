@@ -75,6 +75,23 @@ def resample(data, sampling_factor=10000):
     return data, factor
 
 
+def convert_to_2d(
+        series
+):
+    if series.ndim == 1:
+        # print('Warning: The input dimension must be 2d.')
+        if isinstance(series, pd.Series):
+            series = series.to_frame().T
+        elif isinstance(series, (np.ndarray, np.generic)):
+            series = series.reshape(1, -1)
+    if series.shape[0] > series.shape[1]:
+        raise ValueError(f'Warning: The input shape is wrong: {series.shape}. '
+                         'Dimensions should be on rows. '
+                         'Try transposing the input.')
+
+    return series
+
+
 @njit(fastmath=True, cache=True)
 def compute_paa(ts, segment_size):
     segments = np.int32(np.ceil(len(ts) / segment_size))
@@ -174,6 +191,8 @@ def pd_series_to_numpy(data):
             The raw data of the time series
 
     """
+    data = convert_to_2d(data)
+
     if isinstance(data, pd.Series):
         data_raw = data.values
         data_index = data.index
@@ -183,7 +202,6 @@ def pd_series_to_numpy(data):
     else:
         data_raw = data
         data_index = np.arange(data.shape[-1])
-
     try:
         return (data_index.astype(np.float64), data_raw.astype(np.float64, copy=False))
     except TypeError:  # datetime index cannot be cast to float64
@@ -307,7 +325,8 @@ def compute_distances_with_knns_full(
             The k-nns for each subsequence
 
     """
-    assert time_series.ndim == 2  # Input dim must be 2d
+    # Input dim must be 2d
+    assert time_series.ndim == 2, "Dimensionality is not correct"
 
     dims = time_series.shape[0]
     n = np.int32(time_series.shape[-1] - m + 1)
@@ -433,7 +452,8 @@ def compute_distances_with_knns_sparse(
             The k-nns for each subsequence
 
     """
-    assert time_series.ndim == 2  # Input dim must be 2d
+    # Input dim must be 2d
+    assert time_series.ndim == 2, "Dimensionality is not correct"
 
     dims = time_series.shape[0]
     n = np.int32(time_series.shape[-1] - m + 1)
@@ -575,7 +595,8 @@ def compute_distances_with_knns(
             The k-nns for each subsequence
 
     """
-    assert time_series.ndim == 2  # Input dim must be 2d
+    # Input dim must be 2d
+    assert time_series.ndim == 2, "Dimensionality is not correct"
 
     dims = time_series.shape[0]
     n = np.int32(time_series.shape[-1] - m + 1)
@@ -1032,6 +1053,7 @@ def find_au_ef_motif_length(
         data,
         k_max,
         motif_length_range,
+        exclusion=None,
         n_jobs=4,
         elbow_deviation=1.00,
         slack=0.5,
@@ -1051,6 +1073,8 @@ def find_au_ef_motif_length(
         The interval of k's to compute the area of a single AU_EF.
     motif_length_range : array-like
         The range of lengths to compute the AU-EF.
+    exclusion : 2d-array
+        exclusion zone - use when searching for the TOP-2 motiflets
     n_jobs : int
         Number of jobs to be used.
     elbow_deviation : float, default=1.00
@@ -1106,6 +1130,7 @@ def find_au_ef_motif_length(
                 data,
                 m // subsample,
                 n_jobs=n_jobs,
+                exclusion=exclusion,
                 elbow_deviation=elbow_deviation,
                 slack=slack,
                 distance=distance,
@@ -1156,6 +1181,7 @@ def search_k_motiflets_elbow(
         data,
         motif_length='auto',
         motif_length_range=None,
+        exclusion=None,
         elbow_deviation=1.00,
         filter=True,
         slack=0.5,
@@ -1185,6 +1211,8 @@ def search_k_motiflets_elbow(
         Can be used to determine to length of the motif set automatically.
         If a range is passed and `motif_length == 'auto'`, the best window length
         is first determined, prior to computing the elbow-plot.
+    exclusion : 2d-array (default=None)
+        exclusion zone - use when searching for the TOP-2 motiflets
     approximate_motiflet_pos : array-like (default=None)
         An initial estimate of the positions of the k-Motiflets for each k in the
         given range [2...k_max]. Will be used for bounding distance computations.
@@ -1225,7 +1253,7 @@ def search_k_motiflets_elbow(
     previous_jobs = get_num_threads()
     set_num_threads(n_jobs)
 
-    # convert to numpy array
+    # convert to 2d array
     _, data_raw = pd_series_to_numpy(data)
 
     # used memory
@@ -1310,6 +1338,18 @@ def search_k_motiflets_elbow(
 
         upper_bound = np.inf
         for test_k in np.arange(k_max_ - 1, 1, -1):
+            # # Top-N retrieval
+            # if exclusion is not None and exclusion[test_k] is not None:
+            #     if not sparse:
+            #         for pos in exclusion[test_k].flatten():
+            #             if pos is not None:
+            #                 trivialMatchRange = (max(0, pos - exclusion_m),
+            #                                      min(pos + exclusion_m, len(D_full)))
+            #             D_full[:, trivialMatchRange[0]:trivialMatchRange[1]] = np.inf
+            #     else:
+            #         raise Exception('Top-k is not supported for sparse matrices.')
+
+
             candidate, candidate_dist, _ = get_approximate_k_motiflet(
                 data_raw, m, test_k, D_full, knns,
                 distance_single=distance_single,
@@ -1326,7 +1366,7 @@ def search_k_motiflets_elbow(
         del knns
 
     else:
-        raise Exception(
+        raise ValueError(
             'Unknown backend: ' + backend + '. ' +
             'Use "scalable" , "sparse", or "default".')
 
