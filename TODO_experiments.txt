@@ -1,0 +1,38 @@
+Experiments
+- LSH Delta 0.1
+
+ Vector Indices
+ - FAISS: HNSW
+ 	see ann-benchmarks.com for parameters
+ 	m: 64
+ 	efConstruction: 500
+ 	ef: 800
+
+ - FAISS: IVF 
+ 	(k=sqrt(n), nprobe=32-128)
+ 
+ - FAISS: IVFPQ
+ 	n_bits: 8, 12, 16
+ 	m is the number of subquantizers
+ 	d must be multiple of m (d=0) (halve of the window size?)
+
+ - pynndescent (knn neighbor graphs)
+
+
+- benchmark data with ground truth?
+ 
+
+### Cloning env:
+conda create --name pyattimo_faiss --clone base
+conda activate pyattimo_faiss
+
+### Install Faiss with:
+mamba install mkl-service
+mamba install -c pytorch faiss-cpu mkl blas=1.0=mkl
+
+
+
+
+mamba install numpy --force-reinstall
+mamba install mkl mkl-service
+mamba update numpy scipy
