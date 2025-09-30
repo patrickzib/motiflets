@@ -43,8 +43,8 @@ def test_motiflets_scale_n(
         for n in n_range:
             gc.collect()
 
-            print(f"\n\nUsing {backend} size of ts {n} and l_ranges {l_range}")
-            print(f"Number of cores {cores}")
+            # print(f"\n\tUsing {backend} size of ts {n} and l_ranges {l_range}")
+            print(f"\tNumber of cores {cores}")
 
             ds_name, ts = read_data()
             if isinstance(ts, pd.DataFrame):
@@ -71,7 +71,7 @@ def test_motiflets_scale_n(
                 start = time.time()
                 duration = start
 
-                print(f"\n\nRunning: {ds_name}, motif length: {l}, n: {n}")
+                print(f"Running: {ds_name}, motif length: {l}, n: {n}")
                 l_new = l
 
                 if subsampling:
@@ -114,28 +114,45 @@ def test_motiflets_scale_n(
 
                     if backend == "pyattimo":
                         pyattimo_delta = force_get("pyattimo_delta", kwargs)
-                        backend_name = f"{backend_name} (delta={pyattimo_delta})"
+                        backend_name = f"{backend} (delta={pyattimo_delta})"
 
                         new_filename = (new_filename +
                                         f"_delta_{pyattimo_delta}")
 
                     elif backend == "faiss":
                         faiss_index = force_get("faiss_index", kwargs)
-                        faiss_efConstruction = force_get("faiss_efConstruction", kwargs)
-                        faiss_efSearch = force_get("faiss_efSearch", kwargs)
-                        faiss_M = force_get("faiss_M", kwargs)
 
-                        backend_name = (f"{backend_name} "
-                                        f"(index={faiss_index};"
-                                        f"efConstruction={faiss_efConstruction};"
-                                        f"efSearch={faiss_efSearch};"
-                                        f"M={faiss_M})")
+                        if faiss_index == "HNSW":
+                            faiss_efConstruction = force_get("faiss_efConstruction", kwargs)
+                            faiss_efSearch = force_get("faiss_efSearch", kwargs)
+                            faiss_M = force_get("faiss_M", kwargs)
 
-                        new_filename = (new_filename +
-                                        f"_index_{faiss_index}_"
-                                        f"_efConstruction_{faiss_efConstruction}_"
-                                        f"_efSearch_{faiss_efSearch}_"
-                                        f"_M_{faiss_M}")
+                            backend_name = (f"{backend} "
+                                            f"(index={faiss_index};"
+                                            f"efConstruction={faiss_efConstruction};"
+                                            f"efSearch={faiss_efSearch};"
+                                            f"M={faiss_M})")
+
+                            new_filename = (new_filename +
+                                            f"_backend_{backend}"
+                                            f"_index_{faiss_index}"
+                                            f"_efConstruction_{faiss_efConstruction}"
+                                            f"_efSearch_{faiss_efSearch}"
+                                            f"_M_{faiss_M}")
+
+                        elif faiss_index == "IVF":
+                            faiss_nprobe = force_get("faiss_nprobe", kwargs)
+
+                            backend_name = (f"{backend} "
+                                            f"(index={faiss_index};"
+                                            f"faiss_nprobe={faiss_nprobe})")
+
+                            new_filename = (new_filename +
+                                            f"_backend_{backend}"
+                                            f"_index_{faiss_index}"
+                                            f"_faiss_nprobe_{faiss_nprobe}")
+
+
                     elif subsampling:
                         backend_name = f"{backend_name} (subsampling={subsampling})"
 

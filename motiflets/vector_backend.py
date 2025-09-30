@@ -87,16 +87,31 @@ def znorm_windows(X, window_size):
     return X_lb
 
 
-@njit(fastmath=True, cache=True, parallel=True)
-def apply_exclusion_zone(m, D, knns_lb, k, slack=0.5):
+# FIXME: adding fastmath=True breaks the code???
+@njit(cache=True, parallel=True)
+def apply_exclusion_zone(X, m, D_lb, knns_lb, k, slack=0.5):
     """Go through the list of knns, any apply the exclusion zone.
 
     Returns the knns to each offset with exclusion applied
     """
-    n = D.shape[0]
-
     # compute size of the exclusion zone
+    means, stds = sliding_mean_std(X, m)
     halve_m = np.int32(slack * m)
+
+    n = D_lb.shape[0]
+    D = np.zeros((n, knns_lb.shape[-1]), dtype=np.float64)
+
+    for i in prange(len(knns_lb)):
+        query = X[i:i + m]
+        knn = knns_lb[i]
+
+        for a in prange(1, len(knn)):
+            j = knn[a]
+
+            # Re-rank based on z-normalized Euclidean distance
+            D[i, a] = znormed_euclidean_distance_single(
+                query, X[j:j + m], i, j, means, stds)
+
 
     D_knn = np.full((n, k), np.inf, dtype=np.float64)
     knns = np.full((n, k), -1, dtype=np.int32)
@@ -121,7 +136,9 @@ def apply_exclusion_zone(m, D, knns_lb, k, slack=0.5):
 
             # check if the position is not within some exclusion zone to a previously
             # chosen index
-            if (not np.isnan(dists[pos])) and (not np.isinf(dists[pos])):
+            if ((dists[pos] != np.inf) and
+                    (not np.isnan(dists[pos])) and
+                    (not np.isinf(dists[pos]))):
                 D_knn[order, k_idx] = d
                 knns[order, k_idx] = np.int32(pos)
 
@@ -141,12 +158,14 @@ def compute_knns_vector_search(
         m,
         k,
         index_strategy="faiss",
-        search_radius=3,
+        search_radius=5,
         slack=0.5,
         n_jobs=4,
         **kwargs
 ):
     """Computes approximate distances and k-nearest neighbors using a lower bound."""
+    assert X.shape[0] == 1, \
+        "Vector backends can handle univariate data, only."
 
     # Set the number of threads for Numba
     n_jobs = os.cpu_count() if n_jobs < 1 else n_jobs
@@ -160,6 +179,10 @@ def compute_knns_vector_search(
         X = X.flatten()
 
     X_windows = znorm_windows(X, m)
+
+    # We must shuffle
+    np.random.seed(42)
+    np.random.shuffle(X_windows)
 
     if index_strategy == "faiss":
         import faiss
@@ -175,11 +198,16 @@ def compute_knns_vector_search(
                 # setup our HNSW parameters
 
                 # number of neighbours we add to each vertex
-                M = kwargs["faiss_M"] if kwargs["faiss_M"] in kwargs else 64
-                M = max(M, search_radius * k)
+                M = kwargs["faiss_M"] if "faiss_M" in kwargs else 64
+                # M = max(M, search_radius * k)
 
-                efConstruction = kwargs["faiss_efConstruction"] if kwargs["faiss_efConstruction"] in kwargs else 500
-                efSearch = kwargs["faiss_efSearch"] if kwargs["faiss_efSearch"] in kwargs else 800
+                efConstruction = kwargs["faiss_efConstruction"] if "faiss_efConstruction" in kwargs else 500
+                efSearch = kwargs["faiss_efSearch"] if "faiss_efSearch" in kwargs else 800
+                efSearch = max(search_radius * k, efSearch)
+
+                print(f"\tefSearch:       {efSearch}")
+                print(f"\tefConstruction: {efConstruction}")
+                print(f"\tM:              {M}")
 
                 index = faiss.IndexHNSWFlat(d, M)
                 index.hnsw.efConstruction = efConstruction
@@ -189,15 +217,18 @@ def compute_knns_vector_search(
                 # setup our IVF parameters
 
                 # number of clusters/cells
-                nlist = kwargs["faiss_nlist"] if kwargs["faiss_nlist"] in kwargs \
+                nlist = kwargs["faiss_nlist"] if "faiss_nlist" in kwargs \
                     else np.sqrt(X_windows.shape[0])
 
                 # number of cells to search
-                nprobe = kwargs["faiss_nprobe"] if kwargs["faiss_nprobe"] in kwargs \
+                nprobe = kwargs["faiss_nprobe"] if "faiss_nprobe" in kwargs \
                     else 32
 
+                print(f"\tnlist:  {int(nlist)}")
+                print(f"\tnprobe: {nprobe}")
+
                 quantizer = faiss.IndexFlatL2(d)
-                index = faiss.IndexIVFFlat(quantizer, d, nlist, faiss.METRIC_L2)
+                index = faiss.IndexIVFFlat(quantizer, d, int(nlist), faiss.METRIC_L2)
                 index.nprobe = nprobe     # TODO: reset every time needed?
                 index.train(X_windows)
 
@@ -224,11 +255,14 @@ def compute_knns_vector_search(
             search_radius * k    # FIXME: use M instead?
         )
 
-        print(D.shape, knns.shape)
         index_search_time = time.time() - index_search_time
         # print(f"\tIndexing search took {index_search_time:.3f} seconds.")
 
         faiss.omp_set_num_threads(previous_jobs)
+
+        # cleanup
+        if 'quantizer' in locals():
+            del quantizer
         del index
     else:
         raise ValueError(
@@ -239,14 +273,16 @@ def compute_knns_vector_search(
     # Post-process the results to filter out distances and neighbors
     post_process_time = time.time()
 
-    D, knns = apply_exclusion_zone(
+    D_exact, knns_exact = apply_exclusion_zone(
+        X,
         m,     # :window_size
         D,
         knns,
         k,
         slack=slack
     )
-    print(knns[0])
+    print("\t", knns_exact[0])
+    print("\t", knns_exact[-1])
 
     post_process_time = time.time() - post_process_time
     # print(f"\tPost-processing took {post_process_time:.3f} seconds.")
@@ -259,4 +295,4 @@ def compute_knns_vector_search(
           f"\n\tSearch: {index_search_time:.3f}s "
           f"\n\tPost Process: {post_process_time:.3f}s.")
 
-    return D, knns, index_create_time, index_search_time, post_process_time
+    return D_exact, knns_exact, index_create_time, index_search_time, post_process_time

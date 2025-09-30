@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
 """Compute k-Motiflets.
 
-
 """
 
 __author__ = ["patrickzib"]
 
-import warnings
 import logging
 from ast import literal_eval
 from os.path import exists
@@ -21,6 +19,7 @@ from scipy.signal import argrelextrema
 from scipy.stats import zscore
 
 from motiflets.vector_backend import *
+from motiflets.pyattimo_backend import *
 from motiflets.distances import *
 
 logging.basicConfig(level=logging.CRITICAL)
@@ -1263,11 +1262,6 @@ def search_k_motiflets_elbow(
     # convert to 2d array
     _, data_raw = pd_series_to_numpy(data)
 
-    # used memory
-    memory_usage = 0
-    pid = os.getpid()
-    process = psutil.Process(pid)
-
     # auto motif size selection
     if motif_length == 'AU_EF' or motif_length == 'auto':
         if motif_length_range is None:
@@ -1289,6 +1283,9 @@ def search_k_motiflets_elbow(
         print("Warning: no valid motif_length set - use 'auto' for automatic selection")
         assert False
 
+    pid = os.getpid()
+    process = psutil.Process(pid)
+
     # non-overlapping motifs only
     n = data_raw.shape[-1] - m + 1
     k_max_ = max(3, min(int(n // (m * slack)), k_max))
@@ -1296,103 +1293,37 @@ def search_k_motiflets_elbow(
     # non-overlapping motifs only
     k_motiflet_distances = np.zeros(k_max_)
     k_motiflet_candidates = np.empty(k_max_, dtype=object)
-    exclusion_m = int(m * slack)
 
     if backend in ["faiss", "pyattimo", "default", "scalable", "sparse"]:
         if backend == "pyattimo":
-            import pyattimo
-
-            assert data_raw.shape[0] == 1, \
-                "PyAttimo can handle univariate data, only."
-
-            # Prepare common arguments
-            attimo_args = {
-                'ts': data_raw.flatten(),
-                'w': m,
-                'support': k_max_ - 1,
-                'exclusion_zone': exclusion_m,
-                'max_memory': "8 GB"
-            }
-
-            if "pyattimo_delta" in kwargs:
-                pyattimo_delta = kwargs["pyattimo_delta"]
-                attimo_args.update({
-                    'delta': pyattimo_delta,
-                    'stop_on_threshold': True,
-                    'fraction_threshold': np.log(n) / n,
-                })
-                print(f"\tPyAttimo: Setting "
-                      f"\n\t\tw={m}, "
-                      f"\n\t\tdelta={pyattimo_delta}, "
-                      f"\n\t\tsupport={attimo_args['support']}, "
-                      f"\n\t\tmax_memory={attimo_args['max_memory']}, "
-                      f"\n\t\texclusion_zone={attimo_args['exclusion_zone']}, "
-                      f"\n\t\tstop_on_threshold={attimo_args['stop_on_threshold']}, "
-                      f"\n\t\tfraction_threshold=log(n)/n")
-
-            m_iter = pyattimo.MotifletsIterator(**attimo_args)
-
-            try:
-                for mot in m_iter:
-                    print(f"\t\t{mot}", flush=True)
-                    test_k = mot.support
-                    if test_k < k_max_:
-                        k_motiflet_distances[test_k] = mot.extent ** 2
-                        # TODO: Use mot.lower_bound for confidence scores
-                        k_motiflet_candidates[test_k] = np.array(mot.indices)
-
-                print(f"\t{len(k_motiflet_candidates[-1])}-Motiflet"
-                      f"\n\t\tPos: {k_motiflet_candidates[-1]} "
-                      f"\n\t\tExtent: {k_motiflet_distances[-1]}", flush=True)
-                memory_usage = process.memory_info().rss / (1024 * 1024)  # MB
-
-            except:
-                print("Caught exception in pyattimo", flush=True)
-
-            del m_iter
+            k_motiflet_distances, k_motiflet_candidates, memory_usage \
+                = compute_knns_pyattimo(
+                    data_raw,
+                    m,
+                    k_max_,
+                    slack=slack,
+                    **kwargs)
 
         else:
             if backend == "faiss":
-                assert data_raw.shape[0] == 1, \
-                    "Vector backends can handle univariate data, only."
-
                 (D_full, knns,
                  index_create_time,
                  index_search_time,
                  post_process_time) = compute_knns_vector_search(
-                    data_raw, m, k_max,
+                    data_raw, m, k_max_,
                     index_strategy=backend,
-                    search_radius=5,
+                    search_radius=10,
                     slack=slack,
                     n_jobs=n_jobs,
                     **kwargs
                 )
             else:
-                if backend == "default":
-                    # switch to scalable matrix representation when length is >25000 or 4 GB
-                    if data_raw.ndim == 1:
-                        recommend_scalable = n >= 25000
-                    else:
-                        d = data_raw.shape[0]
-                        scalable_gb = ((n ** 2) * d) * 32 / (1024 ** 3) / 8
-                        recommend_scalable = scalable_gb > 4.0
-                    if recommend_scalable:
-                        print(f"Setting 'scalable' backend for distance computations. "
-                              f"Old Backend: '{backend}'")
-                        backend = "scalable"
-
+                backend = check_valid_backend(backend, data_raw, n)
 
                 if backend == "scalable":
                     # uses pairwise comparisons to compute the distances
                     call_to_distances = compute_distances_with_knns
                 elif backend == "sparse":
-                    warnings.warn(
-                        "Backend 'sparse' is deprecated and will be removed in a "
-                        "future version. Use backend 'scalable' instead.",
-                        DeprecationWarning,
-                        stacklevel=2
-                    )
-
                     # uses sparse backend with sparse matrix
                     call_to_distances = compute_distances_with_knns_sparse
                 else:
@@ -1400,7 +1331,9 @@ def search_k_motiflets_elbow(
                     call_to_distances = compute_distances_with_knns_full
 
                 D_full, knns = call_to_distances(
-                    data_raw, m, k_max_, n_jobs=n_jobs, slack=slack,
+                    data_raw, m, k_max_,
+                    n_jobs=n_jobs,
+                    slack=slack,
                     distance=distance,
                     distance_single=distance_single,
                     distance_preprocessing=distance_preprocessing
@@ -1408,10 +1341,7 @@ def search_k_motiflets_elbow(
 
             memory_usage = process.memory_info().rss / (1024 * 1024)  # MB
 
-            preprocessing = []
-            for dim in np.arange(data_raw.shape[0]):
-                preprocessing.append(distance_preprocessing(data_raw[dim], m))
-            preprocessing = np.array(preprocessing, dtype=np.float64)
+            preprocessing = compute_preprocessing(data_raw, distance_preprocessing, m)
 
             upper_bound = np.inf
             for test_k in np.arange(k_max_ - 1, 1, -1):
@@ -1422,7 +1352,6 @@ def search_k_motiflets_elbow(
                     use_D_full=(backend in ["default", "sparse"]),
                     upper_bound=upper_bound,
                 )
-
                 k_motiflet_distances[test_k] = candidate_dist
                 k_motiflet_candidates[test_k] = candidate
                 upper_bound = min(candidate_dist, upper_bound)
@@ -1433,7 +1362,7 @@ def search_k_motiflets_elbow(
     else:
         raise ValueError(
             'Unknown backend: ' + backend + '. ' +
-            'Use "scalable" , "pyattimo", "sparse", or "default".')
+            'Use "scalable", "faiss", "pyattimo", "sparse" or "default".')
 
     # print(f"\tMemory usage: {memory_usage:.2f} MB")
 
@@ -1453,3 +1382,28 @@ def search_k_motiflets_elbow(
     set_num_threads(previous_jobs)
 
     return k_motiflet_distances, k_motiflet_candidates, elbow_points, m, memory_usage
+
+
+def compute_preprocessing(data_raw, distance_preprocessing, m):
+    preprocessing = []
+    for dim in np.arange(data_raw.shape[0]):
+        preprocessing.append(distance_preprocessing(data_raw[dim], m))
+    preprocessing = np.array(preprocessing, dtype=np.float64)
+    return preprocessing
+
+
+def check_valid_backend(backend, data_raw, n):
+    """ Switch to scalable matrix representation when length is >25000 or 4 GB. """
+    if backend == "default":
+        if data_raw.ndim == 1:
+            recommend_scalable = n >= 25000
+        else:
+            d = data_raw.shape[0]
+            scalable_gb = ((n ** 2) * d) * 32 / (1024 ** 3) / 8
+            recommend_scalable = scalable_gb > 4.0
+
+        if recommend_scalable:
+            print(f"Setting 'scalable' backend for distance computations. "
+                  f"Old Backend: '{backend}'")
+            backend = "scalable"
+    return backend

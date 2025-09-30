@@ -105,8 +105,7 @@ def test_motiflets_scale_n(
 
 def run_safe(ds_name, series, l_range, k_max, backends, subsampling=None, **kwargs):
     try:
-        print(len(series))
-        n = len(series)
+        n = 10_000 # len(series)
         test_motiflets_scale_n(
             ds_name, series, n,
             l_range=l_range,
@@ -122,7 +121,7 @@ def run_safe(ds_name, series, l_range, k_max, backends, subsampling=None, **kwar
 
 # 512 to 8192
 # 2**9,
-l_range = list(reversed([2**10, 2**11, 2**12, 2**13]))
+l_range = [512] #list(reversed([2**10, 2**11, 2**12, 2**13]))
 
 # ks = [5, 10, 20]
 deltas = [0.1]
@@ -132,7 +131,12 @@ deltas = [0.1]
 faiss_efConstruction = [500]
 faiss_efSearch = [400, 600, 800]
 faiss_M = [32, 64, 96]
-faiss_index = ["HNSW"]
+
+# Compare:
+# https://github.com/erikbern/ann-benchmarks/blob/main/ann_benchmarks/algorithms/faiss/config.yml
+# faiss_nlist = [32, None]  # using sqrt(n) by default
+faiss_nprobe = [1, 5, 10, 50, 100, 200]
+
 
 k_max = 10
 
@@ -154,22 +158,38 @@ def main():
 
         # Running FAISS
         backends = ["faiss"]
-        for index in faiss_index:
-            for M in faiss_M:
-                for efConstruction in faiss_efConstruction:
-                    for efSearch in faiss_efSearch:
-                        print(f"\tRunning faiss {index} {M} {efConstruction} {efSearch}")
-                        run_safe(
-                            ds_name,
-                            data,
-                            l_range,
-                            k_max,
-                            backends,
-                            faiss_index=index,
-                            faiss_M=M,
-                            faiss_efConstruction=efConstruction,
-                            faiss_efSearch=efSearch
-                            )
+
+        # faiss_index = "HNSW"
+        # for M in faiss_M:
+        #     for efConstruction in faiss_efConstruction:
+        #         for efSearch in faiss_efSearch:
+        #             print(f"\n\tRunning faiss {faiss_index} {M} {efConstruction} {efSearch}.", flush=True)
+        #             run_safe(
+        #                 ds_name,
+        #                 data,
+        #                 l_range,
+        #                 k_max,
+        #                 backends,
+        #                 faiss_index=faiss_index,
+        #                 faiss_M=M,
+        #                 faiss_efConstruction=efConstruction,
+        #                 faiss_efSearch=efSearch
+        #                 )
+
+        faiss_index = "IVF"
+        for nprobe in faiss_nprobe:
+            print(f"\n\tRunning faiss {faiss_index} {nprobe}")
+            run_safe(
+                ds_name,
+                data,
+                l_range,
+                k_max,
+                backends,
+                faiss_index=faiss_index,
+                faiss_nprobe=nprobe
+                )
+
+
 
         # scalable
         # backends = ["scalable"]
