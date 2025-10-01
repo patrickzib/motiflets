@@ -1,4 +1,3 @@
-import pprint
 import traceback
 import gc
 import multiprocessing
@@ -11,7 +10,7 @@ warnings.simplefilter("ignore")
 
 # setting for sonic / sone server
 num_cores = multiprocessing.cpu_count()
-cores = min(64, num_cores - 2)
+cores = min(60, num_cores - 2)
 
 
 def force_get(key, kwargs):
@@ -32,7 +31,8 @@ def test_motiflets_scale_n(
 ):
     for backend in backends:
         df = pd.DataFrame(
-            columns=['length', 'motif length', 'backend', 'time in s', 'memory in MB', "extent",
+            columns=['length', 'motif length', 'backend', 'time in s', 'memory in MB',
+                     "extent",
                      "motiflet", "elbows"])
 
         last_time = -1
@@ -44,7 +44,7 @@ def test_motiflets_scale_n(
             gc.collect()
 
             # print(f"\n\tUsing {backend} size of ts {n} and l_ranges {l_range}")
-            print(f"\tNumber of cores {cores}")
+            # print(f"\tNumber of cores {cores}")
 
             ds_name, ts = read_data()
             if isinstance(ts, pd.DataFrame):
@@ -53,10 +53,9 @@ def test_motiflets_scale_n(
                 ts = ts[:n]
             ts_orig = ts
 
-            if (len(ts_orig) <= last_n or (last_time > 3600)  # larger than 2 hours
-            ):
+            # larger than 2 hours
+            if (len(ts_orig) <= last_n) or (last_time > 3600):
                 break
-
 
             if subsampling:
                 if isinstance(ts_orig, pd.DataFrame):
@@ -65,7 +64,6 @@ def test_motiflets_scale_n(
                     ts, _ = compute_paa(ts_orig.to_numpy(), subsampling)
                 else:
                     ts, _ = compute_paa(ts_orig, subsampling)
-
 
             for l in l_range:
                 start = time.time()
@@ -102,10 +100,11 @@ def test_motiflets_scale_n(
                     if subsampling:
                         print(f"\tRecomputing Extend using Window Size {l}")
                         motiflet = np.array(motiflet) * subsampling  # scale up again
-                        preprocessing = np.array([mm.distance_preprocessing(ts_orig, l)], dtype=np.float64)
+                        preprocessing = np.array(
+                            [mm.distance_preprocessing(ts_orig, l)], dtype=np.float64)
 
                         extent = get_pairwise_extent_raw(
-                            ts_orig.reshape(1,-1), motiflet, l,
+                            ts_orig.reshape(1, -1), motiflet, l,
                             distance_single=mm.distance_single,
                             preprocessing=preprocessing)
 
@@ -123,7 +122,8 @@ def test_motiflets_scale_n(
                         faiss_index = force_get("faiss_index", kwargs)
 
                         if faiss_index == "HNSW":
-                            faiss_efConstruction = force_get("faiss_efConstruction", kwargs)
+                            faiss_efConstruction = force_get("faiss_efConstruction",
+                                                             kwargs)
                             faiss_efSearch = force_get("faiss_efSearch", kwargs)
                             faiss_M = force_get("faiss_M", kwargs)
 

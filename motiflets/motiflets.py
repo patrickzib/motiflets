@@ -1309,7 +1309,8 @@ def search_k_motiflets_elbow(
                 (D_full, knns,
                  index_create_time,
                  index_search_time,
-                 post_process_time) = compute_knns_vector_search(
+                 post_process_time,
+                 memory_usage) = compute_knns_vector_search(
                     data_raw, m, k_max_,
                     index_strategy=backend,
                     search_radius=10,
@@ -1339,7 +1340,7 @@ def search_k_motiflets_elbow(
                     distance_preprocessing=distance_preprocessing
                 )
 
-            memory_usage = process.memory_info().rss / (1024 * 1024)  # MB
+                memory_usage = process.memory_info().rss / (1024 * 1024)  # MB
 
             preprocessing = compute_preprocessing(data_raw, distance_preprocessing, m)
 

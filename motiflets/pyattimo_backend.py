@@ -15,11 +15,13 @@ def compute_knns_pyattimo(
 
     import pyattimo
 
+    n = X.shape[-1] - m + 1
+
     pid = os.getpid()
     process = psutil.Process(pid)
 
-    k_motiflet_distances = np.zeros(k_max_)
-    k_motiflet_candidates = np.empty(k_max_, dtype=object)
+    k_motiflet_distances = np.zeros(k_max)
+    k_motiflet_candidates = np.empty(k_max, dtype=object)
     memory_usage = 0
     exclusion_m = int(m * slack)
 

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import psutil
 import time
 from warnings import simplefilter
 
@@ -112,7 +113,6 @@ def apply_exclusion_zone(X, m, D_lb, knns_lb, k, slack=0.5):
             D[i, a] = znormed_euclidean_distance_single(
                 query, X[j:j + m], i, j, means, stds)
 
-
     D_knn = np.full((n, k), np.inf, dtype=np.float64)
     knns = np.full((n, k), -1, dtype=np.int32)
 
@@ -172,8 +172,9 @@ def compute_knns_vector_search(
     previous_jobs = get_num_threads()
     set_num_threads(n_jobs)
 
-    # if X.dtype != np.float32:
-    #    X = X.astype(np.float32)
+    pid = os.getpid()
+    process = psutil.Process(pid)
+    memory_usage = 0
 
     if X.ndim > 1:
         X = X.flatten()
@@ -201,17 +202,20 @@ def compute_knns_vector_search(
                 M = kwargs["faiss_M"] if "faiss_M" in kwargs else 64
                 # M = max(M, search_radius * k)
 
-                efConstruction = kwargs["faiss_efConstruction"] if "faiss_efConstruction" in kwargs else 500
-                efSearch = kwargs["faiss_efSearch"] if "faiss_efSearch" in kwargs else 800
+                efConstruction = kwargs[
+                    "faiss_efConstruction"] if "faiss_efConstruction" in kwargs else 500
+                efSearch = kwargs[
+                    "faiss_efSearch"] if "faiss_efSearch" in kwargs else 800
                 efSearch = max(search_radius * k, efSearch)
 
+                print(f"\tHNSW")
                 print(f"\tefSearch:       {efSearch}")
                 print(f"\tefConstruction: {efConstruction}")
                 print(f"\tM:              {M}")
 
                 index = faiss.IndexHNSWFlat(d, M)
                 index.hnsw.efConstruction = efConstruction
-                index.hnsw.efSearch = efSearch     # TODO: reset every time needed?
+                index.hnsw.efSearch = efSearch  # TODO: reset every time needed?
 
             elif faiss_index == "IVF":
                 # setup our IVF parameters
@@ -224,18 +228,40 @@ def compute_knns_vector_search(
                 nprobe = kwargs["faiss_nprobe"] if "faiss_nprobe" in kwargs \
                     else 32
 
+                print(f"\tIVF")
                 print(f"\tnlist:  {int(nlist)}")
                 print(f"\tnprobe: {nprobe}")
 
                 quantizer = faiss.IndexFlatL2(d)
                 index = faiss.IndexIVFFlat(quantizer, d, int(nlist), faiss.METRIC_L2)
-                index.nprobe = nprobe     # TODO: reset every time needed?
                 index.train(X_windows)
 
-            #elif faiss_index == "IVFPQ":
-            #    # setup our IVFPQ parameters
-            #    # TODO !!!
-            #    pass
+                index.nprobe = nprobe  # TODO: reset every time needed?
+
+            elif faiss_index == "IVFPQ":
+                # setup our IVF-PQ parameters
+
+                # number of clusters/cells
+                nlist = kwargs["faiss_nlist"] if "faiss_nlist" in kwargs \
+                    else np.sqrt(X_windows.shape[0])
+
+                # number of cells to search
+                nprobe = kwargs["faiss_nprobe"] if "faiss_nprobe" in kwargs \
+                    else 32
+
+                print(f"\tIVFPQ")
+                print(f"\tnlist:  {int(nlist)}")
+                print(f"\tnprobe: {nprobe}")
+
+                m = d // 2  # Use half dimension for PQ
+                nbits = 4  # bits per Subvector
+
+                factory_string = f"IVF{int(nlist)},PQ{m}x{nbits}fs"
+                index = faiss.index_factory(d, factory_string, faiss.METRIC_L2)
+                index.train(X_windows)
+
+                index.nprobe = nprobe  # TODO: reset every time needed?
+
             else:
                 raise ValueError(
                     'Unknown FAISS index' + faiss_index + '.' +
@@ -244,7 +270,6 @@ def compute_knns_vector_search(
             raise ValueError(
                 'faiss_index not set. Use "HNSW", "IVF", "IVFPQ".')
 
-
         index.add(X_windows)
         index_create_time = time.time() - index_create_time
 
@@ -252,13 +277,14 @@ def compute_knns_vector_search(
         index_search_time = time.time()
         D, knns = index.search(
             X_windows,
-            search_radius * k    # FIXME: use M instead?
+            search_radius * k  # FIXME: use M instead?
         )
 
         index_search_time = time.time() - index_search_time
         # print(f"\tIndexing search took {index_search_time:.3f} seconds.")
 
         faiss.omp_set_num_threads(previous_jobs)
+        memory_usage = process.memory_info().rss / (1024 * 1024)  # MB
 
         # cleanup
         if 'quantizer' in locals():
@@ -275,7 +301,7 @@ def compute_knns_vector_search(
 
     D_exact, knns_exact = apply_exclusion_zone(
         X,
-        m,     # :window_size
+        m,  # :window_size
         D,
         knns,
         k,
@@ -295,4 +321,5 @@ def compute_knns_vector_search(
           f"\n\tSearch: {index_search_time:.3f}s "
           f"\n\tPost Process: {post_process_time:.3f}s.")
 
-    return D_exact, knns_exact, index_create_time, index_search_time, post_process_time
+    return (D_exact, knns_exact, index_create_time,
+            index_search_time, post_process_time, memory_usage)
