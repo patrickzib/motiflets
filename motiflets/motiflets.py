@@ -18,8 +18,8 @@ from numba.typed import Dict, List
 from scipy.signal import argrelextrema
 from scipy.stats import zscore
 
-from motiflets.vector_backend import *
-from motiflets.pyattimo_backend import *
+from motiflets.knn_vector_backend import *
+from motiflets.knn_pyattimo_backend import *
 from motiflets.distances import *
 
 logging.basicConfig(level=logging.CRITICAL)
@@ -1296,28 +1296,31 @@ def search_k_motiflets_elbow(
 
     if backend in ["faiss", "pyattimo", "default", "scalable", "sparse"]:
         if backend == "pyattimo":
-            k_motiflet_distances, k_motiflet_candidates, memory_usage \
-                = compute_knns_pyattimo(
-                    data_raw,
-                    m,
-                    k_max_,
+            backend_imlp = PyAttimoNearestNeighbors(
+                    m, k_max_,
                     slack=slack,
                     **kwargs)
 
+            k_motiflet_distances, k_motiflet_candidates, memory_usage \
+                = backend_imlp.compute_knns(data_raw)
+
         else:
             if backend == "faiss":
-                (D_full, knns,
-                 index_create_time,
-                 index_search_time,
-                 post_process_time,
-                 memory_usage) = compute_knns_vector_search(
-                    data_raw, m, k_max_,
+                backend_imlp = VectorSearchNearestNeighbors(
+                    m, k_max_,
                     index_strategy=backend,
                     search_radius=10,
                     slack=slack,
                     n_jobs=n_jobs,
                     **kwargs
                 )
+
+                (D_full,
+                 knns,
+                 index_create_time,
+                 index_search_time,
+                 post_process_time,
+                 memory_usage) = backend_imlp.compute_knns(data_raw)
             else:
                 backend = check_valid_backend(backend, data_raw, n)
 

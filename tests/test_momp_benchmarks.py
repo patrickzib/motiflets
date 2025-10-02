@@ -166,11 +166,11 @@ def main():
         data = read_mat(filename)
 
         # pyattimo
-        # backends = ["pyattimo", "scalable"]
-        # for delta in deltas:
-        #    run_safe(
-        #        filename, data, l_range, k_max, backends, pyattimo_delta=delta
-        #    )
+        backends = ["pyattimo", "scalable"]
+        for delta in deltas:
+           run_safe(
+               filename, data, l_range, k_max, backends, pyattimo_delta=delta
+           )
 
         # Running FAISS
         backends = ["faiss"]
@@ -205,18 +205,18 @@ def main():
         #         faiss_nprobe=nprobe
         #         )
 
-        faiss_index = "IVFPQ"
-        for nprobe in faiss_nprobe:
-            print(f"\n\tRunning faiss {faiss_index} {nprobe}")
-            run_safe(
-                filename,
-                data,
-                l_range,
-                k_max,
-                backends,
-                faiss_index=faiss_index,
-                faiss_nprobe=nprobe
-            )
+        # faiss_index = "IVFPQ"
+        # for nprobe in faiss_nprobe:
+        #     print(f"\n\tRunning faiss {faiss_index} {nprobe}")
+        #     run_safe(
+        #         filename,
+        #         data,
+        #         l_range,
+        #         k_max,
+        #         backends,
+        #         faiss_index=faiss_index,
+        #         faiss_nprobe=nprobe
+        #     )
 
         # scalable
         # backends = ["scalable"]
