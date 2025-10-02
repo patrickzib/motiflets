@@ -1294,7 +1294,7 @@ def search_k_motiflets_elbow(
     k_motiflet_distances = np.zeros(k_max_)
     k_motiflet_candidates = np.empty(k_max_, dtype=object)
 
-    if backend in ["faiss", "pyattimo", "default", "scalable", "sparse"]:
+    if backend in ["faiss", "pynndescent", "pyattimo", "default", "scalable", "sparse"]:
         if backend == "pyattimo":
             backend_imlp = PyAttimoNearestNeighbors(
                     m, k_max_,
@@ -1305,11 +1305,11 @@ def search_k_motiflets_elbow(
                 = backend_imlp.compute_knns(data_raw)
 
         else:
-            if backend == "faiss":
+            if backend in ["faiss", "pynndescent"]:
                 backend_imlp = VectorSearchNearestNeighbors(
                     m, k_max_,
                     index_strategy=backend,
-                    search_radius=10,
+                    search_radius=5,
                     slack=slack,
                     n_jobs=n_jobs,
                     **kwargs
@@ -1366,7 +1366,8 @@ def search_k_motiflets_elbow(
     else:
         raise ValueError(
             'Unknown backend: ' + backend + '. ' +
-            'Use "scalable", "faiss", "pyattimo", "sparse" or "default".')
+            'Use "scalable", "faiss", "pynndescent", '
+            '"pyattimo", "sparse" or "default".')
 
     # print(f"\tMemory usage: {memory_usage:.2f} MB")
 

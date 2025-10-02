@@ -7,7 +7,7 @@ sys.path.insert(0, "../")
 sys.path.insert(0, "../../")
 
 import traceback
-
+import multiprocessing
 import numpy as np
 import pandas as pd
 import scipy.io as sio
@@ -92,6 +92,7 @@ def test_motiflets_scale_n(
         k_max,
         backends=None,
         subsampling=None,
+        n_jobs=8,
         **kwargs
 ):
     def pass_data():
@@ -104,11 +105,13 @@ def test_motiflets_scale_n(
         k_max=k_max,
         backends=backends,
         subsampling=subsampling,
+        n_jobs=n_jobs,
         **kwargs
     )
 
 
-def run_safe(ds_name, series, l_range, k_max, backends, subsampling=None, **kwargs):
+def run_safe(ds_name, series, l_range, k_max, backends,
+             subsampling=None, n_jobs=8, **kwargs):
     try:
         if run_local:
             print("\nWarning. Running locally.\n")
@@ -122,6 +125,7 @@ def run_safe(ds_name, series, l_range, k_max, backends, subsampling=None, **kwar
             k_max=k_max,
             backends=backends,
             subsampling=subsampling,
+            n_jobs=n_jobs,
             **kwargs)
     except Exception as e:
         print(traceback.format_exc())
@@ -133,7 +137,7 @@ def run_safe(ds_name, series, l_range, k_max, backends, subsampling=None, **kwar
 if run_local:
     l_range = [512]
 else:
-    l_range = list(reversed([2 ** 9, 2 ** 10, 2 ** 11, 2 ** 12, 2 ** 13]))
+    l_range = list([2 ** 9, 2 ** 10, 2 ** 11, 2 ** 12, 2 ** 13])
 
 # ks = [5, 10, 20]
 deltas = [0.1]
@@ -154,7 +158,21 @@ faiss_nprobe = [10]  # [10, 50, 100, 200]
 # faiss_nlist = [32]  # using sqrt(n) by default
 faiss_nprobe = [10]  # [10, 50, 100, 200]
 
+# Compare:
+# https://github.com/erikbern/ann-benchmarks/blob/main/ann_benchmarks/algorithms/pynndescent/config.yml
+pynndescent_n_neighbors = [60]
+pynndescent_leaf_size = [48]
+pynndescent_pruning_degree_multiplier = [2.0]
+pynndescent_diversify_prob = [0.0]
+pynndescent_n_search_trees = [1]
+pynndescent_search_epsilon = [0.2]  # [0.0, 0.04, 0.08, 0.12, 0.16, 0.2, 0.24, 0.28, 0.32, 0.36]
+
+
 k_max = 10
+
+# setting for sonic / sone server
+num_cores = multiprocessing.cpu_count()
+cores = min(60, num_cores - 2)
 
 
 def main():
@@ -165,16 +183,16 @@ def main():
         print(f"Running: {filename, ds_name}")
         data = read_mat(filename)
 
-        # pyattimo
-        backends = ["pyattimo", "scalable"]
-        for delta in deltas:
-           run_safe(
-               filename, data, l_range, k_max, backends, pyattimo_delta=delta
-           )
+        # # pyattimo
+        # backends = ["pyattimo", "scalable"]
+        # for delta in deltas:
+        #    run_safe(
+        #        filename, data, l_range, k_max, backends,
+        #        pyattimo_delta=delta, n_jobs=cores
+        #    )
 
         # Running FAISS
-        backends = ["faiss"]
-
+        # backends = ["faiss"]
         # faiss_index = "HNSW"
         # for M in faiss_M:
         #     for efConstruction in faiss_efConstruction:
@@ -189,7 +207,8 @@ def main():
         #                 faiss_index=faiss_index,
         #                 faiss_M=M,
         #                 faiss_efConstruction=efConstruction,
-        #                 faiss_efSearch=efSearch
+        #                 faiss_efSearch=efSearch,
+        #                 n_jobs=cores
         #                 )
 
         # faiss_index = "IVF"
@@ -202,8 +221,9 @@ def main():
         #         k_max,
         #         backends,
         #         faiss_index=faiss_index,
-        #         faiss_nprobe=nprobe
-        #         )
+        #         faiss_nprobe=nprobe,
+        #         n_jobs=cores
+        #      )
 
         # faiss_index = "IVFPQ"
         # for nprobe in faiss_nprobe:
@@ -215,13 +235,41 @@ def main():
         #         k_max,
         #         backends,
         #         faiss_index=faiss_index,
-        #         faiss_nprobe=nprobe
+        #         faiss_nprobe=nprobe,
+        #         n_jobs=cores
         #     )
+
+
+        # Running pynndescent
+        backends = ["pynndescent"]
+        for n_neighbors in pynndescent_n_neighbors:
+            for leaf_size in pynndescent_leaf_size:
+                for pruning_degree_multiplier in pynndescent_pruning_degree_multiplier:
+                    for diversify_prob in pynndescent_diversify_prob:
+                        for n_search_trees in pynndescent_n_search_trees:
+                            for search_epsilon in pynndescent_search_epsilon:
+                                print(f"\n\tRunning pynndescent")
+                                run_safe(
+                                    filename,
+                                    data,
+                                    l_range,
+                                    k_max,
+                                    backends,
+                                    pynndescent_n_neighbors=n_neighbors,
+                                    pynndescent_leaf_size=leaf_size,
+                                    pynndescent_pruning_degree_multiplier=pruning_degree_multiplier,
+                                    pynndescent_diversify_prob=diversify_prob,
+                                    pynndescent_n_search_trees=n_search_trees,
+                                    pynndescent_search_epsilon=search_epsilon,
+                                    n_jobs=cores
+                                )
+
+
 
         # scalable
         # backends = ["scalable"]
         # run_safe(
-        #   filename, data, l_range, k_max, backends, subsampling=10
+        #   filename, data, l_range, k_max, backends, subsampling=10, n_jobs=cores
         # )
 
         # # subsampling
@@ -229,7 +277,10 @@ def main():
         # for subsampling in [8, 16]:
         #    run_safe(
         #       filename, data,
-        #       l_range=l_range, k_max=k_max, backends=backends, subsampling=subsampling
+        #       l_range=l_range, k_max=k_max,
+        #       backends=backends,
+        #       subsampling=subsampling,
+        #       n_jobs=cores
         #    )
 
 

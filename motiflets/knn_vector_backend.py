@@ -42,6 +42,8 @@ class VectorSearchNearestNeighbors:
 
         self.verbose = verbose
 
+        #### faiss
+
         self.faiss_index = None
         if "faiss_index" in kwargs:
             self.faiss_index = kwargs["faiss_index"]
@@ -60,18 +62,34 @@ class VectorSearchNearestNeighbors:
         # number of cells to search
         self.nprobe = kwargs["faiss_nprobe"] if "faiss_nprobe" in kwargs else 32
 
+
+        #### pynndescent
+        self.pynndescent_n_neighbors \
+            = kwargs["pynndescent_n_neighbors"] if "pynndescent_n_neighbors" in kwargs else 10
+        self.pynndescent_leaf_size \
+            = kwargs["pynndescent_leaf_size"] if "pynndescent_leaf_size" in kwargs else 24
+        self.pynndescent_pruning_degree_multiplier \
+            = kwargs["pynndescent_pruning_degree_multiplier"] if "pynndescent_pruning_degree_multiplier" in kwargs else 1.0
+        self.pynndescent_diversify_prob \
+            = kwargs["pynndescent_diversify_prob"] if "pynndescent_diversify_prob" in kwargs else 1.0
+        self.pynndescent_n_search_trees \
+            = kwargs["pynndescent_n_search_trees"] if "pynndescent_n_search_trees" in kwargs else 1
+        self.pynndescent_search_epsilon \
+            = kwargs["pynndescent_search_epsilon"] if "pynndescent_search_epsilon" in kwargs else 0.1
+
+
+
     def compute_knns(self, X):
         """Computes approximate distances and k-nearest neighbors."""
         assert X.shape[0] == 1, \
             "Vector backends can handle univariate data, only."
 
         # Set the number of threads for Numba
-        previous_jobs = get_num_threads()
+        self.previous_jobs = get_num_threads()
         set_num_threads(self.n_jobs)
 
         pid = os.getpid()
-        process = psutil.Process(pid)
-        memory_usage = 0.0
+        self.process = psutil.Process(pid)
 
         if X.ndim > 1:
             X = X.flatten()
@@ -83,96 +101,13 @@ class VectorSearchNearestNeighbors:
         np.random.shuffle(X_windows)
 
         if self.index_strategy == "faiss":
-            import faiss
-            faiss.omp_set_num_threads(self.n_jobs)
+            D, index_create_time, index_search_time, knns, memory_usage \
+                = self.process_faiss(X_windows)
 
-            # Compute distances using the lower bounding representation
-            index_create_time = time.time()
-            d = X_windows.shape[-1]
+        elif self.index_strategy == "pynndescent":
+            D, index_create_time, index_search_time, knns, memory_usage \
+                = self.process_pynndescent(X_windows)
 
-            if self.faiss_index:
-                if self.faiss_index == "HNSW":
-                    # setup our HNSW parameters
-
-                    # number of neighbours we add to each vertex
-                    if self.verbose:
-                        print(f"\tHNSW")
-                        print(f"\tefSearch:       {self.efSearch}")
-                        print(f"\tefConstruction: {self.efConstruction}")
-                        print(f"\tM:              {self.M}")
-
-                    index = faiss.IndexHNSWFlat(d, self.M)
-                    index.hnsw.efConstruction = self.efConstruction
-                    index.hnsw.efSearch = self.efSearch  # TODO: reset every time needed?
-
-                elif self.faiss_index == "IVF":
-                    # setup our IVF parameters
-
-                    if not self.nlist:
-                        # number of clusters/cells set to sqrt(n)
-                        self.nlist = int(np.sqrt(X_windows.shape[0]))
-
-                    if self.verbose:
-                        print(f"\tIVF")
-                        print(f"\tnlist:  {self.nlist}")
-                        print(f"\tnprobe: {self.nprobe}")
-
-                    quantizer = faiss.IndexFlatL2(d)
-                    index = faiss.IndexIVFFlat(quantizer, d, self.nlist,
-                                               faiss.METRIC_L2)
-                    index.train(X_windows)
-
-                    index.nprobe = self.nprobe  # TODO: reset every time needed?
-
-                elif self.faiss_index == "IVFPQ":
-                    # setup our IVF-PQ parameters
-
-                    if not self.nlist:
-                        # number of clusters/cells set to sqrt(n)
-                        self.nlist = int(np.sqrt(X_windows.shape[0]))
-
-                    if self.verbose:
-                        print(f"\tIVFPQ")
-                        print(f"\tnlist:  {self.nlist}")
-                        print(f"\tnprobe: {self.nprobe}")
-
-                    mm = d // 2  # Use half dimension for PQ
-                    nbits = 4  # bits per Subvector
-
-                    factory_string = f"IVF{int(self.nlist)},PQ{mm}x{nbits}fs"
-                    index = faiss.index_factory(d, factory_string, faiss.METRIC_L2)
-                    index.train(X_windows)
-
-                    index.nprobe = self.nprobe  # TODO: reset every time needed?
-
-                else:
-                    raise ValueError(
-                        'Unknown FAISS index' + faiss_index + '.' +
-                        'Use "HNSW", "IVF", "IVFPQ".')
-            else:
-                raise ValueError(
-                    'faiss_index not set. Use "HNSW", "IVF", "IVFPQ".')
-
-            index.add(X_windows)
-            index_create_time = time.time() - index_create_time
-
-            # Find k-nearest neighbors based on the lower bound distances
-            index_search_time = time.time()
-            D, knns = index.search(
-                X_windows,
-                self.search_radius * self.k  # FIXME: use M instead?
-            )
-
-            index_search_time = time.time() - index_search_time
-            # print(f"\tIndexing search took {index_search_time:.3f} seconds.")
-
-            faiss.omp_set_num_threads(previous_jobs)
-            memory_usage = process.memory_info().rss / (1024 * 1024)  # MB
-
-            # cleanup
-            if 'quantizer' in locals():
-                del quantizer
-            del index
         else:
             raise ValueError(
                 f"Unknown indexing strategy: {index_strategy}. "
@@ -199,7 +134,7 @@ class VectorSearchNearestNeighbors:
         # print(f"\tPost-processing took {post_process_time:.3f} seconds.")
 
         # Set old values
-        set_num_threads(previous_jobs)
+        set_num_threads(self.previous_jobs)
 
         print(f"Total time: "
               f"\n\tCreate: {index_create_time:.3f}s "
@@ -209,6 +144,143 @@ class VectorSearchNearestNeighbors:
         return (D_exact, knns_exact, index_create_time,
                 index_search_time, post_process_time, memory_usage)
 
+    def process_pynndescent(self, X_windows):
+        import pynndescent
+
+        # https://pynndescent.readthedocs.io/en/latest/api.html
+        index_create_time = time.time()
+        index = pynndescent.NNDescent(
+            X_windows,
+            metric="euclidean",
+            low_memory=False,
+            n_neighbors=self.pynndescent_n_neighbors,
+            leaf_size=self.pynndescent_leaf_size,
+            pruning_degree_multiplier=self.pynndescent_pruning_degree_multiplier,
+            diversify_prob=self.pynndescent_diversify_prob,
+            n_search_trees=self.pynndescent_n_search_trees,
+            n_jobs=self.n_jobs
+            # compressed=True,
+            # verbose=True,
+        )
+
+        if self.verbose:
+            print(f"\tpynndescent")
+            print(f"\tn_neighbors:  {self.pynndescent_n_neighbors}")
+            print(f"\tleaf_size: {self.pynndescent_leaf_size}")
+            print(
+                f"\tpruning_degree_multiplier: {self.pynndescent_pruning_degree_multiplier}")
+            print(f"\tdiversify_prob: {self.pynndescent_diversify_prob}")
+            print(f"\tn_search_trees: {self.pynndescent_n_search_trees}")
+            print(f"\tsearch_epsilon: {self.pynndescent_search_epsilon}")
+
+        index_create_time = time.time() - index_create_time
+
+        # We can then extract the nearest neighbors of each training sample by
+        # using the neighbor_graph attribute.
+        index_search_time = time.time()
+        knns, D = index.neighbor_graph
+        index_search_time = time.time() - index_search_time
+
+        memory_usage = self.process.memory_info().rss / (1024 * 1024)  # MB
+
+        del index
+        return D, index_create_time, index_search_time, knns, memory_usage
+
+    def process_faiss(self, X_windows):
+
+        import faiss
+        faiss.omp_set_num_threads(self.n_jobs)
+
+        # Compute distances using the lower bounding representation
+        index_create_time = time.time()
+        d = X_windows.shape[-1]
+
+        if self.faiss_index:
+            if self.faiss_index == "HNSW":
+                # setup our HNSW parameters
+
+                # number of neighbours we add to each vertex
+                if self.verbose:
+                    print(f"\tHNSW")
+                    print(f"\tefSearch:       {self.efSearch}")
+                    print(f"\tefConstruction: {self.efConstruction}")
+                    print(f"\tM:              {self.M}")
+
+                index = faiss.IndexHNSWFlat(d, self.M)
+                index.hnsw.efConstruction = self.efConstruction
+                index.hnsw.efSearch = self.efSearch  # TODO: reset every time needed?
+
+            elif self.faiss_index == "IVF":
+                # setup our IVF parameters
+
+                if not self.nlist:
+                    # number of clusters/cells set to sqrt(n)
+                    self.nlist = int(np.sqrt(X_windows.shape[0]))
+
+                if self.verbose:
+                    print(f"\tIVF")
+                    print(f"\tnlist:  {self.nlist}")
+                    print(f"\tnprobe: {self.nprobe}")
+
+                quantizer = faiss.IndexFlatL2(d)
+                index = faiss.IndexIVFFlat(quantizer, d, self.nlist,
+                                           faiss.METRIC_L2)
+                index.train(X_windows)
+
+                index.nprobe = self.nprobe  # TODO: reset every time needed?
+
+            elif self.faiss_index == "IVFPQ":
+                # setup our IVF-PQ parameters
+
+                if not self.nlist:
+                    # number of clusters/cells set to sqrt(n)
+                    self.nlist = int(np.sqrt(X_windows.shape[0]))
+
+                if self.verbose:
+                    print(f"\tIVFPQ")
+                    print(f"\tnlist:  {self.nlist}")
+                    print(f"\tnprobe: {self.nprobe}")
+
+                mm = d // 2  # Use half dimension for PQ
+                nbits = 4  # bits per Subvector
+
+                factory_string = f"IVF{int(self.nlist)},PQ{mm}x{nbits}fs"
+                index = faiss.index_factory(d, factory_string, faiss.METRIC_L2)
+                index.train(X_windows)
+
+                index.nprobe = self.nprobe  # TODO: reset every time needed?
+
+            else:
+                raise ValueError(
+                    'Unknown FAISS index' + faiss_index + '.' +
+                    'Use "HNSW", "IVF", "IVFPQ".')
+        else:
+            raise ValueError(
+                'faiss_index not set. Use "HNSW", "IVF", "IVFPQ".')
+
+        index.add(X_windows)
+        index_create_time = time.time() - index_create_time
+
+        # Find k-nearest neighbors based on the lower bound distances
+        index_search_time = time.time()
+        D, knns = index.search(
+            X_windows,
+            self.search_radius * self.k
+        )
+
+        index_search_time = time.time() - index_search_time
+        # print(f"\tIndexing search took {index_search_time:.3f} seconds.")
+
+        faiss.omp_set_num_threads(self.previous_jobs)
+        memory_usage = self.process.memory_info().rss / (1024 * 1024)  # MB
+
+        # cleanup
+        if 'quantizer' in locals():
+            del quantizer
+        del index
+
+        return D, index_create_time, index_search_time, knns, memory_usage
+
 
 @njit(fastmath=True, cache=True, inline='always')
 def znormed_euclidean_distance_single(a, b, a_i, b_j, means, stds):
@@ -217,18 +289,6 @@ def znormed_euclidean_distance_single(a, b, a_i, b_j, means, stds):
     z = 2 * m * (1 - (np.dot(a, b) - m * means[a_i] * means[b_j]) / (
             m * stds[a_i] * stds[b_j]))
     return np.sqrt(z)
-
-
-@njit(fastmath=True, cache=True, parallel=True)
-def argsort_rows_topk(D, k):
-    n_rows, _ = D.shape
-    result = np.zeros((n_rows, k), dtype=np.int32)
-    for i in prange(n_rows):
-        for j in range(k):
-            result[i, j] = np.argmin(D[i])
-            D[i, result[i, j]] = np.inf  # set to inf to not select again
-        # result[i] = np.argsort(D[i])[:k]
-    return result
 
 
 @njit(fastmath=True, cache=True)
@@ -292,18 +352,6 @@ def apply_exclusion_zone(X, m, D_lb, knns_lb, k, slack=0.5):
     halve_m = np.int32(slack * m)
 
     n = D_lb.shape[0]
-    D = np.zeros((n, knns_lb.shape[-1]), dtype=np.float64)
-
-    for i in prange(len(knns_lb)):
-        query = X[i:i + m]
-        knn = knns_lb[i]
-
-        for a in prange(1, len(knn)):
-            j = knn[a]
-
-            # Re-rank based on z-normalized Euclidean distance
-            D[i, a] = znormed_euclidean_distance_single(
-                query, X[j:j + m], i, j, means, stds)
 
     D_knn = np.full((n, k), np.inf, dtype=np.float64)
     knns = np.full((n, k), -1, dtype=np.int32)
@@ -312,10 +360,10 @@ def apply_exclusion_zone(X, m, D_lb, knns_lb, k, slack=0.5):
     # to take top-k neighbors
     for order in prange(n):
         dists = np.full(n, np.inf, dtype=np.float64)
-        dists[knns_lb[order]] = D[order]
+        dists[knns_lb[order]] = D_lb[order]
 
         dist_pos = knns_lb[order]
-        dist_sort = D[order]
+        dist_sort = D_lb[order]
 
         # top-k counter
         k_idx = 0
@@ -342,4 +390,17 @@ def apply_exclusion_zone(X, m, D_lb, knns_lb, k, slack=0.5):
             if k_idx >= k:
                 break
 
-    return D_knn, knns
+    D = np.zeros((n, D_knn.shape[-1]), dtype=np.float64)
+    for i in prange(len(knns)):
+        query = X[i:i + m]
+        knn = knns[i]
+        for a in prange(1, len(knn)):
+            j = knn[a]
+            if j > -1:
+                # Re-rank based on z-normalized Euclidean distance
+                D[i, a] = znormed_euclidean_distance_single(query, X[j:j + m], i, j,
+                                                            means, stds)
+            else:
+                D[i, a] = np.inf
+
+    return D, knns

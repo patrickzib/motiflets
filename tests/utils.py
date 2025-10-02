@@ -1,16 +1,11 @@
 import traceback
 import gc
-import multiprocessing
 import warnings
 
 from motiflets.motiflets import *
 from motiflets.plotting import *
 
 warnings.simplefilter("ignore")
-
-# setting for sonic / sone server
-num_cores = multiprocessing.cpu_count()
-cores = min(60, num_cores - 2)
 
 
 def force_get(key, kwargs):
@@ -27,6 +22,7 @@ def test_motiflets_scale_n(
         k_max,
         backends=["default", "pyattimo", "scalable"],
         subsampling=None,
+        n_jobs=8,
         **kwargs
 ):
     for backend in backends:
@@ -44,7 +40,7 @@ def test_motiflets_scale_n(
             gc.collect()
 
             # print(f"\n\tUsing {backend} size of ts {n} and l_ranges {l_range}")
-            # print(f"\tNumber of cores {cores}")
+            print(f"\tNumber of cores {n_jobs}")
 
             ds_name, ts = read_data()
             if isinstance(ts, pd.DataFrame):
@@ -85,7 +81,7 @@ def test_motiflets_scale_n(
                         ds_name,
                         ts,
                         backend=backend,
-                        n_jobs=cores,
+                        n_jobs=n_jobs,
                         **kwargs)
 
                     dists, motiflets, elbow_points = mm.fit_k_elbow(
@@ -117,6 +113,32 @@ def test_motiflets_scale_n(
 
                         new_filename = (new_filename +
                                         f"_delta_{pyattimo_delta}")
+
+                    elif backend == "pynndescent":
+                        pynndescent_n_neighbors = force_get("pynndescent_n_neighbors", kwargs)
+                        pynndescent_leaf_size = force_get("pynndescent_leaf_size", kwargs)
+                        pynndescent_pruning_degree_multiplier = force_get("pynndescent_pruning_degree_multiplier", kwargs)
+                        pynndescent_diversify_prob = force_get("pynndescent_diversify_prob", kwargs)
+                        pynndescent_n_search_trees = force_get("pynndescent_n_search_trees", kwargs)
+                        pynndescent_search_epsilon = force_get("pynndescent_search_epsilon", kwargs)
+
+                        backend_name = (
+                            f"{backend} "
+                            f"(n_neighbors={pynndescent_n_neighbors};"
+                            f"leaf_size={pynndescent_leaf_size};"
+                            f"pruning_degree_multiplier={pynndescent_pruning_degree_multiplier};"
+                            f"diversify_prob={pynndescent_diversify_prob};"
+                            f"n_search_trees={pynndescent_n_search_trees};"
+                            f"search_epsilon={pynndescent_search_epsilon})")
+
+                        new_filename = (
+                            new_filename +
+                            f"_nn={pynndescent_n_neighbors}"
+                            f"_ls={pynndescent_leaf_size}"
+                            f"_pdm={pynndescent_pruning_degree_multiplier}"
+                            f"_dp={pynndescent_diversify_prob}"
+                            f"_nst={pynndescent_n_search_trees}"
+                            f"_se={pynndescent_search_epsilon}")
 
                     elif backend == "faiss":
                         faiss_index = force_get("faiss_index", kwargs)
