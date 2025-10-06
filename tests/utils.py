@@ -162,7 +162,7 @@ def test_motiflets_scale_n(
                                             f"_efSearch_{faiss_efSearch}"
                                             f"_M_{faiss_M}")
 
-                        elif faiss_index == "IVF":
+                        elif faiss_index in ["IVF", "IVFPQ"]:
                             faiss_nprobe = force_get("faiss_nprobe", kwargs)
 
                             backend_name = (f"{backend} "

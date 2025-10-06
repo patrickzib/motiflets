@@ -192,7 +192,8 @@ def main():
         #    )
 
         # Running FAISS
-        # backends = ["faiss"]
+        backends = ["faiss"]
+
         # faiss_index = "HNSW"
         # for M in faiss_M:
         #     for efConstruction in faiss_efConstruction:
@@ -225,44 +226,44 @@ def main():
         #         n_jobs=cores
         #      )
 
-        # faiss_index = "IVFPQ"
-        # for nprobe in faiss_nprobe:
-        #     print(f"\n\tRunning faiss {faiss_index} {nprobe}")
-        #     run_safe(
-        #         filename,
-        #         data,
-        #         l_range,
-        #         k_max,
-        #         backends,
-        #         faiss_index=faiss_index,
-        #         faiss_nprobe=nprobe,
-        #         n_jobs=cores
-        #     )
+        faiss_index = "IVFPQ"
+        for nprobe in faiss_nprobe:
+            print(f"\n\tRunning faiss {faiss_index} {nprobe}")
+            run_safe(
+                filename,
+                data,
+                l_range,
+                k_max,
+                backends,
+                faiss_index=faiss_index,
+                faiss_nprobe=nprobe,
+                n_jobs=cores
+            )
 
 
-        # Running pynndescent
-        backends = ["pynndescent"]
-        for n_neighbors in pynndescent_n_neighbors:
-            for leaf_size in pynndescent_leaf_size:
-                for pruning_degree_multiplier in pynndescent_pruning_degree_multiplier:
-                    for diversify_prob in pynndescent_diversify_prob:
-                        for n_search_trees in pynndescent_n_search_trees:
-                            for search_epsilon in pynndescent_search_epsilon:
-                                print(f"\n\tRunning pynndescent")
-                                run_safe(
-                                    filename,
-                                    data,
-                                    l_range,
-                                    k_max,
-                                    backends,
-                                    pynndescent_n_neighbors=n_neighbors,
-                                    pynndescent_leaf_size=leaf_size,
-                                    pynndescent_pruning_degree_multiplier=pruning_degree_multiplier,
-                                    pynndescent_diversify_prob=diversify_prob,
-                                    pynndescent_n_search_trees=n_search_trees,
-                                    pynndescent_search_epsilon=search_epsilon,
-                                    n_jobs=cores
-                                )
+        # # Running pynndescent
+        # backends = ["pynndescent"]
+        # for n_neighbors in pynndescent_n_neighbors:
+        #     for leaf_size in pynndescent_leaf_size:
+        #         for pruning_degree_multiplier in pynndescent_pruning_degree_multiplier:
+        #             for diversify_prob in pynndescent_diversify_prob:
+        #                 for n_search_trees in pynndescent_n_search_trees:
+        #                     for search_epsilon in pynndescent_search_epsilon:
+        #                         print(f"\n\tRunning pynndescent")
+        #                         run_safe(
+        #                             filename,
+        #                             data,
+        #                             l_range,
+        #                             k_max,
+        #                             backends,
+        #                             pynndescent_n_neighbors=n_neighbors,
+        #                             pynndescent_leaf_size=leaf_size,
+        #                             pynndescent_pruning_degree_multiplier=pruning_degree_multiplier,
+        #                             pynndescent_diversify_prob=diversify_prob,
+        #                             pynndescent_n_search_trees=n_search_trees,
+        #                             pynndescent_search_epsilon=search_epsilon,
+        #                             n_jobs=cores
+        #                         )
 
 
 
