@@ -14,7 +14,13 @@ import scipy.io as sio
 import utils as ut
 
 run_local = True
-path = "../datasets/momp/"
+path = "/vol/fob-wbib-vol2/wbi/schaefpa/motiflets/momp/"
+if os.path.exists(path) and os.path.isdir(path):
+    run_local = False
+else:
+    path = "../datasets/momp/"
+
+print(f"Using directory: {path} {run_local}")
 
 filenames = {
     # key, filename, momp motif length, momp motif meaning, dataset length
@@ -115,7 +121,7 @@ def run_safe(ds_name, series, l_range, k_max, backends,
     try:
         if run_local:
             print("\nWarning. Running locally.\n")
-            n = 10_000
+            n = 30_000
         else:
             n = len(series)
 
@@ -127,7 +133,9 @@ def run_safe(ds_name, series, l_range, k_max, backends,
             subsampling=subsampling,
             n_jobs=n_jobs,
             **kwargs)
+
     except Exception as e:
+        print(f"Caught a panic: {e}")
         print(traceback.format_exc())
     except BaseException as e:
         print(f"Caught a panic: {e}")
@@ -135,7 +143,7 @@ def run_safe(ds_name, series, l_range, k_max, backends,
 
 # 512 to 8192
 if run_local:
-    l_range = [512]
+    l_range = [2 ** 13]
 else:
     l_range = list([2 ** 9, 2 ** 10, 2 ** 11, 2 ** 12, 2 ** 13])
 
@@ -167,6 +175,13 @@ pynndescent_diversify_prob = [0.0]
 pynndescent_n_search_trees = [1]
 pynndescent_search_epsilon = [0.2]  # [0.0, 0.04, 0.08, 0.12, 0.16, 0.2, 0.24, 0.28, 0.32, 0.36]
 
+# LSH
+faiss_nbits = [4]
+
+# Annoy
+annoy_n_trees = [100]
+annoy_search_k = [-1]
+
 
 k_max = 10
 
@@ -184,15 +199,30 @@ def main():
         data = read_mat(filename)
 
         # # pyattimo
-        # backends = ["pyattimo", "scalable"]
+        # backends = ["pyattimo"]
         # for delta in deltas:
-        #    run_safe(
-        #        filename, data, l_range, k_max, backends,
-        #        pyattimo_delta=delta, n_jobs=cores
-        #    )
+        #     for subsampling in [16, 32, 64]:
+        #         run_safe(
+        #                filename, data, l_range, k_max, backends,
+        #                pyattimo_delta=delta, n_jobs=cores, subsampling=subsampling
+        #         )
 
         # Running FAISS
-        backends = ["faiss"]
+        # backends = ["faiss"]
+        #
+        # faiss_index = "LSH"
+        # for nbits in faiss_nbits:
+        #     print(f"\n\tRunning faiss {faiss_index} {nbits}")
+        #     run_safe(
+        #         filename,
+        #         data,
+        #         l_range,
+        #         k_max,
+        #         backends,
+        #         faiss_index=faiss_index,
+        #         faiss_nbits=nbits,
+        #         n_jobs=cores
+        #      )
 
         # faiss_index = "HNSW"
         # for M in faiss_M:
@@ -226,19 +256,19 @@ def main():
         #         n_jobs=cores
         #      )
 
-        faiss_index = "IVFPQ"
-        for nprobe in faiss_nprobe:
-            print(f"\n\tRunning faiss {faiss_index} {nprobe}")
-            run_safe(
-                filename,
-                data,
-                l_range,
-                k_max,
-                backends,
-                faiss_index=faiss_index,
-                faiss_nprobe=nprobe,
-                n_jobs=cores
-            )
+        # faiss_index = "IVFPQ"
+        # for nprobe in faiss_nprobe:
+        #     print(f"\n\tRunning faiss {faiss_index} {nprobe}")
+        #     run_safe(
+        #         filename,
+        #         data,
+        #         l_range,
+        #         k_max,
+        #         backends,
+        #         faiss_index=faiss_index,
+        #         faiss_nprobe=nprobe,
+        #         n_jobs=cores
+        #     )
 
 
         # # Running pynndescent
@@ -264,6 +294,23 @@ def main():
         #                             pynndescent_search_epsilon=search_epsilon,
         #                             n_jobs=cores
         #                         )
+
+        # Running ANNOY
+        backends = ["annoy"]
+
+        for n_trees in annoy_n_trees:
+            for search_k in annoy_search_k:
+                print(f"\n\tRunning annoy {n_trees} {search_k}")
+                run_safe(
+                    filename,
+                    data,
+                    l_range,
+                    k_max,
+                    backends,
+                    annoy_n_trees=n_trees,
+                    annoy_search_k=search_k,
+                    n_jobs=cores
+                 )
 
 
 

@@ -73,7 +73,7 @@ def test_motiflets_scale_n(
                     print(f"\tApplying Subsampling {subsampling}, "
                           f"Old Size {ts_orig.shape} " +
                           f"New Size {ts.shape}, " +
-                          f"Old Window {l}" +
+                          f"Old Window {l} " +
                           f"New Window {l_new}")
 
                 try:
@@ -113,6 +113,21 @@ def test_motiflets_scale_n(
 
                         new_filename = (new_filename +
                                         f"_delta_{pyattimo_delta}")
+
+                    elif backend == "annoy":
+                        annoy_n_trees = force_get("annoy_n_trees", kwargs)
+                        annoy_search_k = force_get("annoy_search_k", kwargs)
+                        backend_name = \
+                            (f"{backend} "
+                            f"(annoy_n_trees={annoy_n_trees};"
+                            f"annoy_search_k={annoy_search_k})"
+                            )
+
+                        new_filename = (
+                            new_filename +
+                            f"_n_trees={annoy_n_trees}"
+                            f"_search_k={annoy_search_k}"
+                            )
 
                     elif backend == "pynndescent":
                         pynndescent_n_neighbors = force_get("pynndescent_n_neighbors", kwargs)
@@ -175,11 +190,22 @@ def test_motiflets_scale_n(
                                             f"_faiss_nprobe_{faiss_nprobe}")
 
 
-                    elif subsampling:
-                        backend_name = f"{backend_name} (subsampling={subsampling})"
+                        elif faiss_index in ["LSH"]:
+                            faiss_nbits = force_get("faiss_nbits", kwargs)
 
-                        new_filename = (new_filename +
-                                        f"_subs_{subsampling}")
+                            backend_name = (f"{backend} "
+                                            f"(index={faiss_index};"
+                                            f"faiss_nbits={faiss_nbits})")
+
+                            new_filename = (new_filename +
+                                            f"_backend_{backend}"
+                                            f"_index_{faiss_index}"
+                                            f"_faiss_nbits_{faiss_nbits}")
+
+
+                    if subsampling:
+                        backend_name = f"{backend_name} (subsampling={subsampling})"
+                        new_filename = (new_filename + f"_subs_{subsampling}")
 
                     duration = time.time() - start
                     memory_usage = mm.memory_usage
