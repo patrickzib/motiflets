@@ -49,6 +49,15 @@ Change into the directory and build the package from source.
 pip install .
 ```
 
+## c) Streamlit Motif Explorer
+
+Install the optional dependencies and launch the interactive UI:
+```
+pip install -e .[app]
+streamlit run apps/streamlit_app.py
+```
+The app lets you experiment with synthetic or uploaded time series, tune motif parameters, and download discovered motif sets.
+
 # Usage
 
 Here we illustrate how to use k-Motiflets. 

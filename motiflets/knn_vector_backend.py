@@ -2,6 +2,7 @@
 
 import os
 import time
+from abc import ABC, abstractmethod
 from warnings import simplefilter
 
 import numpy as np
@@ -13,15 +14,261 @@ simplefilter(action="ignore", category=UserWarning)
 
 STD_THRESHOLD = 1e-8
 
-index_strategies = [
-    "faiss",
-    "annoy",
-    "pynndescent"
-]
+
+class BaseKnnBackend(ABC):
+    """Abstract interface for approximate nearest-neighbour backends."""
+
+    def __init__(self, *, m, k, search_radius, slack, n_jobs, verbose):
+        self.m = m
+        self.k = k
+        self.search_radius = search_radius
+        self.slack = slack
+        self.n_jobs = n_jobs
+        self.verbose = verbose
+
+    def _log(self, message):
+        if self.verbose:
+            print(message)
+
+    @abstractmethod
+    def compute(self, X_windows, process, previous_num_threads):
+        """Return distances, timings, neighbours, and memory usage."""
+
+
+class FaissBackend(BaseKnnBackend):
+    """FAISS-based ANN backend."""
+
+    def __init__(self, *, m, k, search_radius, slack, n_jobs, verbose, **kwargs):
+        super().__init__(
+            m=m, k=k,
+            search_radius=search_radius, slack=slack,
+            n_jobs=n_jobs, verbose=verbose
+        )
+        self.faiss_index = kwargs.get("faiss_index")
+        self.M = kwargs.get("faiss_M", 64)
+        self.efConstruction = kwargs.get("faiss_efConstruction", 500)
+        self.efSearch = max(search_radius * k, kwargs.get("faiss_efSearch", 800))
+        self.nlist = kwargs.get("faiss_nlist")
+
+        if self.nlist is not None:
+            self.nlist = int(self.nlist)
+
+        self.nprobe = kwargs.get("faiss_nprobe", 32)
+        self.nBits = kwargs.get("faiss_nBits", kwargs.get("nBits", 4))
+
+    def compute(self, X_windows, process, previous_num_threads):
+        import faiss
+
+        faiss.omp_set_num_threads(self.n_jobs)
+
+        start_time = time.time()
+        quantizer = None
+        index = None
+        d = X_windows.shape[-1]
+
+        if not self.faiss_index:
+            raise ValueError(
+                'faiss_index not set. Use "HNSW", "IVF", "IVFPQ", "IVFPQ+HNSW", "LSH".')
+
+        if self.faiss_index == "LSH":
+            n_bits = self.nBits * d
+            self._log("\tLSH")
+            self._log(f"\tnBits:       {n_bits}")
+            index = faiss.IndexLSH(d, n_bits)
+
+        elif self.faiss_index == "HNSW":
+            self._log("\tHNSW")
+            self._log(f"\tefSearch:       {self.efSearch}")
+            self._log(f"\tefConstruction: {self.efConstruction}")
+            self._log(f"\tM:              {self.M}")
+            index = faiss.IndexHNSWFlat(d, self.M)
+            index.hnsw.efConstruction = self.efConstruction
+            index.hnsw.efSearch = self.efSearch
+
+        elif self.faiss_index == "IVF":
+            if not self.nlist:
+                self.nlist = int(np.sqrt(X_windows.shape[0]))
+            self._log("\tIVF")
+            self._log(f"\tnlist:  {self.nlist}")
+            self._log(f"\tnprobe: {self.nprobe}")
+            quantizer = faiss.IndexFlatL2(d)
+            index = faiss.IndexIVFFlat(quantizer, d, self.nlist, faiss.METRIC_L2)
+            index.train(X_windows)
+            index.nprobe = self.nprobe
+
+        elif self.faiss_index == "IVFPQ":
+            if not self.nlist:
+                self.nlist = int(np.sqrt(X_windows.shape[0]))
+            self._log("\tIVFPQ")
+            self._log(f"\tnlist:  {self.nlist}")
+            self._log(f"\tnprobe: {self.nprobe}")
+            mm = 64
+            nbits = 8
+            factory_string = f"IVF{int(self.nlist)},PQ{mm}x{nbits}"
+            index = faiss.index_factory(d, factory_string, faiss.METRIC_L2)
+            index.train(X_windows)
+            index.nprobe = self.nprobe
+
+        elif self.faiss_index == "IVFPQ+HNSW":
+            if not self.nlist:
+                self.nlist = int(np.sqrt(X_windows.shape[0]))
+            self._log("\tIVFPQ+HNSW")
+            self._log(f"\tnlist:  {self.nlist}")
+            self._log(f"\tnprobe: {self.nprobe}")
+            self._log(f"\tefSearch:       {self.efSearch}")
+            self._log(f"\tefConstruction: {self.efConstruction}")
+            self._log(f"\tM:      {self.M}")
+            mm = 64
+            nbits = 8
+            quantizer = faiss.IndexHNSWFlat(d, self.M)
+            quantizer.hnsw.efConstruction = self.efConstruction
+            quantizer.hnsw.efSearch = self.efSearch
+            index = faiss.IndexIVFPQ(quantizer, d, self.nlist, mm, nbits,
+                                     faiss.METRIC_L2)
+            index.train(X_windows)
+            index.nprobe = self.nprobe
+
+        else:
+            raise ValueError(
+                f'Unknown FAISS index {self.faiss_index}. '
+                'Use "HNSW", "IVF", "IVFPQ", "IVFPQ+HNSW", "LSH".')
+
+        index.add(X_windows)
+        index_create_time = time.time() - start_time
+
+        index_search_time = time.time()
+        D, knns = index.search(
+            X_windows,
+            self.search_radius * self.k
+        )
+        index_search_time = time.time() - index_search_time
+
+        faiss.omp_set_num_threads(previous_num_threads)
+        memory_usage = process.memory_info().rss / (1024 * 1024)
+
+        if quantizer is not None:
+            del quantizer
+        del index
+
+        return D, index_create_time, index_search_time, knns, memory_usage
+
+
+class AnnoyBackend(BaseKnnBackend):
+    """Annoy-based ANN backend."""
+
+    def __init__(self, *, m, k, search_radius, slack, n_jobs, verbose, **kwargs):
+        super().__init__(
+            m=m, k=k,
+            search_radius=search_radius, slack=slack,
+            n_jobs=n_jobs, verbose=verbose)
+
+        self.annoy_n_trees = kwargs.get("annoy_n_trees", 10)
+        self.annoy_search_k = kwargs.get("annoy_search_k", -1)
+
+    def compute(self, X_windows, process, _previous_num_threads):
+        import annoy
+
+        d = X_windows.shape[-1]
+        start_time = time.time()
+        index = annoy.AnnoyIndex(d, metric="euclidean")
+
+        self._log("\tannoy")
+        self._log(f"\tn_trees:  {self.annoy_n_trees}")
+        self._log(f"\tsearch_k:  {self.annoy_search_k}")
+
+        for i, vector in enumerate(X_windows):
+            index.add_item(i, vector)
+
+        index.build(self.annoy_n_trees, n_jobs=-1)
+        index_create_time = time.time() - start_time
+
+        index_search_time = time.time()
+        knns = np.full((len(X_windows), self.k), -1, dtype=np.int32)
+        D = np.full((len(X_windows), self.k), np.inf, dtype=np.float32)
+        for i, vector in enumerate(X_windows):
+            neighbors, distances = index.get_nns_by_vector(
+                vector, self.k, self.annoy_search_k, include_distances=True)
+            neighbors = np.asarray(neighbors, dtype=np.int32)
+            distances = np.asarray(distances, dtype=np.float32)
+            knns[i, :len(neighbors)] = neighbors
+            D[i, :len(distances)] = distances
+
+        index_search_time = time.time() - index_search_time
+
+        memory_usage = process.memory_info().rss / (1024 * 1024)
+        del index
+
+        return D, index_create_time, index_search_time, knns, memory_usage
+
+
+class PyNNDescentBackend(BaseKnnBackend):
+    """PyNNDescent-based ANN backend."""
+
+    def __init__(self, *, m, k, search_radius, slack, n_jobs, verbose, **kwargs):
+        super().__init__(
+            m=m, k=k,
+            search_radius=search_radius, slack=slack,
+            n_jobs=n_jobs, verbose=verbose
+        )
+        self.pynndescent_n_neighbors = kwargs.get("pynndescent_n_neighbors", 10)
+        self.pynndescent_leaf_size = kwargs.get("pynndescent_leaf_size", 24)
+        self.pynndescent_pruning_degree_multiplier = kwargs.get(
+            "pynndescent_pruning_degree_multiplier", 1.0)
+        self.pynndescent_diversify_prob = kwargs.get(
+            "pynndescent_diversify_prob", 1.0)
+        self.pynndescent_n_search_trees = kwargs.get(
+            "pynndescent_n_search_trees", 1)
+        self.pynndescent_search_epsilon = kwargs.get(
+            "pynndescent_search_epsilon", 0.1)
+
+    def compute(self, X_windows, process, _previous_num_threads):
+        import pynndescent
+
+        start_time = time.time()
+        index = pynndescent.NNDescent(
+            X_windows,
+            metric="euclidean",
+            low_memory=False,
+            n_neighbors=self.pynndescent_n_neighbors,
+            leaf_size=self.pynndescent_leaf_size,
+            pruning_degree_multiplier=self.pynndescent_pruning_degree_multiplier,
+            diversify_prob=self.pynndescent_diversify_prob,
+            n_search_trees=self.pynndescent_n_search_trees,
+            n_jobs=self.n_jobs
+        )
+
+        self._log("\tpynndescent")
+        self._log(f"\tn_neighbors:  {self.pynndescent_n_neighbors}")
+        self._log(f"\tleaf_size: {self.pynndescent_leaf_size}")
+        self._log(f"\tpruning_degree_multiplier: "
+                  f"{self.pynndescent_pruning_degree_multiplier}")
+        self._log(f"\tdiversify_prob: {self.pynndescent_diversify_prob}")
+        self._log(f"\tn_search_trees: {self.pynndescent_n_search_trees}")
+        self._log(f"\tsearch_epsilon: {self.pynndescent_search_epsilon}")
+
+        index_create_time = time.time() - start_time
+
+        index_search_time = time.time()
+        knns, D = index.neighbor_graph
+        index_search_time = time.time() - index_search_time
+
+        memory_usage = process.memory_info().rss / (1024 * 1024)
+        del index
+
+        return D, index_create_time, index_search_time, knns, memory_usage
+
+
+BACKEND_REGISTRY = {
+    "faiss": FaissBackend,
+    "annoy": AnnoyBackend,
+    "pynndescent": PyNNDescentBackend,
+}
+
+index_strategies = tuple(BACKEND_REGISTRY.keys())
 
 
 class VectorSearchNearestNeighbors:
-    """ VectorSearch-based nearest neighbor computations for motiflet discovery. """
+    """VectorSearch-based nearest neighbor computations for motiflet discovery."""
 
     def __init__(
             self,
@@ -39,69 +286,39 @@ class VectorSearchNearestNeighbors:
         self.index_strategy = index_strategy
         self.search_radius = search_radius
         self.slack = slack
-        self.n_jobs = n_jobs
-        self.n_jobs = os.cpu_count() if self.n_jobs < 1 else self.n_jobs
-
+        requested_jobs = n_jobs
+        if requested_jobs < 1:
+            requested_jobs = os.cpu_count() or 1
+        self.n_jobs = requested_jobs
         self.verbose = verbose
 
-        #### faiss
+        self.backend = self._build_backend(dict(kwargs))
 
-        self.faiss_index = None
-        if "faiss_index" in kwargs:
-            self.faiss_index = kwargs["faiss_index"]
+    def _build_backend(self, params):
+        backend_cls = BACKEND_REGISTRY.get(self.index_strategy)
 
-        self.M = kwargs["faiss_M"] if "faiss_M" in kwargs else 64
-        self.efConstruction = kwargs[
-            "faiss_efConstruction"] if "faiss_efConstruction" in kwargs else 500
-        self.efSearch = kwargs["faiss_efSearch"] if "faiss_efSearch" in kwargs else 800
-        self.efSearch = max(search_radius * self.k, self.efSearch)
+        if backend_cls is None:
+            available = ", ".join(index_strategies)
+            raise ValueError(
+                f"Unknown indexing strategy: {self.index_strategy}. "
+                f"Available strategies: {available}"
+            )
 
-        # number of clusters/cells
-        self.nlist = kwargs["faiss_nlist"] if "faiss_nlist" in kwargs else None
-        if self.nlist:
-            self.nlist = int(self.nlist)
-
-        # number of cells to search
-        self.nprobe = kwargs["faiss_nprobe"] if "faiss_nprobe" in kwargs else 32
-
-        # number of bits used for hashing (resolution)
-        self.nBits = kwargs["faiss_nBits"] if "nBits" in kwargs else 4
-
-        #### annoy
-
-        self.annoy_n_trees \
-            = kwargs["annoy_n_trees"] if "annoy_n_trees" in kwargs else 10
-        self.annoy_search_k \
-            = kwargs["annoy_search_k"] if "annoy_search_k" in kwargs else -1
-
-
-        #### pynndescent
-
-        self.pynndescent_n_neighbors \
-            = kwargs[
-            "pynndescent_n_neighbors"] if "pynndescent_n_neighbors" in kwargs else 10
-        self.pynndescent_leaf_size \
-            = kwargs[
-            "pynndescent_leaf_size"] if "pynndescent_leaf_size" in kwargs else 24
-        self.pynndescent_pruning_degree_multiplier \
-            = kwargs[
-            "pynndescent_pruning_degree_multiplier"] if "pynndescent_pruning_degree_multiplier" in kwargs else 1.0
-        self.pynndescent_diversify_prob \
-            = kwargs[
-            "pynndescent_diversify_prob"] if "pynndescent_diversify_prob" in kwargs else 1.0
-        self.pynndescent_n_search_trees \
-            = kwargs[
-            "pynndescent_n_search_trees"] if "pynndescent_n_search_trees" in kwargs else 1
-        self.pynndescent_search_epsilon \
-            = kwargs[
-            "pynndescent_search_epsilon"] if "pynndescent_search_epsilon" in kwargs else 0.1
+        return backend_cls(
+            m=self.m,
+            k=self.k,
+            search_radius=self.search_radius,
+            slack=self.slack,
+            n_jobs=self.n_jobs,
+            verbose=self.verbose,
+            **params
+        )
 
     def compute_knns(self, X):
         """Computes approximate distances and k-nearest neighbors."""
         assert X.shape[0] == 1, \
             "Vector backends can handle univariate data, only."
 
-        # Set the number of threads for Numba
         self.previous_jobs = get_num_threads()
         set_num_threads(self.n_jobs)
 
@@ -113,53 +330,35 @@ class VectorSearchNearestNeighbors:
 
         X_windows = znorm_windows(X, self.m)
 
-        # We must shuffle
         np.random.seed(42)
         np.random.shuffle(X_windows)
 
-        if self.index_strategy == "faiss":
-            D, index_create_time, index_search_time, knns, memory_usage \
-                = self.process_faiss(X_windows)
+        (D_lb, index_create_time, index_search_time,
+         knns_lb, memory_usage) = self.backend.compute(
+            X_windows, self.process, self.previous_jobs)
 
-        elif self.index_strategy == "annoy":
-            D, index_create_time, index_search_time, knns, memory_usage \
-                = self.process_annoy(X_windows)
-
-        elif self.index_strategy == "pynndescent":
-            D, index_create_time, index_search_time, knns, memory_usage \
-                = self.process_pynndescent(X_windows)
-
-        else:
-            raise ValueError(
-                f"Unknown indexing strategy: {index_strategy}. "
-                f"Available strategies: {index_strategies}"
-            )
-
-        # Post-process the results to filter out distances and neighbors
         post_process_time = time.time()
 
         if self.verbose:
             print(f"\tApplying exclusion Zone")
-            print("\t", knns[0])
-            print("\t", knns[-1])
+            #print("\t", knns_lb[0])
+            #print("\t", knns_lb[-1])
 
         D_exact, knns_exact = apply_exclusion_zone(
             X,
-            self.m,  # :window_size
-            D,
-            knns,
+            self.m,
+            D_lb,
+            knns_lb,
             self.k,
             slack=self.slack
         )
 
-        if self.verbose:
-            print("\t", knns_exact[0])
-            print("\t", knns_exact[-1])
+        #if self.verbose:
+        #    print("\t", knns_exact[0])
+        #    print("\t", knns_exact[-1])
 
         post_process_time = time.time() - post_process_time
-        # print(f"\tPost-processing took {post_process_time:.3f} seconds.")
 
-        # Set old values
         set_num_threads(self.previous_jobs)
 
         print(f"Total time: "
@@ -169,220 +368,6 @@ class VectorSearchNearestNeighbors:
 
         return (D_exact, knns_exact, index_create_time,
                 index_search_time, post_process_time, memory_usage)
-
-    def process_annoy(self, X_windows):
-        import annoy
-
-        d = X_windows.shape[-1]
-        # https://github.com/spotify/annoy
-        index_create_time = time.time()
-        index = annoy.AnnoyIndex(d, metric="euclidean")
-
-        if self.verbose:
-            print(f"\tannoy")
-            print(f"\tn_trees:  {self.annoy_n_trees}")
-            print(f"\tsearch_k:  {self.annoy_search_k}")
-
-        for i, X in enumerate(X_windows):
-            index.add_item(i, X)
-
-        index.build(self.annoy_n_trees, n_jobs=-1)
-        index_create_time = time.time() - index_create_time
-
-        index_search_time = time.time()
-        # FIXME: no method to query multiple samples at the same time
-        #        thus, too slow
-        knns = np.zeros((len(X_windows), self.k), dtype=np.int32)
-        D = np.zeros((len(X_windows), self.k), dtype=np.float32)
-        for i, X in enumerate(X_windows):
-            knns[i], D[i] = index.get_nns_by_vector(
-                X_windows, self.k, self.annoy_search_k, include_distances=True)
-
-        index_search_time = time.time() - index_search_time
-
-        memory_usage = self.process.memory_info().rss / (1024 * 1024)  # MB
-
-        del index
-        return D, index_create_time, index_search_time, knns, memory_usage
-
-    def process_pynndescent(self, X_windows):
-        import pynndescent
-
-        # https://pynndescent.readthedocs.io/en/latest/api.html
-        index_create_time = time.time()
-        index = pynndescent.NNDescent(
-            X_windows,
-            metric="euclidean",
-            low_memory=False,
-            n_neighbors=self.pynndescent_n_neighbors,
-            leaf_size=self.pynndescent_leaf_size,
-            pruning_degree_multiplier=self.pynndescent_pruning_degree_multiplier,
-            diversify_prob=self.pynndescent_diversify_prob,
-            n_search_trees=self.pynndescent_n_search_trees,
-            n_jobs=self.n_jobs
-            # compressed=True,
-            # verbose=True,
-        )
-
-        if self.verbose:
-            print(f"\tpynndescent")
-            print(f"\tn_neighbors:  {self.pynndescent_n_neighbors}")
-            print(f"\tleaf_size: {self.pynndescent_leaf_size}")
-            print(
-                f"\tpruning_degree_multiplier: {self.pynndescent_pruning_degree_multiplier}")
-            print(f"\tdiversify_prob: {self.pynndescent_diversify_prob}")
-            print(f"\tn_search_trees: {self.pynndescent_n_search_trees}")
-            print(f"\tsearch_epsilon: {self.pynndescent_search_epsilon}")
-
-        index_create_time = time.time() - index_create_time
-
-        # We can then extract the nearest neighbors of each training sample by
-        # using the neighbor_graph attribute.
-        index_search_time = time.time()
-        knns, D = index.neighbor_graph
-        index_search_time = time.time() - index_search_time
-
-        memory_usage = self.process.memory_info().rss / (1024 * 1024)  # MB
-
-        del index
-        return D, index_create_time, index_search_time, knns, memory_usage
-
-    def process_faiss(self, X_windows):
-
-        import faiss
-        faiss.omp_set_num_threads(self.n_jobs)
-
-        # Compute distances using the lower bounding representation
-        index_create_time = time.time()
-        d = X_windows.shape[-1]
-
-        if self.faiss_index:
-
-            if self.faiss_index == "LSH":
-                # setup our HNSW parameters
-                n_bits = self.nBits * d  # total number of bits
-
-                # number of neighbours we add to each vertex
-                if self.verbose:
-                    print(f"\tLSH")
-                    print(f"\tnBits:       {n_bits}")
-
-                index = faiss.IndexLSH(d, n_bits)
-
-            elif self.faiss_index == "HNSW":
-                # setup our HNSW parameters
-
-                # number of neighbours we add to each vertex
-                if self.verbose:
-                    print(f"\tHNSW")
-                    print(f"\tefSearch:       {self.efSearch}")
-                    print(f"\tefConstruction: {self.efConstruction}")
-                    print(f"\tM:              {self.M}")
-
-                index = faiss.IndexHNSWFlat(d, self.M)
-                index.hnsw.efConstruction = self.efConstruction
-                index.hnsw.efSearch = self.efSearch  # TODO: reset every time needed?
-
-            elif self.faiss_index == "IVF":
-                # setup our IVF parameters
-
-                if not self.nlist:
-                    # number of clusters/cells set to sqrt(n)
-                    self.nlist = int(np.sqrt(X_windows.shape[0]))
-
-                if self.verbose:
-                    print(f"\tIVF")
-                    print(f"\tnlist:  {self.nlist}")
-                    print(f"\tnprobe: {self.nprobe}")
-
-                quantizer = faiss.IndexFlatL2(d)
-                index = faiss.IndexIVFFlat(quantizer, d, self.nlist, faiss.METRIC_L2)
-                index.train(X_windows)
-
-                index.nprobe = self.nprobe  # TODO: reset every time needed?
-
-            elif self.faiss_index == "IVFPQ":
-                # setup our IVF-PQ parameters
-
-                if not self.nlist:
-                    # number of clusters/cells set to sqrt(n)
-                    self.nlist = int(np.sqrt(X_windows.shape[0]))
-
-                if self.verbose:
-                    print(f"\tIVFPQ")
-                    print(f"\tnlist:  {self.nlist}")
-                    print(f"\tnprobe: {self.nprobe}")
-
-                mm = 64  # d // 32  # Use 1/32 dimension for PQ
-                nbits = 8  # bits per Subvector
-
-                factory_string = f"IVF{int(self.nlist)},PQ{mm}x{nbits}"
-                index = faiss.index_factory(d, factory_string, faiss.METRIC_L2)
-                index.train(X_windows)
-
-                index.nprobe = self.nprobe  # TODO: reset every time needed?
-
-            elif self.faiss_index == "IVFPQ+HNSW":
-                # setup our IVF-PQ parameters
-
-                if not self.nlist:
-                    # number of clusters/cells set to sqrt(n)
-                    self.nlist = int(np.sqrt(X_windows.shape[0]))
-
-                if self.verbose:
-                    print(f"\tIVFPQ+HNSW")
-                    print(f"\tnlist:  {self.nlist}")
-                    print(f"\tnprobe: {self.nprobe}")
-                    print(f"\tefSearch:       {self.efSearch}")
-                    print(f"\tefConstruction: {self.efConstruction}")
-                    print(f"\tM:      {self.M}")
-
-                mm = 64  # d // 32  # Use 1/32 dimension for PQ
-                nbits = 8  # bits per Subvector
-
-                # The coarse quantizer is responsible for finding the partition
-                # centroids that are nearest to the query vector so that vector search
-                # only needs to be performed on those partitions.
-                quantizer = faiss.IndexHNSWFlat(D, self.M)
-                quantizer.hnsw.efConstruction = self.efConstruction
-                quantizer.hnsw.efSearch = self.efSearch
-
-                index = faiss.IndexIVFPQ(quantizer, D, self.nlist, mm, nbits,
-                                         faiss.METRIC_L2)
-
-                index.train(X_windows)
-                index.nprobe = self.nprobe  # TODO: reset every time needed?
-
-            else:
-                raise ValueError(
-                    'Unknown FAISS index' + faiss_index + '.' +
-                    'Use "HNSW", "IVF", "IVFPQ", "LSH".')
-        else:
-            raise ValueError(
-                'faiss_index not set. Use "HNSW", "IVF", "IVFPQ", "LSH".')
-
-        index.add(X_windows)
-        index_create_time = time.time() - index_create_time
-
-        # Find k-nearest neighbors based on the lower bound distances
-        index_search_time = time.time()
-        D, knns = index.search(
-            X_windows,
-            self.search_radius * self.k
-        )
-
-        index_search_time = time.time() - index_search_time
-        # print(f"\tIndexing search took {index_search_time:.3f} seconds.")
-
-        faiss.omp_set_num_threads(self.previous_jobs)
-        memory_usage = self.process.memory_info().rss / (1024 * 1024)  # MB
-
-        # cleanup
-        if 'quantizer' in locals():
-            del quantizer
-        del index
-
-        return D, index_create_time, index_search_time, knns, memory_usage
 
 
 @njit(fastmath=True, cache=True, inline='always')
