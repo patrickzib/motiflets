@@ -1,0 +1,2 @@
+length,motif length,backend,time in s,memory in MB,extent,motiflet,elbows
+10000,8192,faiss (index=HNSW;efConstruction=500;efSearch=400;M=64),4.020982027053833,802.390625,inf,,[2]

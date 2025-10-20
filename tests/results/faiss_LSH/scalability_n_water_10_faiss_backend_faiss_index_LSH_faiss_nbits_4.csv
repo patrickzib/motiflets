@@ -1,2 +1,0 @@
-length,motif length,backend,time in s,memory in MB,extent,motiflet,elbows
-2100777,512,faiss (index=LSH;faiss_nbits=4),1886.1124176979065,13081.8046875,329.0854777271999,[1847138   57244  158910 1569405  951977  345766  934414    4343  441552],[6]

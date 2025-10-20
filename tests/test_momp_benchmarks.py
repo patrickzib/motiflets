@@ -121,7 +121,7 @@ def run_safe(ds_name, series, l_range, k_max, backends,
     try:
         if run_local:
             print("\nWarning. Running locally.\n")
-            n = 30_000
+            n = 10_000
         else:
             n = len(series)
 
@@ -208,8 +208,8 @@ def main():
         #         )
 
         # Running FAISS
-        # backends = ["faiss"]
-        #
+        backends = ["faiss"]
+
         # faiss_index = "LSH"
         # for nbits in faiss_nbits:
         #     print(f"\n\tRunning faiss {faiss_index} {nbits}")
@@ -224,23 +224,23 @@ def main():
         #         n_jobs=cores
         #      )
 
-        # faiss_index = "HNSW"
-        # for M in faiss_M:
-        #     for efConstruction in faiss_efConstruction:
-        #         for efSearch in faiss_efSearch:
-        #             print(f"\n\tRunning faiss {faiss_index} {M} {efConstruction} {efSearch}.", flush=True)
-        #             run_safe(
-        #                 filename,
-        #                 data,
-        #                 l_range,
-        #                 k_max,
-        #                 backends,
-        #                 faiss_index=faiss_index,
-        #                 faiss_M=M,
-        #                 faiss_efConstruction=efConstruction,
-        #                 faiss_efSearch=efSearch,
-        #                 n_jobs=cores
-        #                 )
+        faiss_index = "HNSW"
+        for M in faiss_M:
+            for efConstruction in faiss_efConstruction:
+                for efSearch in faiss_efSearch:
+                    print(f"\n\tRunning faiss {faiss_index} {M} {efConstruction} {efSearch}.", flush=True)
+                    run_safe(
+                        filename,
+                        data,
+                        l_range,
+                        k_max,
+                        backends,
+                        faiss_index=faiss_index,
+                        faiss_M=M,
+                        faiss_efConstruction=efConstruction,
+                        faiss_efSearch=efSearch,
+                        n_jobs=cores
+                        )
 
         # faiss_index = "IVF"
         # for nprobe in faiss_nprobe:
@@ -295,24 +295,22 @@ def main():
         #                             n_jobs=cores
         #                         )
 
-        # Running ANNOY
-        backends = ["annoy"]
-
-        for n_trees in annoy_n_trees:
-            for search_k in annoy_search_k:
-                print(f"\n\tRunning annoy {n_trees} {search_k}")
-                run_safe(
-                    filename,
-                    data,
-                    l_range,
-                    k_max,
-                    backends,
-                    annoy_n_trees=n_trees,
-                    annoy_search_k=search_k,
-                    n_jobs=cores
-                 )
-
-
+        # # Running ANNOY
+        # backends = ["annoy"]
+        #
+        # for n_trees in annoy_n_trees:
+        #     for search_k in annoy_search_k:
+        #         print(f"\n\tRunning annoy {n_trees} {search_k}")
+        #         run_safe(
+        #             filename,
+        #             data,
+        #             l_range,
+        #             k_max,
+        #             backends,
+        #             annoy_n_trees=n_trees,
+        #             annoy_search_k=search_k,
+        #             n_jobs=cores
+        #          )
 
         # scalable
         # backends = ["scalable"]

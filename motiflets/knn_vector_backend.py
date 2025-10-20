@@ -65,7 +65,7 @@ class VectorSearchNearestNeighbors:
         self.nprobe = kwargs["faiss_nprobe"] if "faiss_nprobe" in kwargs else 32
 
         # number of bits used for hashing (resolution)
-        self.nBits = kwargs["faiss_nBits"] if "nBits" in kwargs else 4
+        self.nBits = kwargs["faiss_nbits"] if "faiss_nbits" in kwargs else 4
 
         #### annoy
 
