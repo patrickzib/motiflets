@@ -5,26 +5,14 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 import time
 import numpy as np
-import pandas as pd
 
 import numpy.fft as fft
 from numba import objmode, prange, njit
 
 import motiflets.motiflets as motif
+from tests._datasets import read_penguin
 
 np.set_printoptions(suppress=True)
-
-
-def read_penguin_data():
-    path = "../datasets/experiments/"
-    series = pd.read_csv(path + "penguin.txt",
-                         names=(["X-Acc", "Y-Acc", "Z-Acc",
-                                 "4", "5", "6",
-                                 "7", "Pressure", "9"]),
-                         delimiter="\t", header=None)
-    ds_name = "Penguins (Longer Snippet)"
-
-    return ds_name, series
 
 
 @njit(fastmath=True, cache=True, parallel=True)
@@ -67,14 +55,14 @@ def test_sliding_dot_product_implementations():
     lengths = [
         #1_000,
         #1_001,
-        #5_000,
-        #5_001,
-        10_000,
-        10_001
+        5_000,
+        5_001,
+        # 10_000,
+        # 10_001
     ]
     window_sizes = [100, 101]
 
-    ds_name, B = read_penguin_data()
+    ds_name, B = read_penguin()
     times = np.zeros(3, dtype=np.float64)
 
     for i, length in enumerate(lengths):

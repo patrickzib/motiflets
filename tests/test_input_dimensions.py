@@ -1,23 +1,13 @@
 import warnings
 
 from motiflets.plotting import *
+from tests._datasets import read_penguin
 
 warnings.simplefilter("ignore")
 
-path = "../datasets/experiments/"
-
-def read_penguin_data():
-    series = pd.read_csv(path + "penguin.txt",
-                         names=(["X-Acc", "Y-Acc", "Z-Acc",
-                                 "4", "5", "6",
-                                 "7", "Pressure", "9"]),
-                         delimiter="\t", header=None)
-    ds_name = "Penguins (Longer Snippet)"
-    return ds_name, series
-
 
 def test_input_dims():
-    ds_name, series = read_penguin_data()
+    ds_name, series = read_penguin()
 
     length = 10_000
 
@@ -59,7 +49,5 @@ def check(ds_name, series):
         plot_motifs_as_grid=False
     )
     return dists, motiflets, elbow_points
-
-
 
 

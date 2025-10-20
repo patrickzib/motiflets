@@ -1,0 +1,5 @@
+Lengths,Time,Method
+1000,4.069189786911011,Motiflets (one-dim)
+5000,0.9979259967803955,Motiflets (one-dim)
+10000,3.404715061187744,Motiflets (one-dim)
+30000,0.0,Motiflets (one-dim)
