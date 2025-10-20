@@ -78,6 +78,25 @@ def resample(data, sampling_factor=10000):
 def convert_to_2d(
         series
 ):
+    """Return a 2-D view over the provided time series data.
+
+    Parameters
+    ----------
+    series : array-like or pandas Series/DataFrame
+        Input time series. A 1-D array is interpreted as a single univariate
+        sequence. Pandas structures retain their index information.
+
+    Returns
+    -------
+    array-like
+        A 2-D array shaped as (n_dims, n_timestamps).
+
+    Raises
+    ------
+    ValueError
+        If the inferred dimensionality suggests more rows than columns, which
+        indicates that the caller likely forgot to transpose the input.
+    """
     if series.ndim == 1:
         # print('Warning: The input dimension must be 2d.')
         if isinstance(series, pd.Series):
@@ -94,6 +113,22 @@ def convert_to_2d(
 
 @njit(fastmath=True, cache=True)
 def compute_paa(ts, segment_size):
+    """Compute a Piecewise Aggregate Approximation (PAA) of a series.
+
+    Parameters
+    ----------
+    ts : array-like
+        Input time series values.
+    segment_size : int
+        Number of consecutive samples aggregated into a single segment.
+
+    Returns
+    -------
+    tuple of numpy.ndarray
+        First array holds the mean value per PAA segment, second array stores
+        the number of original samples contributing to each segment. The second
+        array is used when computing lower bounds.
+    """
     segments = np.int32(np.ceil(len(ts) / segment_size))
 
     paa = np.zeros(segments, dtype=np.float64)
@@ -312,10 +347,12 @@ def compute_distances_with_knns_full(
         slack: float (default: 0.5)
             Defines an exclusion zone around each subsequence to avoid trivial matches.
             Defined as percentage of m. E.g. 0.5 is equal to half the window length.
-        distance: callable (default: znormed_euclidean_distance)
-                The distance function to be computed.
-        distance_preprocessing: callable (default: sliding_mean_std)
-                The distance preprocessing function to be computed.
+        distance : callable, default=znormed_euclidean_distance
+            Distance function used to compare subsequences.
+        distance_single : callable, default=znormed_euclidean_distance_single
+            Single-distance evaluator used when falling back to pairwise checks.
+        distance_preprocessing : callable, default=sliding_mean_std
+            Preprocessing routine that prepares rolling statistics for ``distance``.
 
         Returns
         -------
@@ -378,6 +415,30 @@ def compute_upper_bound(
         ts, D_knn, knns, k, m,
         distance_single, preprocessing,
 ):
+    """Estimate an upper bound on motiflet extent per neighbourhood size.
+
+    Parameters
+    ----------
+    ts : array-like
+        Original (possibly multivariate) time series data.
+    D_knn : numpy.ndarray
+        Matrix containing distances to the k-nearest neighbours per position.
+    knns : numpy.ndarray
+        Indices of the k-nearest neighbours per position.
+    k : int
+        Motiflet cardinality to evaluate.
+    m : int
+        Subsequence length.
+    distance_single : callable
+        Distance kernel operating on two subsequences.
+    preprocessing : sequence
+        Precomputed statistics required by ``distance_single`` for each dimension.
+
+    Returns
+    -------
+    numpy.ndarray
+        Estimated upper bounds per neighbourhood size ``1..k-1``.
+    """
     kth_extent = np.zeros(k, dtype=np.float64)
     kth_extent[0] = np.inf
 
@@ -439,10 +500,12 @@ def compute_distances_with_knns_sparse(
         slack: float (default: 0.5)
             Defines an exclusion zone around each subsequence to avoid trivial matches.
             Defined as percentage of m. E.g. 0.5 is equal to half the window length.
-        distance: callable (default: znormed_euclidean_distance)
-                The distance function to be computed.
-        distance_preprocessing: callable (default: sliding_mean_std)
-                The distance preprocessing function to be computed.
+        distance : callable, default=znormed_euclidean_distance
+            Distance function used to compare subsequences.
+        distance_single : callable, default=znormed_euclidean_distance_single
+            Single-distance evaluator used when falling back to pairwise checks.
+        distance_preprocessing : callable, default=sliding_mean_std
+            Preprocessing routine that prepares rolling statistics for ``distance``.
 
         Returns
         -------
@@ -582,10 +645,12 @@ def compute_distances_with_knns(
         slack: float (default: 0.5)
             Defines an exclusion zone around each subsequence to avoid trivial matches.
             Defined as percentage of m. E.g. 0.5 is equal to half the window length.
-        distance: callable (default: znormed_euclidean_distance)
-                The distance function to be computed.
-        distance_preprocessing: callable (default: sliding_mean_std)
-                The distance preprocessing function to be computed.
+        distance : callable, default=znormed_euclidean_distance
+            Distance function used to compare subsequences.
+        distance_single : callable, default=znormed_euclidean_distance_single
+            Single-distance evaluator used when falling back to pairwise checks.
+        distance_preprocessing : callable, default=sliding_mean_std
+            Preprocessing routine that prepares rolling statistics for ``distance``.
 
         Returns
         -------
@@ -861,6 +926,10 @@ def get_approximate_k_motiflet(
         The distance matrix
     knns: 2d array-like
         The k-NNs for each subsequence
+    distance_single : callable, optional
+        Distance kernel to apply when ``use_D_full`` is False.
+    preprocessing : sequence, optional
+        Precomputed statistics required by ``distance_single``.
     use_D_full : bool
         If True, uses the full distance matrix D for computing the extent of the motiflet.
         If False, uses pairwise distances computed from the time series.
@@ -1058,9 +1127,7 @@ def find_au_ef_motif_length(
         elbow_deviation=1.00,
         slack=0.5,
         subsample=2,
-        distance=znormed_euclidean_distance,
-        distance_single=znormed_euclidean_distance_single,
-        distance_preprocessing=sliding_mean_std,
+        distance_bundle=DEFAULT_DISTANCE_BUNDLE,
         backend="scalable",
         delta=None):
     """Computes the Area under the Elbow-Function within an of motif lengths.
@@ -1081,18 +1148,21 @@ def find_au_ef_motif_length(
         The minimal absolute deviation needed to detect an elbow.
         It measures the absolute change in deviation from k to k+1.
         1.05 corresponds to 5% increase in deviation.
+    subsample : int, default=2
+        Factor used to downsample the input data before analysis.
     slack: float
         Defines an exclusion zone around each subsequence to avoid trivial matches.
         Defined as percentage of m. E.g. 0.5 is equal to half the window length.
-    distance: callable
-        The distance function to be computed.
-    distance_preprocessing: callable
-        The distance preprocessing function to be computed.
+    distance_bundle : DistanceBundle
+        Bundled preprocessing, pairwise, and single distance functions used
+        throughout motiflet computations.
     backend : String, default="scalable"
         The backend to use. As of now 'scalable', 'sparse' and 'default' are supported.
         Use 'default' for the original exact implementation with excessive memory,
         Use 'scalable' for a scalable, exact implementation with less memory,
         Use 'sparse' for a scalable, exact implementation with more memory.
+    delta : float, optional
+        Optional sparsity threshold forwarded to downstream computations.
 
     Returns
     -------
@@ -1122,6 +1192,10 @@ def find_au_ef_motif_length(
     top_motiflets = np.zeros(len(motif_length_range), dtype=object)
     dists = np.zeros(len(motif_length_range), dtype=object)
 
+    distance_preprocessing = distance_bundle.preprocessing
+    distance = distance_bundle.pairwise
+    distance_single = distance_bundle.single
+
     # TODO parallelize?
     for i, m in enumerate(motif_length_range[::-1]):
         if m // subsample < data.shape[-1]:
@@ -1133,9 +1207,7 @@ def find_au_ef_motif_length(
                 exclusion=exclusion,
                 elbow_deviation=elbow_deviation,
                 slack=slack,
-                distance=distance,
-                distance_single=distance_single,
-                distance_preprocessing=distance_preprocessing,
+                distance_bundle=distance_bundle,
                 backend=backend)
 
             dists_ = dist[(~np.isinf(dist)) & (~np.isnan(dist))]
@@ -1186,9 +1258,7 @@ def search_k_motiflets_elbow(
         filter=True,
         slack=0.5,
         n_jobs=4,
-        distance=znormed_euclidean_distance,
-        distance_single=znormed_euclidean_distance_single,
-        distance_preprocessing=sliding_mean_std,
+        distance_bundle=DEFAULT_DISTANCE_BUNDLE,
         backend="scalable"
 ):
     """Computes the elbow-function.
@@ -1213,9 +1283,6 @@ def search_k_motiflets_elbow(
         is first determined, prior to computing the elbow-plot.
     exclusion : 2d-array (default=None)
         exclusion zone - use when searching for the TOP-2 motiflets
-    approximate_motiflet_pos : array-like (default=None)
-        An initial estimate of the positions of the k-Motiflets for each k in the
-        given range [2...k_max]. Will be used for bounding distance computations.
     elbow_deviation : float, default=1.00 (user parameter)
         The minimal absolute deviation needed to detect an elbow.
         It measures the absolute change in deviation from k to k+1.
@@ -1227,10 +1294,9 @@ def search_k_motiflets_elbow(
         Defined as percentage of m. E.g. 0.5 is equal to half the window length.
     n_jobs : int (default=4)
         Number of jobs to be used.
-    distance: callable (default=znormed_euclidean_distance)
-            The distance function to be computed.
-    distance_preprocessing: callable (default=sliding_mean_std)
-            The distance preprocessing function to be computed.
+    distance_bundle : DistanceBundle, optional
+        Bundled preprocessing, pairwise, and single distance functions. Defaults
+        to the z-normalised Euclidean configuration.
     backend : String, default="scalable"
         The backend to use. As of now 'scalable', 'sparse' and 'default' are supported.
         Use 'default' for the original exact implementation with excessive memory,
@@ -1248,6 +1314,8 @@ def search_k_motiflets_elbow(
             elbow-points
         m : int
             best motif length
+        memory_usage : float
+            Resident memory usage in megabytes after distance computation
     """
     n_jobs = os.cpu_count() if n_jobs < 1 else n_jobs
     previous_jobs = get_num_threads()
@@ -1261,6 +1329,10 @@ def search_k_motiflets_elbow(
     pid = os.getpid()
     process = psutil.Process(pid)
 
+    distance_preprocessing = distance_bundle.preprocessing
+    distance = distance_bundle.pairwise
+    distance_single = distance_bundle.single
+
     # auto motif size selection
     if motif_length == 'AU_EF' or motif_length == 'auto':
         if motif_length_range is None:
@@ -1271,6 +1343,7 @@ def search_k_motiflets_elbow(
             n_jobs=n_jobs,
             elbow_deviation=elbow_deviation,
             slack=slack,
+            distance_bundle=distance_bundle,
             backend=backend)
         m = np.int32(m)
     elif isinstance(motif_length, int) or \
@@ -1324,16 +1397,14 @@ def search_k_motiflets_elbow(
 
         D_full, knns = call_to_distances(
             data_raw, m, k_max_, n_jobs=n_jobs, slack=slack,
-            distance=distance,
-            distance_single=distance_single,
-            distance_preprocessing=distance_preprocessing
+            **distance_bundle.as_kwargs(),
         )
 
         memory_usage = process.memory_info().rss / (1024 * 1024)  # MB
 
         preprocessing = []
         for dim in np.arange(data_raw.shape[0]):
-            preprocessing.append(distance_preprocessing(data_raw[dim], m))
+            preprocessing.append(distance_bundle.preprocessing(data_raw[dim], m))
         preprocessing = np.array(preprocessing, dtype=np.float64)
 
         upper_bound = np.inf
@@ -1352,7 +1423,7 @@ def search_k_motiflets_elbow(
 
             candidate, candidate_dist, _ = get_approximate_k_motiflet(
                 data_raw, m, test_k, D_full, knns,
-                distance_single=distance_single,
+                distance_single=distance_bundle.single,
                 preprocessing=preprocessing,
                 use_D_full=(backend != "scalable"),
                 upper_bound=upper_bound,
@@ -1425,10 +1496,15 @@ def find_k_motiflets(ts, D_full, m, k, upperbound=None, slack=0.5):
         k-Motiflet size
     upperbound : float
         Admissible pruning on distance computations.
+    slack : float, default=0.5
+        Defines an exclusion zone around each subsequence to avoid trivial matches
+        (expressed as a fraction of ``m``).
 
     Returns
     -------
-    best found motiflet and its extent.
+    tuple
+        ``(motiflet_dist, motiflet_pos)`` where ``motiflet_dist`` is the extent of the
+        best motiflet found and ``motiflet_pos`` holds the start indices.
     """
     n = ts.shape[-1] - m + 1
 
@@ -1508,11 +1584,8 @@ def compute_distances_full(
             Defined as percentage of m. E.g. 0.5 is equal to half the window length.
         Returns
         -------
-        D : 2d array-like
-            The O(n^2) z-normed ED distances between all pairs of subsequences
-        knns : 2d array-like
-            The k-nns for each subsequence
-
+        numpy.ndarray
+            The O(n^2) z-normed ED distances between all pairs of subsequences.
     """
 
     D, _ = compute_distances_with_knns_full(ts, m, k=1,

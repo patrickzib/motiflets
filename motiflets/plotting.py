@@ -86,8 +86,7 @@ class Motiflets:
         self.n_jobs = n_jobs
 
         # distance function used
-        self.distance_preprocessing, self.distance, self.distance_single \
-            = map_distances(distance)
+        self.distance_bundle = map_distances(distance)
         self.backend = backend
 
         self.motif_length_range = None
@@ -149,9 +148,7 @@ class Motiflets:
             slack=self.slack,
             subsample=subsample,
             n_jobs=self.n_jobs,
-            distance=self.distance,
-            distance_single=self.distance_single,
-            distance_preprocessing=self.distance_preprocessing,
+            distance_bundle=self.distance_bundle,
             backend=self.backend
 
         )
@@ -181,8 +178,10 @@ class Motiflets:
                 the length of the motif (user parameter)
             filter: bool, default=True
                 filters overlapping motiflets from the result,
-            plot_elbows: bool, default=False
-                plots the elbow ploints into the plot
+            plot_elbows: bool, default=True
+                plots the elbow points into the plot
+            plot_motifs_as_grid: bool, default=True
+                renders motif occurrences as a grid of small multiples
 
             Returns
             -------
@@ -211,9 +210,7 @@ class Motiflets:
             n_jobs=self.n_jobs,
             elbow_deviation=self.elbow_deviation,
             slack=self.slack,
-            distance=self.distance,
-            distance_single=self.distance_single,
-            distance_preprocessing=self.distance_preprocessing,
+            distance_bundle=self.distance_bundle,
             backend=self.backend,
         )
 
@@ -667,9 +664,7 @@ def plot_elbow(
         n_jobs=4,
         elbow_deviation=1.00,
         slack=0.5,
-        distance=znormed_euclidean_distance,
-        distance_single=znormed_euclidean_distance_single,
-        distance_preprocessing=sliding_mean_std,
+        distance_bundle=DEFAULT_DISTANCE_BUNDLE,
         backend="scalable"
 ):
     """Plots the elbow-plot for k-Motiflets.
@@ -701,10 +696,9 @@ def plot_elbow(
         The minimal absolute deviation needed to detect an elbow.
         It measures the absolute change in deviation from k to k+1.
         1.05 corresponds to 5% increase in deviation.
-    distance: callable (default=znormed_euclidean_distance)
-        The distance function to be computed.
-    distance_preprocessing: callable (default=sliding_mean_std)
-        The distance preprocessing function to be computed.
+    distance_bundle : DistanceBundle, optional
+        Bundled preprocessing, pairwise, and single distance functions. Defaults
+        to the z-normalised Euclidean configuration.
     backend : String, default="scalable"
         The backend to use. As of now 'scalable', 'sparse' and 'default' are supported.
         Use 'default' for the original exact implementation with excessive memory,
@@ -731,9 +725,7 @@ def plot_elbow(
         n_jobs=n_jobs,
         elbow_deviation=elbow_deviation,
         slack=slack,
-        distance=distance,
-        distance_single=distance_single,
-        distance_preprocessing=distance_preprocessing,
+        distance_bundle=distance_bundle,
         backend=backend)
     endTime = (time.perf_counter() - startTime)
 
@@ -784,9 +776,7 @@ def plot_motif_length_selection(
         elbow_deviation=1.00,
         slack=0.5,
         subsample=2,
-        distance=znormed_euclidean_distance,
-        distance_single=znormed_euclidean_distance_single,
-        distance_preprocessing=sliding_mean_std,
+        distance_bundle=DEFAULT_DISTANCE_BUNDLE,
         backend="scalable"
 ):
     """Computes the AU_EF plot to extract the best motif lengths
@@ -817,10 +807,9 @@ def plot_motif_length_selection(
         Defined as percentage of m. E.g. 0.5 is equal to half the window length.
     subsample: int (default=2)
         the subsample factor
-    distance: callable (default=znormed_euclidean_distance)
-        The distance function to be computed.
-    distance_preprocessing: callable (default=sliding_mean_std)
-        The distance preprocessing function to be computed.
+    distance_bundle : DistanceBundle, optional
+        Bundled preprocessing, pairwise, and single distance functions. Defaults
+        to the z-normalised Euclidean configuration.
     backend : String, default="scalable"
         The backend to use. As of now 'scalable', 'sparse' and 'default' are supported.
         Use 'default' for the original exact implementation with excessive memory,
@@ -851,9 +840,7 @@ def plot_motif_length_selection(
             elbow_deviation=elbow_deviation,
             slack=slack,
             subsample=subsample,
-            distance=distance,
-            distance_single=distance_single,
-            distance_preprocessing=distance_preprocessing,
+            distance_bundle=distance_bundle,
             backend=backend)
     endTime = (time.perf_counter() - startTime)
     print("\tTime", np.round(endTime, 1), "s")

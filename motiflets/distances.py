@@ -4,8 +4,26 @@
 
 __author__ = ["patrickzib"]
 
+from typing import Callable, NamedTuple
+
 import numpy as np
 from numba import njit
+
+
+class DistanceBundle(NamedTuple):
+    """Container bundling distance related callables."""
+
+    preprocessing: Callable
+    pairwise: Callable
+    single: Callable
+
+    def as_kwargs(self):
+        """Return kwargs matching motiflet routines."""
+        return {
+            "distance_preprocessing": self.preprocessing,
+            "distance": self.pairwise,
+            "distance_single": self.single,
+        }
 
 
 @njit(fastmath=True, cache=True, nogil=True)
@@ -199,63 +217,68 @@ def complexity_invariant_distance_single(a, b, a_i, b_j, preprocessing):
 
 _DISTANCE_MAPPING = {
     # z-normed Euclidean Distance
-    "znormed_euclidean": (
+    "znormed_euclidean": DistanceBundle(
         sliding_mean_std,
         znormed_euclidean_distance, znormed_euclidean_distance_single),
-    "znormed_ed": (
+    "znormed_ed": DistanceBundle(
         sliding_mean_std,
         znormed_euclidean_distance, znormed_euclidean_distance_single),
 
     # Euclidean Distance
-    "ed": (
+    "ed": DistanceBundle(
         sliding_csum,
         euclidean_distance, euclidean_distance_single),
-    "euclidean": (
+    "euclidean": DistanceBundle(
         sliding_csum,
         euclidean_distance, euclidean_distance_single),
 
     # Cosine Distance
-    "cosine": (
+    "cosine": DistanceBundle(
         sliding_csum,
         cosine_distance, cosine_distance_single),
 
     # Complexity Invariant Distance
-    "CID": (
+    "CID": DistanceBundle(
         sliding_csum_dcsum,
         complexity_invariant_distance, complexity_invariant_distance_single),
-    "cid": (
+    "cid": DistanceBundle(
         sliding_csum_dcsum,
         complexity_invariant_distance, complexity_invariant_distance_single)
 }
 
 
-def map_distances(distance_name):
+def map_distances(distance_name: str) -> DistanceBundle:
     """
-    Computes and returns the distance function and its corresponding preprocessing function, given a distance name.
+    Return the bundled distance callables for a given distance name.
 
     Parameters:
     -----------
     distance_name: str
-        The name of the distance function to be computed. Available options are "znormed_euclidean_distance"
-        and "euclidean_distance".
+        The name of the distance function to be computed.
 
     Returns:
     --------
-    tuple:
-        A tuple containing two functions - the preprocessing function and the distance function.
-        The preprocessing function takes in a time series and the window size. The distance function takes in
-        the index of the subsequence, the dot product between the subsequence and all other subsequences,
-        the window size, the preprocessing output, and a boolean flag indicating whether to compute the
-        squared distance. It returns the distance between the two subsequences.
+    DistanceBundle
+        Named tuple containing ``preprocessing``, ``pairwise`` and ``single`` callables.
 
     Raises:
     -------
     ValueError:
-        If `distance_name` is not a valid distance function name. Valid options are "znormed_euclidean_distance"
-        and "euclidean_distance".
+        If `distance_name` is not a valid distance function name.
     """
     if distance_name not in _DISTANCE_MAPPING:
         raise ValueError(
             f"{distance_name} is not a valid distance. Implementations include: {', '.join(_DISTANCE_MAPPING.keys())}")
 
     return _DISTANCE_MAPPING[distance_name]
+
+
+def make_distance_bundle(
+        preprocessing: Callable,
+        pairwise: Callable,
+        single: Callable) -> DistanceBundle:
+    """Create a distance bundle from explicit callables."""
+    return DistanceBundle(preprocessing, pairwise, single)
+
+
+DEFAULT_DISTANCE_BUNDLE = _DISTANCE_MAPPING["znormed_euclidean"]

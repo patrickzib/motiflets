@@ -14,6 +14,21 @@ warnings.simplefilter("ignore")
 
 @njit
 def get_pair_motif(D_full):
+    """Locate the closest pair motif in a distance matrix.
+
+    Parameters
+    ----------
+    D_full : numpy.ndarray
+        Dense pairwise distance matrix between subsequences (modified in-place
+        by setting the diagonal to ``np.inf``).
+
+    Returns
+    -------
+    tuple
+        ``(pair_indices, pair_distance, D_full)`` where ``pair_indices`` is a
+        2-D array containing the index pairs that realise the minimum distance
+        and ``pair_distance`` is the shared minimum value.
+    """
     # ignore self
     for order in range(0, len(D_full)):
         D_full[order, order] = np.inf
@@ -26,6 +41,21 @@ def get_pair_motif(D_full):
 
 @njit
 def filter_non_trivial_matches(motif_set, m):
+    """Remove trivial matches that overlap with previously accepted offsets.
+
+    Parameters
+    ----------
+    motif_set : array-like
+        Sorted indices of candidate motif occurrences.
+    m : int
+        Window length used to determine the exclusion zone.
+
+    Returns
+    -------
+    numpy.ndarray
+        Filtered motif offsets where no two indices overlap by more than
+        ``m / 2``.
+    """
     # filter trivial matches
     non_trivial_matches = []
     last_offset = - m
@@ -43,6 +73,24 @@ def get_valmod_motif_set_ranged(
         max_r=10,
         steps=10
 ):
+    """Yield VALMOD motif sets while sweeping a radius range.
+
+    Parameters
+    ----------
+    data : array-like
+        Time series data used for motif discovery.
+    motif_length : int
+        Length of the subsequences (motifs).
+    max_r : int, default=10
+        Maximum search radius added on top of the best pair motif distance.
+    steps : int, default=10
+        Number of increments between zero and ``max_r``.
+
+    Yields
+    ------
+    numpy.ndarray
+        Non-trivial motif offsets for the current radius.
+    """
     D_full = ml.compute_distances_full(data, motif_length)
     m_half = motif_length // 2
 
@@ -73,6 +121,24 @@ def get_valmod_motif_set(
         motif_length,
         r,
         D_full=None):
+    """Compute a VALMOD motif set for a fixed similarity threshold.
+
+    Parameters
+    ----------
+    data : array-like
+        Time series data used for motif discovery.
+    motif_length : int
+        Length of the subsequences (motifs).
+    r : float
+        Maximum distance allowed between motif members.
+    D_full : numpy.ndarray, optional
+        Precomputed pairwise distance matrix; computed on demand when omitted.
+
+    Returns
+    -------
+    numpy.ndarray
+        Non-trivial motif offsets that satisfy the distance threshold.
+    """
     if D_full is None:
         D_full = ml.compute_distances_full(data, motif_length)
 
@@ -93,6 +159,23 @@ def get_k_motifs_ranged(
         data,
         motif_length,
         max_r=10):
+    """Yield k-Motifs while gradually increasing the radius parameter.
+
+    Parameters
+    ----------
+    data : array-like
+        Time series data used for motif discovery.
+    motif_length : int
+        Length of the subsequences (motifs).
+    max_r : int, default=10
+        Maximum additional radius to consider beyond the pair motif distance.
+
+    Yields
+    ------
+    numpy.ndarray
+        Non-trivial motif offsets that maximise motif cardinality for the
+        current radius.
+    """
     D_full = ml.compute_distances_full(data, motif_length)
 
     # get pair motif
@@ -116,6 +199,24 @@ def get_k_motifs(
         motif_length,
         r,
         D_full=None):
+    """Return the k-Motifset with maximal cardinality below a radius.
+
+    Parameters
+    ----------
+    data : array-like
+        Time series data used for motif discovery.
+    motif_length : int
+        Length of the subsequences (motifs).
+    r : float
+        Maximum pairwise distance allowed inside the motif set.
+    D_full : numpy.ndarray, optional
+        Precomputed pairwise distance matrix; computed on demand when omitted.
+
+    Returns
+    -------
+    numpy.ndarray
+        The motif offsets that maximise cardinality while respecting ``r``.
+    """
     if D_full is None:
         D_full = ml.compute_distances_full(data, motif_length)
 
