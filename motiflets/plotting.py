@@ -139,6 +139,8 @@ class Motiflets:
         self.motif_length_range = motif_length_range
         self.k_max = k_max
 
+        distance_kwargs = self.distance_bundle.as_kwargs()
+
         self.motif_length = plot_motif_length_selection(
             k_max,
             self.series,
@@ -148,7 +150,7 @@ class Motiflets:
             slack=self.slack,
             subsample=subsample,
             n_jobs=self.n_jobs,
-            distance_bundle=self.distance_bundle,
+            **distance_kwargs,
             backend=self.backend
 
         )
@@ -198,6 +200,8 @@ class Motiflets:
         else:
             self.motif_length = motif_length
 
+        distance_kwargs = self.distance_bundle.as_kwargs()
+
         self.dists, self.motiflets, self.elbow_points, self.memory_usage = plot_elbow(
             k_max,
             self.series,
@@ -210,7 +214,7 @@ class Motiflets:
             n_jobs=self.n_jobs,
             elbow_deviation=self.elbow_deviation,
             slack=self.slack,
-            distance_bundle=self.distance_bundle,
+            **distance_kwargs,
             backend=self.backend,
         )
 
@@ -664,7 +668,9 @@ def plot_elbow(
         n_jobs=4,
         elbow_deviation=1.00,
         slack=0.5,
-        distance_bundle=DEFAULT_DISTANCE_BUNDLE,
+        distance=znormed_euclidean_distance,
+        distance_single=znormed_euclidean_distance_single,
+        distance_preprocessing=sliding_mean_std,
         backend="scalable"
 ):
     """Plots the elbow-plot for k-Motiflets.
@@ -696,9 +702,10 @@ def plot_elbow(
         The minimal absolute deviation needed to detect an elbow.
         It measures the absolute change in deviation from k to k+1.
         1.05 corresponds to 5% increase in deviation.
-    distance_bundle : DistanceBundle, optional
-        Bundled preprocessing, pairwise, and single distance functions. Defaults
-        to the z-normalised Euclidean configuration.
+    distance: callable (default=znormed_euclidean_distance)
+        The distance function to be computed.
+    distance_preprocessing: callable (default=sliding_mean_std)
+        The distance preprocessing function to be computed.
     backend : String, default="scalable"
         The backend to use. As of now 'scalable', 'sparse' and 'default' are supported.
         Use 'default' for the original exact implementation with excessive memory,
@@ -716,6 +723,12 @@ def plot_elbow(
     # turn into 2d array
     data = ml.convert_to_2d(data)
     _, raw_data = ml.pd_series_to_numpy(data)
+
+    distance_bundle = make_distance_bundle(
+        distance_preprocessing,
+        distance,
+        distance_single,
+    )
 
     startTime = time.perf_counter()
     dists, candidates, elbow_points, m, memory_usage = ml.search_k_motiflets_elbow(
@@ -776,7 +789,9 @@ def plot_motif_length_selection(
         elbow_deviation=1.00,
         slack=0.5,
         subsample=2,
-        distance_bundle=DEFAULT_DISTANCE_BUNDLE,
+        distance=znormed_euclidean_distance,
+        distance_single=znormed_euclidean_distance_single,
+        distance_preprocessing=sliding_mean_std,
         backend="scalable"
 ):
     """Computes the AU_EF plot to extract the best motif lengths
@@ -807,9 +822,10 @@ def plot_motif_length_selection(
         Defined as percentage of m. E.g. 0.5 is equal to half the window length.
     subsample: int (default=2)
         the subsample factor
-    distance_bundle : DistanceBundle, optional
-        Bundled preprocessing, pairwise, and single distance functions. Defaults
-        to the z-normalised Euclidean configuration.
+    distance: callable (default=znormed_euclidean_distance)
+        The distance function to be computed.
+    distance_preprocessing: callable (default=sliding_mean_std)
+        The distance preprocessing function to be computed.
     backend : String, default="scalable"
         The backend to use. As of now 'scalable', 'sparse' and 'default' are supported.
         Use 'default' for the original exact implementation with excessive memory,
@@ -830,6 +846,12 @@ def plot_motif_length_selection(
 
     # discretizes ranges
     motif_length_range = np.int32(motif_length_range)
+
+    distance_bundle = make_distance_bundle(
+        distance_preprocessing,
+        distance,
+        distance_single,
+    )
 
     startTime = time.perf_counter()
     best_motif_length, _, au_ef, elbow, top_motiflets, _ = \

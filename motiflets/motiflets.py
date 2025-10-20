@@ -962,8 +962,9 @@ def get_approximate_k_motiflet(
         for i in np.arange(n, dtype=np.int32):
             knn_distances[i] = D[i][knns[i, k - 1]]
     else:
+        k_index = np.int32(k - 1)
         for i in np.arange(n, dtype=np.int32):
-            knn_distances[i] = D[i][k - 1]
+            knn_distances[i] = D[i][k_index]
 
     # order by increasing k-nn distance
     best_order = np.argsort(knn_distances)
