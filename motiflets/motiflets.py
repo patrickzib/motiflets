@@ -127,7 +127,7 @@ def read_ground_truth(dataset):
         print(file)
         series = pd.read_csv(file, index_col=0)
 
-        for i in range(0, series.shape[0]):
+        for i in np.arange(0, series.shape[0]):
             series.iloc[i] = series.iloc[i].apply(literal_eval)
 
         return series
@@ -381,7 +381,7 @@ def compute_upper_bound(
     kth_extent = np.zeros(k, dtype=np.float64)
     kth_extent[0] = np.inf
 
-    for kk in range(1, len(kth_extent)):
+    for kk in np.arange(1, len(kth_extent)):
         # kk is the kk-th NN
         # The motiflet candidate has thus kk+1 elements (including the query itself)
         best_knn_pos = np.argmin(D_knn[:, kk])
@@ -484,7 +484,7 @@ def compute_distances_with_knns_sparse(
 
     # TODO no sparse matrix support in numba. Thus we use this hack
     D_bool = [Dict.empty(key_type=types.int32, value_type=types.uint16) for _ in
-              range(n)]
+              np.arange(n)]
 
     # Store an upper bound for each k-nn distance
     kth_extent = compute_upper_bound(
@@ -500,7 +500,7 @@ def compute_distances_with_knns_sparse(
 
             bound = False
             k_index = -1
-            for kk in range(len(kth_extent) - 1, 0, -1):
+            for kk in np.arange(len(kth_extent) - 1, 0, -1):
                 if D_knn[order, kk] <= kth_extent[kk]:
                     bound = True
                     k_index = kk + 1
@@ -510,19 +510,19 @@ def compute_distances_with_knns_sparse(
                     D_bool[ks][ks2] = True
 
     D_sparse = List()
-    for i in range(n):
-        D_sparse.append(Dict.empty(key_type=types.int32, value_type=types.float32))
+    for i in np.arange(n):
+        D_sparse.append(Dict.empty(key_type=types.int32, value_type=types.float64))
 
     # second pass, filling only the pairs needed
     for idx in prange(n_jobs):
-        dot_rolled = np.zeros((dims, n), dtype=np.float32)
-        dot_prev = np.zeros((dims, n), dtype=np.float32)
+        dot_rolled = np.zeros((dims, n), dtype=np.float64)
+        dot_prev = np.zeros((dims, n), dtype=np.float64)
 
         start = idx * bin_size
         end = min(start + bin_size, n)
 
         for order in np.arange(start, end, dtype=np.int32):
-            dist = np.zeros(n, dtype=np.float32)
+            dist = np.zeros(n, dtype=np.float64)
             for d in np.arange(dims):
                 ts = time_series[d, :]
                 if order == start:
@@ -642,7 +642,7 @@ def compute_distances_with_knns(
                     dot_rolled[d][0] = dot_first[d][order]
 
                 dists = distance(dot_rolled[d], n, m, preprocessing[d], order, halve_m)
-                for i in range(len(dists)):
+                for i in np.arange(len(dists)):
                     dist[i] += dists[i]
                 dot_prev[d] = dot_rolled[d]
 
@@ -671,10 +671,10 @@ def get_radius(D_full, motifset_pos):
     """
     motiflet_radius = np.inf
 
-    for ii in range(len(motifset_pos) - 1):
+    for ii in np.arange(len(motifset_pos) - 1):
         i = motifset_pos[ii]
         current = np.float64(0.0)
-        for jj in range(1, len(motifset_pos)):
+        for jj in np.arange(1, len(motifset_pos)):
             if (i != jj):
                 j = motifset_pos[jj]
                 current = max(current, D_full[i, j])
@@ -709,10 +709,10 @@ def get_pairwise_extent(D_full, motifset_pos, upperbound=np.inf):
 
     motifset_extent = np.float64(0.0)
 
-    for ii in range(len(motifset_pos) - 1):
+    for ii in np.arange(len(motifset_pos) - 1):
         i = motifset_pos[ii]
 
-        for jj in range(ii + 1, len(motifset_pos)):
+        for jj in np.arange(ii + 1, len(motifset_pos)):
             j = motifset_pos[jj]
 
             motifset_extent = max(motifset_extent, D_full[i][j])
@@ -805,7 +805,7 @@ def _argknn(
     idx = []  # there may be less than k, thus use a list
 
     # go through the partitioned list
-    for i in range(len(dist_sort)):
+    for i in np.arange(len(dist_sort)):
         p = np.argmin(dist_sort)
         pos = dist_pos[p]
         dist_sort[p] = np.inf
@@ -822,7 +822,7 @@ def _argknn(
             break
 
     # if not enough elements found, go through the rest
-    for i in range(len(idx), k):
+    for i in np.arange(len(idx), k):
         pos = np.argmin(dists)
         if (not np.isnan(dists[pos])) \
                 and (not np.isinf(dists[pos])) \
@@ -888,12 +888,12 @@ def get_approximate_k_motiflet(
     # Fill diagonal with 0
     knn_distances = np.zeros(n, dtype=np.float64)
     if use_D_full:
-        for i in range(len(D)):
-            D[i][i] = 0.0
-        for i in np.arange(n):
+        for i in np.arange(len(D), dtype=np.int32):
+            D[i][i] = np.float64(0.0)
+        for i in np.arange(n, dtype=np.int32):
             knn_distances[i] = D[i][knns[i, k - 1]]
     else:
-        for i in np.arange(n):
+        for i in np.arange(n, dtype=np.int32):
             knn_distances[i] = D[i][k - 1]
 
     # order by increasing k-nn distance
@@ -979,9 +979,9 @@ def filter_unique(elbow_points, candidates, motif_length):
 
     """
     filtered_ebp = []
-    for i in range(len(elbow_points)):
+    for i in np.arange(len(elbow_points)):
         unique = True
-        for j in range(i + 1, len(elbow_points)):
+        for j in np.arange(i + 1, len(elbow_points)):
             unique = _check_unique(
                 candidates[elbow_points[i]], candidates[elbow_points[j]], motif_length)
             if not unique:
@@ -1017,7 +1017,7 @@ def find_elbow_points(dists, alpha=2, elbow_deviation=1.00):
     elbow_points.clear()
 
     peaks = np.zeros(len(dists))
-    for i in range(3, len(peaks) - 1):
+    for i in np.arange(3, len(peaks) - 1):
         if (dists[i] != np.inf and
                 dists[i + 1] != np.inf and
                 dists[i - 1] != np.inf):
@@ -1337,7 +1337,7 @@ def search_k_motiflets_elbow(
         preprocessing = np.array(preprocessing, dtype=np.float64)
 
         upper_bound = np.inf
-        for test_k in np.arange(k_max_ - 1, 1, -1):
+        for test_k in np.arange(k_max_ - 1, 1, -1, dtype=np.int32):
             # # Top-N retrieval
             # if exclusion is not None and exclusion[test_k] is not None:
             #     if not sparse:
@@ -1374,7 +1374,7 @@ def search_k_motiflets_elbow(
 
     # smoothen the line to make it monotonically increasing
     k_motiflet_distances[0:2] = k_motiflet_distances[2]
-    for i in range(len(k_motiflet_distances), 2):
+    for i in np.arange(len(k_motiflet_distances), 2):
         k_motiflet_distances[i - 1] = min(k_motiflet_distances[i],
                                           k_motiflet_distances[i - 1])
 
@@ -1392,7 +1392,7 @@ def search_k_motiflets_elbow(
 
 @njit(fastmath=True, cache=True)
 def candidate_dist(D_full, pool, upperbound, m, slack=0.5):
-    motiflet_candidate_dist = 0.0
+    motiflet_candidate_dist = np.float64(0.0)
     m_half = int(m * slack)
     for i in pool:
         for j in pool:
@@ -1468,7 +1468,7 @@ def find_k_motiflets(ts, D_full, m, k, upperbound=None, slack=0.5):
             motiflet_dist,
             motiflet_pos,
             m
-        ) for i in range(0, n, m)))
+        ) for i in np.arange(0, n, m)))
 
     min_pos = np.nanargmin(motiflet_dists)
     motiflet_dist = motiflet_dists[min_pos]

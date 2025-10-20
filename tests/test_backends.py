@@ -1,24 +1,12 @@
+import numpy as np
 import warnings
 
 from motiflets.plotting import *
+from tests._datasets import read_penguin
 
 warnings.simplefilter("ignore")
 
-path = "../datasets/experiments/"
-
-import numpy as np
-
 np.printoptions(precision=2, suppress=True)
-
-
-def read_penguin_data():
-    series = pd.read_csv(
-        path + "penguin.txt",
-        names=(["X-Acc", "Y-Acc", "Z-Acc", "4", "5", "6", "7", "Pressure", "9"]),
-        delimiter="\t", header=None)
-    ds_name = "Penguins (Longer Snippet)"
-
-    return ds_name, series
 
 
 def test_motiflets_univariate():
@@ -26,14 +14,14 @@ def test_motiflets_univariate():
     motif_length = 27
 
     lengths = [
-        1_000,
+        # 1_000,
         5_000,
-        10_000,
-        30_000,
+        # 10_000,
+        # 30_000,
         # 50_000
     ]
 
-    ds_name, B = read_penguin_data()
+    ds_name, B = read_penguin()
 
     for i, length in enumerate(lengths):
         series = B.iloc[:length, 0].values

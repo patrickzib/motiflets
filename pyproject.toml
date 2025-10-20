@@ -40,6 +40,7 @@ dependencies = [
     "numba>=0.55.1",
     "numpy>=1.21.0",
     "pandas>=1.1.0",
+    'importlib-metadata>=4.11.0; python_version < "3.8"',
     "scikit-learn>=0.24.0",
     "scipy<2.0.0",
     "seaborn>=0.11.2",
@@ -57,7 +58,7 @@ repository = "https://github.com/patrickzib/motiflets"
 file = "LICENSE"
 
 [build-system]
-requires = ["setuptools", "wheel", "toml", "build"]
+requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
@@ -65,3 +66,21 @@ log_cli = true
 log_cli_level = "INFO"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["tests", "tests.*"]
+
+[tool.setuptools.package-data]
+motiflets = [
+    "*.csv",
+    "*.csv.gz",
+    "*.arff",
+    "*.arff.gz",
+    "*.txt",
+    "*.ts",
+    "*.tsv",
+]
