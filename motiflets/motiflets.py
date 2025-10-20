@@ -1061,8 +1061,7 @@ def find_au_ef_motif_length(
         distance=znormed_euclidean_distance,
         distance_single=znormed_euclidean_distance_single,
         distance_preprocessing=sliding_mean_std,
-        backend="scalable",
-        delta=None):
+        backend="scalable"):
     """Computes the Area under the Elbow-Function within an of motif lengths.
 
     Parameters
