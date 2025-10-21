@@ -50,24 +50,6 @@ pip install .
 ```
 
 # Usage
-
-## Command Line Interface
-
-You can pull a time series dataset directly from any URL, and detect motiflets using
-the following command. Just run it with uvx:
-
-```bash
-uvx motiflets fit_motif_length data.csv --k-max 6 --motif-length-range 64 128 256
-```
-
-The call prints a summary of input parameters, and the best window length.
-
-```bash
-uvx motiflets fit_k data.csv --k-max 6 --motif-length 128
-```
-
-The call prints a summary of input parameters, and the found k-Motiflet locations.
-
 ## Python API
 
 Here we illustrate how to use k-Motiflets. 
@@ -88,6 +70,11 @@ and to find the largest set of the same motif, i.e. all repetitions.
 We first extract meaningful **motif lengths (l)** from this use case:
 
 ```
+from motiflets.motiflets import *
+from motiflets.plotting import *   # the Motiflets module is located here
+
+series, df_gt = read_dataset_with_index(file) 
+
 # The Motiflets-class
 ml = Motiflets(
     ds_name,     # the name of the series
@@ -111,6 +98,9 @@ to roughly a heartbeat rate of 60-80 bpm.
 To extract meaningful **motif sizes (k)** from this use case, we run 
 
 ```
+
+[...]
+
 dists, candidates, elbow_points = ml.fit_k_elbow(
     k_max,
     motif_length    
@@ -129,6 +119,25 @@ We finally plot these motifs:
 
 The first repetitions perfectly match the calibration signal (orange), while the latter 16 
 repetitions perfectly match the ECG waves (green).
+
+
+## Command Line Interface
+
+You can pull a time series dataset directly from any URL, and detect motiflets using
+the following command. Just run it with uvx:
+
+```bash
+uvx motiflets fit_motif_length data.csv --k-max 6 --motif-length-range 64 128 256
+```
+
+The call prints a summary of input parameters, and the best window length.
+
+```bash
+uvx motiflets fit_k data.csv --k-max 6 --motif-length 128
+```
+
+The call prints a summary of input parameters, and the found k-Motiflet locations.
+
 
 ### Multivariate Motif Discovery
 
