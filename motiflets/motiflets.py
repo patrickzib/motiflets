@@ -353,7 +353,7 @@ def compute_distances_with_knns_full(
             dot_first = _sliding_dot_product(ts[:m], ts)
 
             dot_prev = None
-            for order in np.arange(start, end):
+            for order in range(start, end):
                 if order == start:
                     # O(n log n) operation
                     dot_rolled = _sliding_dot_product(ts[start:start + m], ts)
@@ -523,7 +523,7 @@ def compute_distances_with_knns_sparse(
         start = idx * bin_size
         end = min(start + bin_size, n)
 
-        for order in np.arange(start, end, dtype=np.int32):
+        for order in range(start, end):
             dist = np.zeros(n, dtype=np.float64)
             for d in np.arange(dims):
                 ts = time_series[d, :]
@@ -758,12 +758,12 @@ def get_pairwise_extent_raw(
         i = motifset_pos[ii]
         a = series[:, i:i + motif_length]
 
-        for jj in np.arange(ii + 1, len(motifset_pos)):
+        for jj in range(ii + 1, len(motifset_pos)):
             j = motifset_pos[jj]
             b = series[:, j:j + motif_length]
 
             dist = np.float64(0.0)
-            for dim in np.arange(series.shape[0]):
+            for dim in range(series.shape[0]):
                 dist += distance_single(a[dim], b[dim], i, j, preprocessing[dim])
 
             motifset_extent = max(motifset_extent, dist)
