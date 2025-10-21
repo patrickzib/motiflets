@@ -46,8 +46,12 @@ dependencies = [
     "seaborn>=0.11.2",
     "tqdm>=4.63.0",
     "matplotlib>=3.5.1",
-    "tsdownsample>=0.1.3"
+    "tsdownsample>=0.1.3",
+    "psutil>=5.9.0"
 ]
+
+[project.scripts]
+motiflets = "motiflets._cli:main"
 
 [project.urls]
 repository = "https://github.com/patrickzib/motiflets"
@@ -58,7 +62,7 @@ repository = "https://github.com/patrickzib/motiflets"
 file = "LICENSE"
 
 [build-system]
-requires = ["setuptools>=64", "wheel"]
+requires = ["setuptools>=64", "wheel", "toml"]
 build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]

@@ -109,10 +109,7 @@ class Motiflets:
             k_max,
             motif_length_range,
             subsample=2,
-            # plot=True,
-            # plot_elbows=False,
-            # plot_motifs_as_grid=True,
-            # plot_best_only=True
+            plot=True,
     ):
         """Computes the AU_EF plot to extract the best motif lengths
 
@@ -152,8 +149,8 @@ class Motiflets:
             distance=self.distance,
             distance_single=self.distance_single,
             distance_preprocessing=self.distance_preprocessing,
-            backend=self.backend
-
+            backend=self.backend,
+            plot=plot
         )
 
         return self.motif_length
@@ -787,7 +784,8 @@ def plot_motif_length_selection(
         distance=znormed_euclidean_distance,
         distance_single=znormed_euclidean_distance_single,
         distance_preprocessing=sliding_mean_std,
-        backend="scalable"
+        backend="scalable",
+        plot=True
 ):
     """Computes the AU_EF plot to extract the best motif lengths
 
@@ -858,25 +856,27 @@ def plot_motif_length_selection(
     endTime = (time.perf_counter() - startTime)
     print("\tTime", np.round(endTime, 1), "s")
     indices = ~np.isinf(au_ef)
-    fig, ax = plt.subplots(figsize=(5, 2))
-    ax = sns.lineplot(
-        x=motif_length_range[indices],
-        y=au_ef[indices],
-        label="AU_EF",
-        ci=None, estimator=None)
-    sns.despine()
-    plt.tight_layout()
-    ax.set_title("Best length on " + ds_name, size=20)
-    ax.set(xlabel='Motif Length' + header, ylabel='Area under EF\n(lower is better)')
 
-    for item in ([ax.xaxis.label, ax.yaxis.label] +
-                 ax.get_xticklabels() + ax.get_yticklabels()):
-        item.set_fontsize(16)
+    if plot:
+        fig, ax = plt.subplots(figsize=(5, 2))
+        ax = sns.lineplot(
+            x=motif_length_range[indices],
+            y=au_ef[indices],
+            label="AU_EF",
+            errorbar=None, estimator=None)
+        sns.despine()
+        plt.tight_layout()
+        ax.set_title("Best length on " + ds_name, size=20)
+        ax.set(xlabel='Motif Length' + header, ylabel='Area under EF\n(lower is better)')
 
-    # plt.legend(loc="best")
-    fig.set_figheight(5)
-    fig.set_figwidth(5)
-    plt.show()
+        for item in ([ax.xaxis.label, ax.yaxis.label] +
+                     ax.get_xticklabels() + ax.get_yticklabels()):
+            item.set_fontsize(16)
+
+        # plt.legend(loc="best")
+        fig.set_figheight(5)
+        fig.set_figwidth(5)
+        plt.show()
 
     return best_motif_length
 
@@ -999,13 +999,13 @@ def plot_grid_motiflets(
                                  y=data_raw_sampled[0, start:end],
                                  label=column,
                                  color=color_palette[aaa + 1],
-                                 ci=None, estimator=None
+                                 errorbar=None, estimator=None
                                  )
                 else:
                     sns.lineplot(x=data_index_sampled[start:end],
                                  y=data_raw_sampled[0, start:end],
                                  color=color_palette[aaa + 1],
-                                 ci=None, estimator=None
+                                 errorbar=None, estimator=None
                                  )
 
     if len(motifsets[elbow_points]) > 6:
@@ -1145,7 +1145,7 @@ def plot_grid_motiflets(
                     [elbow_points[i] / len(motifsets), 0.7, 0.1, 0.2])
 
                 _ = sns.lineplot(ax=axins, data=df_melt, x="time", y="value",
-                                 ci=0, n_boot=10,
+                                 errorbar=None, n_boot=10,
                                  color=color_palette[
                                      (len(ground_truth) + ii % grid_dim) % len(
                                          color_palette)])
