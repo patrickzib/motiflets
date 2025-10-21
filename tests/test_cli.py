@@ -12,7 +12,7 @@ from motiflets import _cli
 def _write_series(tmp_path: Path) -> Path:
     frame = pd.DataFrame(
         {
-            "timestamp": pd.date_range("2020-01-01", periods=1024, freq="H"),
+            "timestamp": pd.date_range("2020-01-01", periods=1024, freq="h"),
             "value": pd.Series(range(1024), dtype=float),
         }
     )
@@ -120,7 +120,7 @@ def test_resolve_motif_length_range_rejects_out_of_bounds():
 def test_select_series_infers_numeric_column():
     frame = pd.DataFrame(
         {
-            "timestamp": pd.date_range("2020-01-01", periods=120, freq="H"),
+            "timestamp": pd.date_range("2020-01-01", periods=120, freq="h"),
             "value": pd.Series(range(120), dtype=float) * 0.01 + 1.0,
         }
     )

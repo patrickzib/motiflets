@@ -347,7 +347,7 @@ def compute_distances_with_knns_full(
         start = idx * bin_size
         end = min(start + bin_size, n)
 
-        for d in np.arange(dims):
+        for d in range(dims):
             ts = time_series[d]
             preprocessing = distance_preprocessing(ts, m)
             dot_first = _sliding_dot_product(ts[:m], ts)
@@ -368,7 +368,7 @@ def compute_distances_with_knns_full(
                 D[order] += dist
                 dot_prev = dot_rolled
 
-        for order in np.arange(start, end):
+        for order in range(start, end):
             knn = _argknn(D[order], k, m, slack=slack)
             knns[order, :len(knn)] = knn
 
@@ -502,7 +502,7 @@ def compute_distances_with_knns_sparse(
 
             bound = False
             k_index = -1
-            for kk in np.arange(len(kth_extent) - 1, 0, -1):
+            for kk in range(len(kth_extent) - 1, 0, -1):
                 if D_knn[order, kk] <= kth_extent[kk]:
                     bound = True
                     k_index = kk + 1
@@ -525,7 +525,7 @@ def compute_distances_with_knns_sparse(
 
         for order in range(start, end):
             dist = np.zeros(n, dtype=np.float64)
-            for d in np.arange(dims):
+            for d in range(dims):
                 ts = time_series[d, :]
                 if order == start:
                     # O(n log n) operation
@@ -629,9 +629,9 @@ def compute_distances_with_knns(
         start = np.int32(idx * bin_size)
         end = np.int32(min(start + bin_size, n))
 
-        for order in np.arange(start, end, ):
+        for order in range(start, end, ):
             dist = np.zeros(n, dtype=np.float64)
-            for d in np.arange(dims):
+            for d in range(dims):
                 ts = time_series[d, :]
                 if order == start:
                     # O(n log n) operation
@@ -644,7 +644,7 @@ def compute_distances_with_knns(
                     dot_rolled[d][0] = dot_first[d][order]
 
                 dists = distance(dot_rolled[d], n, m, preprocessing[d], order, halve_m)
-                for i in np.arange(len(dists)):
+                for i in range(len(dists)):
                     dist[i] += dists[i]
                 dot_prev[d] = dot_rolled[d]
 
@@ -676,7 +676,7 @@ def get_radius(D_full, motifset_pos):
     for ii in np.arange(len(motifset_pos) - 1):
         i = motifset_pos[ii]
         current = np.float64(0.0)
-        for jj in np.arange(1, len(motifset_pos)):
+        for jj in range(1, len(motifset_pos)):
             if (i != jj):
                 j = motifset_pos[jj]
                 current = max(current, D_full[i, j])
@@ -714,7 +714,7 @@ def get_pairwise_extent(D_full, motifset_pos, upperbound=np.inf):
     for ii in np.arange(len(motifset_pos) - 1):
         i = motifset_pos[ii]
 
-        for jj in np.arange(ii + 1, len(motifset_pos)):
+        for jj in range(ii + 1, len(motifset_pos)):
             j = motifset_pos[jj]
 
             motifset_extent = max(motifset_extent, D_full[i][j])
@@ -983,7 +983,7 @@ def filter_unique(elbow_points, candidates, motif_length):
     filtered_ebp = []
     for i in np.arange(len(elbow_points)):
         unique = True
-        for j in np.arange(i + 1, len(elbow_points)):
+        for j in range(i + 1, len(elbow_points)):
             unique = _check_unique(
                 candidates[elbow_points[i]], candidates[elbow_points[j]], motif_length)
             if not unique:
