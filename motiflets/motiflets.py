@@ -203,9 +203,11 @@ def pd_series_to_numpy(data):
         data_raw = data
         data_index = np.arange(data.shape[-1])
     try:
-        return (data_index.astype(np.float64), data_raw.astype(np.float64, copy=False))
+        return (data_index.astype(np.float64),
+                np.ascontiguousarray(data_raw.astype(np.float64, copy=False)))
     except TypeError:  # datetime index cannot be cast to float64
-        return (data_index, data_raw.astype(np.float64, copy=False))
+        return (data_index,
+                np.ascontiguousarray(data_raw.astype(np.float64, copy=False)))
 
 
 def read_dataset(dataset, sampling_factor=10000):
@@ -1114,6 +1116,7 @@ def find_au_ef_motif_length(
             data = data[:, ::subsample]
         else:
             data = data[::subsample]
+        data = np.ascontiguousarray(data)
 
     # in reverse order
     au_efs = np.full(len(motif_length_range), np.inf, dtype=object)

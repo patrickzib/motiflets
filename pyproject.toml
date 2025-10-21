@@ -62,7 +62,7 @@ repository = "https://github.com/patrickzib/motiflets"
 file = "LICENSE"
 
 [build-system]
-requires = ["setuptools>=64", "wheel"]
+requires = ["setuptools>=64", "wheel", "toml"]
 build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]

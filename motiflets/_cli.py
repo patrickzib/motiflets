@@ -2,19 +2,20 @@
 
 from __future__ import annotations
 
+import warnings
+
+from numba.core.errors import NumbaPerformanceWarning
+
+warnings.simplefilter("ignore", NumbaPerformanceWarning)
+
 import argparse
 import os
 import sys
-import io
 from pathlib import Path
-from typing import Iterable, List, Optional, Sequence, Union
+from typing import List, Optional, Sequence, Union
 from urllib.parse import urlparse
-import urllib.request
-from urllib.error import HTTPError
 
 import pandas as pd
-
-import motiflets.motiflets as ml
 
 os.environ.setdefault("MPLBACKEND", "Agg")
 
@@ -44,7 +45,6 @@ def _dispatch(args: argparse.Namespace) -> int:
     series = _load_series(
         args.source,
         column=_parse_column_identifier(args.column),
-        index_column=_parse_column_identifier(args.index_column),
         dropna=not args.keep_na,
     )
 
@@ -52,16 +52,15 @@ def _dispatch(args: argparse.Namespace) -> int:
     motiflets = Motiflets(
         ds_name=ds_name,
         series=series,
-        elbow_deviation=args.elbow_deviation,
         distance=args.distance,
-        slack=args.slack,
-        n_jobs=args.n_jobs,
-        backend=args.backend,
+        n_jobs=args.n_jobs
     )
+
+    print(f"Loaded dataset '{motiflets.ds_name}' with {len(series)} observations.")
 
     if args.command == "fit_motif_length":
         return _run_fit_motif_length(args, motiflets, series)
-    if args.command == "fit_k_elbow":
+    if args.command == "fit_k":
         return _run_fit_k_elbow(args, motiflets, series)
 
     raise CLIError(f"unsupported command '{args.command}'")
@@ -103,35 +102,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Column to use as the time series (name or zero-based index).",
     )
     common.add_argument(
-        "--index-column",
-        help="Optional column to use as the time index (name or index).",
-    )
-    common.add_argument(
         "--keep-na",
         action="store_true",
         help="Keep missing values instead of dropping them.",
     )
     common.add_argument(
-        "--elbow-deviation",
-        type=float,
-        default=1.0,
-        help="Minimal deviation to consider an elbow (default: 1.0).",
-    )
-    common.add_argument(
-        "--slack",
-        type=float,
-        default=0.5,
-        help="Slack percentage to avoid trivial matches (default: 0.5).",
-    )
-    common.add_argument(
         "--distance",
         default="znormed_ed",
         help="Distance metric name (default: znormed_ed).",
-    )
-    common.add_argument(
-        "--backend",
-        default="scalable",
-        help="Backend to run motiflets with (default: scalable).",
     )
     common.add_argument(
         "--n-jobs",
@@ -148,13 +126,14 @@ def _build_parser() -> argparse.ArgumentParser:
     fit_motif_length.add_argument(
         "--k-max",
         type=int,
-        default=10,
-        help="Search k in [2, k_max] (default: 10).",
+        required=True,
+        help="Search k in [2, k_max] (required).",
     )
     fit_motif_length.add_argument(
         "--motif-length-range",
         nargs="+",
-        help="Explicit motif length candidates (e.g. 48 96 144 or 24:192:24).",
+        required=True,
+        help="Explicit motif length candidates (e.g. 24:192:24).",
     )
     fit_motif_length.add_argument(
         "--subsample",
@@ -164,25 +143,21 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     fit_k_elbow = subparsers.add_parser(
-        "fit_k_elbow",
+        "fit_k",
         parents=[common],
         help="Search motif sets across different k.",
     )
     fit_k_elbow.add_argument(
         "--k-max",
         type=int,
-        default=10,
-        help="Search k in [2, k_max] (default: 10).",
+        required=True,
+        help="Search k in [2, k_max] (required).",
     )
     fit_k_elbow.add_argument(
         "--motif-length",
         type=int,
-        help="Use a fixed motif length (otherwise determined automatically).",
-    )
-    fit_k_elbow.add_argument(
-        "--motif-length-range",
-        nargs="+",
-        help="Candidates to determine motif length when not provided.",
+        required=True,
+        help="Use a fixed motif length (required).",
     )
     fit_k_elbow.add_argument(
         "--subsample",
@@ -190,31 +165,15 @@ def _build_parser() -> argparse.ArgumentParser:
         default=2,
         help="Subsampling factor to speed up automatic length search (default: 2).",
     )
-    fit_k_elbow.add_argument(
-        "--no-filter",
-        action="store_true",
-        help="Disable filtering of overlapping motiflets.",
-    )
-    fit_k_elbow.add_argument(
-        "--show-elbows",
-        action="store_true",
-        help="Display elbow points plot (disabled by default).",
-    )
-    fit_k_elbow.add_argument(
-        "--show-grid",
-        action="store_true",
-        help="Display motif grid plots (disabled by default).",
-    )
 
     return parser
 
 
 def _run_fit_motif_length(
-    args: argparse.Namespace,
-    motiflets: "Motiflets",
-    series: pd.Series,
+        args: argparse.Namespace,
+        motiflets: "Motiflets",
+        series: pd.Series,
 ) -> int:
-
     motif_length_range = _resolve_motif_length_range(
         args.motif_length_range,
         len(series),
@@ -229,36 +188,26 @@ def _run_fit_motif_length(
 
     print(f"dataset:      {motiflets.ds_name}")
     print(f"observations: {len(series)}")
-    print("motif_length_candidates: " + ", ".join(str(v) for v in motif_length_range),)
+    print(f"motif_length_candidates: " + ", ".join(str(v) for v in motif_length_range))
     print(f"best_motif_length: {best}")
 
     return 0
 
 
 def _run_fit_k_elbow(
-    args: argparse.Namespace,
-    motiflets: "Motiflets",
-    series: pd.Series,
+        args: argparse.Namespace,
+        motiflets: "Motiflets",
+        series: pd.Series,
 ) -> int:
     motif_length = args.motif_length
     motif_length_range: Optional[List[int]] = None
 
     if motif_length is None:
-        motif_length_range = _resolve_motif_length_range(
-            args.motif_length_range,
-            len(series),
-        )
-        motif_length = motiflets.fit_motif_length(
-            args.k_max,
-            motif_length_range,
-            subsample=args.subsample,
-            plot=False
-        )
+        raise CLIError(f"motif-length parameter must be set.")
 
     dists, motif_sets, elbow_points = motiflets.fit_k_elbow(
         args.k_max,
         motif_length=motif_length,
-        filter=not args.no_filter,
         plot_elbows=False,
         plot_motifs_as_grid=False,
     )
@@ -271,32 +220,28 @@ def _run_fit_k_elbow(
         print("motif_length_candidates: " + ", ".join(
             str(v) for v in motif_length_range), )
 
-    elbow_list = _convert_elbow_points(elbow_points)
+    elbow_list = list(elbow_points)
     print(
         "elbow_points: "
         + (", ".join(str(k) for k in elbow_list) if elbow_list else "none"),
     )
 
     for k in elbow_list:
-        motif = _safe_index(motif_sets, k)
-        dist = _safe_index(dists, k)
+        motif = motif_sets[k]
+        dist = dists[k]
         motif_repr = _format_motif_set(motif)
         dist_value = _format_distance(dist)
         print(f"k={k}: distance={dist_value} motif_set={motif_repr}")
-
 
     return 0
 
 
 def _load_series(
-    source: str,
-    column: Optional[Union[str, int]],
-    index_column: Optional[Union[str, int]],
-    dropna: bool,
+        source: str,
+        column: Optional[Union[str, int]],
+        dropna: bool,
 ) -> pd.Series:
     read_kwargs = {}
-    if index_column is not None:
-        read_kwargs["index_col"] = index_column
 
     frame = _read_csv_with_errors(source, read_kwargs)
     if frame.empty:
@@ -312,30 +257,32 @@ def _load_series(
 
 
 def _select_series(
-    frame: pd.DataFrame,
-    column: Optional[Union[str, int]],
+        frame: pd.DataFrame,
+        column: Optional[Union[str, int]],
 ) -> pd.Series:
     if column is None:
         numeric = frame.select_dtypes(include="number")
-        if numeric.shape[1] >= 1:
+        if frame.shape[1] == 2:
+            candidate = frame.iloc[:, 1]
+        elif numeric.shape[1] == 1:
+            candidate = frame.iloc[:, 0]
+        elif numeric.shape[1] >= 1:
             raise CLIError(
                 "cannot infer time series column; provide --column explicitly",
             )
-        elif frame.shape[1] == 1:
-            candidate = frame.iloc[:, 1]
     else:
         candidate = _locate_column(frame, column)
 
     series = candidate.squeeze()
     if not isinstance(series, pd.Series):
-        series = pd.Series(series)
+        series = pd.Series(np.ascontiguousarray(series))
     series.name = candidate.name
     return series
 
 
 def _locate_column(
-    frame: pd.DataFrame,
-    column: Union[str, int],
+        frame: pd.DataFrame,
+        column: Union[str, int],
 ) -> pd.Series:
     if isinstance(column, int):
         if column < 0 or column >= frame.shape[1]:
@@ -352,8 +299,8 @@ def _locate_column(
 
 
 def _resolve_motif_length_range(
-    raw_values: Optional[Sequence[str]],
-    series_length: int,
+        raw_values: Optional[Sequence[str]],
+        series_length: int,
 ) -> List[int]:
     if raw_values:
         resolved = _parse_motif_length_range(raw_values)
@@ -384,44 +331,19 @@ def _default_motif_length_range(series_length: int) -> List[int]:
     if series_length <= 0:
         raise CLIError("series length must be positive")
 
-    minimum = max(4, series_length // 50)
-    maximum = max(minimum + 1, series_length // 4)
-    maximum = min(maximum, series_length)
-    if minimum >= maximum:
-        return [minimum]
+    min_len = max(4, series_length // 50)
+    max_len = min(series_length // 4, series_length)
+    if min_len >= max_len:
+        return [min_len]
 
     desired_points = 8
-    step = max(1, (maximum - minimum) // (desired_points - 1))
+    step = max(1, (max_len - min_len) // (desired_points - 1))
+    values = list(range(min_len, max_len + 1, step))
 
-    values: List[int] = []
-    current = minimum
-    while current <= maximum:
-        values.append(current)
-        current += step
-
-    if values[-1] != maximum:
-        values.append(maximum)
+    if values[-1] != max_len:
+        values.append(max_len)
 
     return sorted(set(values))
-
-
-def _convert_elbow_points(elbow_points) -> List[int]:
-    if elbow_points is None:
-        return []
-    if isinstance(elbow_points, (list, tuple, set)):
-        return sorted(int(k) for k in elbow_points)
-    if hasattr(elbow_points, "tolist"):
-        values = elbow_points.tolist()
-        if isinstance(values, list):
-            return sorted(int(k) for k in values)
-    return [int(elbow_points)]
-
-
-def _safe_index(container, index: int):
-    try:
-        return container[index]
-    except Exception:  # pragma: no cover - defensive fallback
-        return None
 
 
 def _format_motif_set(motif) -> str:
@@ -442,6 +364,61 @@ def _format_distance(distance) -> str:
     if not pd.notna(value):
         return "nan"
     return f"{value:.6f}"
+
+
+def _parse_motif_length_range(raw_values: Sequence[str]) -> List[int]:
+    if not raw_values:
+        return []
+
+    candidates: List[int] = []
+    for token in raw_values:
+        value = token.strip()
+        if not value:
+            raise CLIError("motif length specification cannot be empty")
+
+        if ":" in value:
+            parts = [part.strip() for part in value.split(":")]
+            if len(parts) not in (2, 3):
+                raise CLIError(
+                    f"invalid motif length range expression '{value}' "
+                    "(expected start:stop[:step])",
+                )
+
+            try:
+                start = int(parts[0])
+                stop = int(parts[1])
+                step = int(parts[2]) if len(parts) == 3 else 1
+            except ValueError as exc:
+                raise CLIError(
+                    f"invalid motif length range expression '{value}'",
+                ) from exc
+
+            if step == 0:
+                raise CLIError("motif length step cannot be zero")
+
+            increasing = start <= stop
+            if (step > 0 and not increasing) or (step < 0 and increasing):
+                raise CLIError(
+                    f"range '{value}' does not progress towards the stop value",
+                )
+
+            current = start
+            if step > 0:
+                while current <= stop:
+                    candidates.append(current)
+                    current += step
+            else:
+                while current >= stop:
+                    candidates.append(current)
+                    current += step
+            continue
+
+        try:
+            candidates.append(int(value))
+        except ValueError as exc:
+            raise CLIError(f"invalid motif length '{value}'") from exc
+
+    return candidates
 
 
 def _parse_column_identifier(value: Optional[str]) -> Optional[Union[str, int]]:
