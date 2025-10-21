@@ -314,6 +314,8 @@ def get_approximate_k_motiflet(
             in the time series. The first k elements are the k-NNs, the rest is -1.
     """
     n = ts.shape[-1] - m + 1
+    k = np.int32(k)  # avoid warning: unsafe cast from int64 to int32
+
     motiflet_dist = upper_bound
     motiflet_candidate = None
 
