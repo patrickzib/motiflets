@@ -51,6 +51,25 @@ pip install .
 
 # Usage
 
+## Command Line Interface
+
+YOu can pull a time series dataset directly from any URL, and detect motiflets using
+the following command. Just run it with uvx:
+
+```bash
+uvx motiflets fit_motif_length data.csv --k-max 6 --motif-length-range 64 128 256
+```
+
+The call prints a summary of input parameters, and the best window length.
+
+```bash
+uvx motiflets fit_k data.csv --k-max 6 --motif-length 128
+```
+
+The call prints a summary of input parameters, and the found k-Motiflet locations.
+
+## Python API
+
 Here we illustrate how to use k-Motiflets. 
 
 The following TS is an ECG from the Long Term Atrial Fibrillation (LTAF) database, which 
