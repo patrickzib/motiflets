@@ -53,7 +53,7 @@ pip install .
 
 ## Command Line Interface
 
-YOu can pull a time series dataset directly from any URL, and detect motiflets using
+You can pull a time series dataset directly from any URL, and detect motiflets using
 the following command. Just run it with uvx:
 
 ```bash
