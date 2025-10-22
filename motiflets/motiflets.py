@@ -365,7 +365,7 @@ def get_approximate_k_motiflet(
 def _check_unique(motifset_1, motifset_2, motif_length):
     """Check for overlaps between two motif sets.
 
-    Two motif sets overlapp, if more than m/2 subsequences overlap from motifset 1.
+    Two motif sets overlap, if more than m/2 subsequences overlap from motifset 1.
 
     Parameters
     ----------
@@ -397,7 +397,7 @@ def filter_unique(elbow_points, candidates, motif_length):
 
     This method applied a duplicate detection by filtering overlapping motif sets.
     Two candidate motif sets overlap, if at least m/2 subsequences of the smaller
-    motifset overlapp with the larger motifset. Only the largest non-overlapping
+    motifset overlap with the larger motifset. Only the largest non-overlapping
     motif sets are retained.
 
     Parameters
@@ -463,7 +463,7 @@ def find_elbow_points(dists, alpha=2, elbow_deviation=1.00):
             m2 = (dists[i] - dists[i - 1]) + 0.00001
 
             # avoid detecting elbows in near constant data
-            # TODO adding this removes reproducability
+            # TODO adding this removes reproducibility
             # if dists[i - 1] == dists[i]:
             #    m2 = 1.0  # peaks[i] = 0
 
