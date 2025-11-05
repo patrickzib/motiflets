@@ -54,7 +54,6 @@ filenames = {
 def read_mat(filename):
     print(f"\tReading {filename} from {path + filename + '.mat'}")
     data = sio.loadmat(path + filename + '.mat')
-
     # extract data array
     key = filename
     try:

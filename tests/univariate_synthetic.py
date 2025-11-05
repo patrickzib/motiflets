@@ -1,5 +1,4 @@
 from motiflets.plotting import *
-# from scipy.stats import zscore
 
 def generate_rectangular_wave(motif_length):
     return (motif_length,
