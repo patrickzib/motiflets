@@ -41,8 +41,10 @@ class PyAttimoNearestNeighbors:
 
         if "pyattimo_max_memory" in kwargs:
             self.pyattimo_max_memory = kwargs["pyattimo_max_memory"]
+            print(f"Setting PyAttimo max memory to {self.pyattimo_max_memory}")
         else:
             self.pyattimo_max_memory = "8 GB"
+
 
     def compute_knns(self, X):
         """Compute k-nearest neighbors using PyAttimo motiflet discovery."""
@@ -70,7 +72,7 @@ class PyAttimoNearestNeighbors:
             'w': self.m,
             'support': self.k_max - 1,
             'exclusion_zone': int(self.m * self.slack),
-            'max_memory': "8 GB"
+            'max_memory': self.pyattimo_max_memory
         }
 
         if self.pyattimo_delta:
