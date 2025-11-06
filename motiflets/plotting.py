@@ -241,7 +241,7 @@ class Motiflets:
 
         return fig, ax
 
-    def plot_motifset(self, path=None, elbow_point=None):
+    def plot_motifset(self, max_points=10_000, path=None, elbow_point=None):
 
         if self.dists is None or self.motiflets is None or self.elbow_points is None:
             raise Exception("Please call fit_k_elbow first.")
@@ -252,8 +252,8 @@ class Motiflets:
         fig, ax = plot_motifset(
             self.ds_name,
             self.series,
+            max_points=max_points,
             motifsets=self.motiflets[elbow_point],
-            dist=self.dists[elbow_point],
             motif_length=self.motif_length,
             show=path is None)
 
@@ -347,7 +347,6 @@ def plot_motifset(
         ds_name,
         data,
         motifsets=None,
-        dist=None,
         max_points=2_000,
         motif_length=None,
         ground_truth=None,
@@ -362,8 +361,6 @@ def plot_motifset(
         The time series data
     motifsets: array like
         One found motif set
-    dist: array like
-        The distances (extents) for each motif set
     motif_length: int
         The length of the motif
     ground_truth: pd.Series
@@ -433,6 +430,7 @@ def plot_motifset(
     color_offset = 1
     offset = 0
     tick_offsets = []
+    # y_labels = []
     axes[0, 0].set_title(ds_name, fontsize=22)
 
     for dim in range(data_raw.shape[0]):
@@ -459,14 +457,13 @@ def plot_motifset(
                     for a, pos in enumerate(motifset):
                         _ = sns.lineplot(
                             ax=axes[0, 0],
-                            x=data_index_sampled[
+                            x = data_index_sampled[
                               pos: pos + motif_length_sampled],
-                            y=dim_raw_sampled[
+                            y = dim_raw_sampled[
                               pos: pos + motif_length_sampled] + offset,
                             linewidth=3,
                             color=sns.color_palette("tab10")[
-                                (color_offset + i) % len(
-                                    sns.color_palette("tab10"))],
+                                (color_offset + i) % len(sns.color_palette("tab10"))],
                             errorbar=("ci", None),
                             estimator=None)
 
@@ -478,12 +475,17 @@ def plot_motifset(
                             ", l=" + str(motif_length_disp),
                             fontsize=18)
 
+                        motif_factor = 1
+                        if motif_length_disp > max_points:
+                            motif_factor = int(max(1, np.floor(motif_length_disp / max_points)))
+                            print(f"factor{motif_factor}")
+
                         df = pd.DataFrame()
-                        df["time"] = range(0, motif_length_disp, 1)
+                        df["time"] = range(0, motif_length_disp, motif_factor)
 
                         for aa, pos in enumerate(motifsets[i]):
                             values = np.zeros(len(df["time"]), dtype=np.float32)
-                            value = dim_raw[pos:pos + motif_length_disp:1]
+                            value = dim_raw[pos:pos + motif_length_disp:motif_factor]
                             values[:len(value)] = value
 
                             df[str(aa)] = (values - values.mean()) / (
@@ -493,7 +495,8 @@ def plot_motifset(
                         _ = sns.lineplot(
                             ax=axes[0, 1 + i],
                             data=df_melt,
-                            errorbar=("ci", 99),
+                            # errorbar=("ci", 99),
+                            errorbar="se",
                             n_boot=1,
                             lw=1,
                             color=sns.color_palette("tab10")[
@@ -558,14 +561,9 @@ def plot_motifset(
                         )
                         axes[1, 0].add_patch(rect)
 
-                # label = (("Motif Set " + str(i + 1)))
-                if dist is not None:
-                    label = "Motif Set, k=" + str(len(motifsets)) + ", d=" + str(
-                        np.round(dist, 2))
-                else:
-                    label = "Motif Set, k=" + str(len(motifsets))
-
-                    y_labels.append(label)
+                label = (("Motif Set " + str(i + 1)))
+                # label = "Motif Set, k=" + str(len(motifsets))
+                y_labels.append(label)
 
     if len(y_labels) > 0:
         axes[1, 0].set_yticks(-np.arange(len(y_labels)) + 0.5)

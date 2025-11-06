@@ -54,7 +54,7 @@ def main():
     for filename in np.array(list(ut.filenames.keys()))[sorted_idx]:
         ds_name, length, _, _ = ut.filenames[filename]
         print(f"Running: {filename, ds_name}")
-        data = read_mat(filename)
+        data = ut.read_mat(filename)
 
         # # pyattimo
         # backend = "pyattimo"
