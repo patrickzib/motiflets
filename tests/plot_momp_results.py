@@ -48,9 +48,9 @@ MOMP_results = {
 }
 
 def test_plot():
-    points_to_plot = 10_000
+    points_to_plot = 2_000
+    momp_path = f"results/pyattimo_momp/k20/"
 
-    momp_path = f"results/pyattimo_momp/"
     for ds_name, _ in MOMP_results.items():
         if f"{ds_name}.json" in os.listdir(momp_path):
             ts = ut.read_mat(ds_name)
@@ -61,10 +61,10 @@ def test_plot():
             motif_sets = df["motiflet"][0]
             motif_length = df["motif length"][0]
             elbows = df["elbows"][0]
-            elbows.append(len(motif_sets)-1)
+            # elbows.append(len(motif_sets)-1)
             motiflets = np.array(motif_sets, dtype=object)[elbows]
 
-            fig, ax = plot_motifset(
+            plot_motifset(
                 ds_name,
                 ts,
                 motifsets=list(map(np.array, motiflets)),
@@ -75,36 +75,34 @@ def test_plot():
 
             path = f"images/datasets/MOMP_pyattimo_{ds_name.lower().replace(' ', '_')}.pdf"
             plt.savefig(path)
-            plt.show()
+            # plt.show()
 
 
-    for name, ds_name in interesting.items():
-        filename = interesting[name]
-        ts = ut.read_mat(filename)
+    for ds_name, _ in MOMP_results.items():
+        # filename = interesting[name]
+        ts = ut.read_mat(ds_name)
 
-        ml = Motiflets(ds_name, ts)
-
+        # ml = Motiflets(ds_name, ts)
         # ml.plot_dataset(
         #     max_points=points_to_plot,
         #     path=f"images/datasets/{name.lower().replace(' ', '_')}.pdf"
         # )
 
-        momp = MOMP_results[filename]
+        momp = MOMP_results[ds_name]
         motiflets = np.array([momp[0]])
-        dists = [0]
         motif_length = momp[1]
 
-        fig, ax = plot_motifset(
+        plot_motifset(
             ds_name,
             ts,
             motifsets=motiflets,
             max_points=points_to_plot,
             motif_length=motif_length,
-            show=False,
+            show=False
         )
 
-        path = f"images/datasets/MOMP_{name.lower().replace(' ', '_')}.pdf"
+        path = f"images/datasets/MOMP_MP_{ds_name.lower().replace(' ', '_')}.pdf"
         plt.savefig(path)
-        plt.show()
+    #     plt.show()
 
 

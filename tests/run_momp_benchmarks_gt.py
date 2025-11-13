@@ -11,13 +11,13 @@ import utils as ut
 
 
 deltas = [0.1]
-k_max = 10
+k_max = 20
 
 memory = {
     # key, filename, momp motif length, momp motif meaning, dataset length
     "EOG_one_hour_50_Hz": "20 GB",
     "Challenge2009TestSetA_101a": "20 GB",
-    "swtAttack7": "200 GB",
+    "swtAttack7": "20 GB",
     "swtAttack38": "20 GB",
     "BlackLeggedKittiwake": "20 GB",
     "stator_winding": "128 GB",
@@ -76,7 +76,8 @@ def main():
             "Bird12-Week3_2018_1_10",
             "FingerFlexionECoG",
             "SpainishEnergyDataset5sec",
-            "lorenzAttractorsLONG"
+            "lorenzAttractorsLONG",
+            "SynchrophasorEventsLarge"
         ]:
             continue
 
