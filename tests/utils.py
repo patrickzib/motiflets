@@ -89,7 +89,7 @@ def read_mat(filename):
 
 def run_safe(
         ds_name, series, l_range, k_max,
-        backend, subsampling=None, n_jobs=8, **kwargs):
+        backend, subsampling=None, n_jobs=-1, **kwargs):
     try:
         if run_local:
             print("\nWarning. Running locally.\n")

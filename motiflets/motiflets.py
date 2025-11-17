@@ -10,6 +10,8 @@ from ast import literal_eval
 from os.path import exists
 
 import math
+
+import numpy as np
 import pandas as pd
 import psutil
 from numba import objmode
@@ -278,7 +280,7 @@ def _sliding_dot_product(query, time_series):
     return conv[m - 1: n]
 
 
-@njit(nogil=True, fastmath=True, cache=True, parallel=True)
+@njit(nogil=True, cache=True, parallel=True)
 def compute_distances_with_knns_full(
         time_series,
         m,
@@ -404,7 +406,7 @@ def compute_upper_bound(
     return kth_extent
 
 
-@njit(fastmath=True, cache=True, nogil=True)
+@njit(cache=True, nogil=True)
 def compute_distances_with_knns_sparse(
         time_series,
         m,
@@ -547,7 +549,7 @@ def compute_distances_with_knns_sparse(
     return D_sparse, knns
 
 
-@njit(nogil=True, fastmath=True, cache=True, parallel=True)
+@njit(nogil=True, cache=True, parallel=True)
 def compute_distances_with_knns(
         time_series,
         m,
@@ -677,7 +679,7 @@ def get_radius(D_full, motifset_pos):
         i = motifset_pos[ii]
         current = np.float64(0.0)
         for jj in range(1, len(motifset_pos)):
-            if (i != jj):
+            if i != jj:
                 j = motifset_pos[jj]
                 current = max(current, D_full[i, j])
         motiflet_radius = min(current, motiflet_radius)
@@ -772,8 +774,8 @@ def get_pairwise_extent_raw(
 
     return motifset_extent
 
-
-@njit(nogil=True, fastmath=True, cache=True)
+# FIXME: adding fastmath=True breaks the code???
+@njit(cache=True)   # fastmath breaks the CODE: np.isinf does not work???
 def _argknn(
         dist, k, m, lowest_dist=np.inf, slack=0.5):
     """Finds the closest k-NN non-overlapping subsequences in candidates.
@@ -798,7 +800,7 @@ def _argknn(
 
     """
     halve_m = np.int32(m * slack)
-    dists = np.copy(dist)
+    dists = np.copy(dist).astype(np.float32)
 
     new_k = np.int32(min(len(dist) - 1, 2 * k))
     dist_pos = np.argpartition(dist, new_k)[:new_k]
@@ -812,9 +814,9 @@ def _argknn(
         pos = dist_pos[p]
         dist_sort[p] = np.inf
 
-        if (not np.isnan(dists[pos])) \
-                and (not np.isinf(dists[pos])) \
-                and (dists[pos] <= lowest_dist):
+        if (not np.isnan(dists[pos])
+                and (not np.isinf(dists[pos]))
+                and (dists[pos] < lowest_dist)):
             idx.append(pos)
 
             # exclude all trivial matches and itself
@@ -826,9 +828,9 @@ def _argknn(
     # if not enough elements found, go through the rest
     for i in range(len(idx), k):
         pos = np.argmin(dists)
-        if (not np.isnan(dists[pos])) \
-                and (not np.isinf(dists[pos])) \
-                and (dists[pos] <= lowest_dist):
+        if (not np.isnan(dists[pos])
+                and (not np.isinf(dists[pos]))
+                and (dists[pos] < lowest_dist)):
             idx.append(pos)
 
             # exclude all trivial matches

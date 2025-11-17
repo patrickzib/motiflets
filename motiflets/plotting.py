@@ -495,9 +495,9 @@ def plot_motifset(
                         _ = sns.lineplot(
                             ax=axes[0, 1 + i],
                             data=df_melt,
-                            # errorbar=("ci", 99),
-                            errorbar="se",
-                            n_boot=1,
+                            errorbar=("ci", 95),
+                            # errorbar="se",
+                            n_boot=3,
                             lw=1,
                             color=sns.color_palette("tab10")[
                                 (color_offset + i) % len(sns.color_palette("tab10"))],
