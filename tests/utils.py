@@ -252,8 +252,7 @@ def test_motiflets_scale_n(
                     print(f"\tRecomputing Extend using Window Size {l}")
                     for i, motiflet in enumerate(motiflets):
                         if motiflet:
-                            motiflet = np.array(
-                                motiflet) * subsampling  # scale up again
+                            motiflet = np.array(motiflet) * subsampling  # scale up again
                             preprocessing = np.array(
                                 [mm.distance_preprocessing(ts_orig, l)],
                                 dtype=np.float64)

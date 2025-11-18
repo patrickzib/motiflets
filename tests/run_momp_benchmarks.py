@@ -10,6 +10,12 @@ import numpy as np
 import utils as ut
 
 
+
+run_local = True
+path = "/vol/fob-wbib-vol2/wbi/schaefpa/motiflets/momp/"
+if os.path.exists(path) and os.path.isdir(path):
+    run_local = False
+
 # ks = [5, 10, 20]
 deltas = [0.1]
 
@@ -44,6 +50,12 @@ faiss_nbits = [4]
 # Annoy
 annoy_n_trees = [100]
 annoy_search_k = [-1]
+
+# 512 to 8192
+if run_local:
+    l_range = [2 ** 9]
+else:
+    l_range = list([2 ** 9, 2 ** 10, 2 ** 11, 2 ** 12, 2 ** 13])
 
 
 k_max = 10
@@ -86,7 +98,7 @@ def main():
             for efConstruction in faiss_efConstruction:
                 for efSearch in faiss_efSearch:
                     print(f"\n\tRunning faiss {faiss_index} {M} {efConstruction} {efSearch}.", flush=True)
-                    ut.ut.run_safe(
+                    ut.run_safe(
                         filename,
                         data,
                         l_range,
