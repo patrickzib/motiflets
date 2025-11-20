@@ -71,7 +71,6 @@ def test_plot():
 
         for motif_length in [512, 1024, 2048, 4096]:
             best_motiflet, min_extent = compute_knn(
-                ds_name,
                 ts.copy(),
                 motiflets,
                 motif_length,
@@ -94,7 +93,6 @@ def test_plot():
 
 @njit(cache=True)
 def compute_knn(
-        ds_name,
         ts,
         motiflets,
         m,

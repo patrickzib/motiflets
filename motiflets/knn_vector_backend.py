@@ -7,6 +7,7 @@ from warnings import simplefilter
 import numpy as np
 import psutil
 from numba import set_num_threads, njit, prange, get_num_threads
+from distances import znormed_euclidean_distance_single, sliding_mean_std
 
 simplefilter(action="ignore", category=FutureWarning)
 simplefilter(action="ignore", category=UserWarning)
@@ -45,7 +46,6 @@ class VectorSearchNearestNeighbors:
         self.verbose = verbose
 
         #### faiss
-
         self.faiss_index = None
         if "faiss_index" in kwargs:
             self.faiss_index = kwargs["faiss_index"]
@@ -73,7 +73,6 @@ class VectorSearchNearestNeighbors:
             = kwargs["annoy_n_trees"] if "annoy_n_trees" in kwargs else 10
         self.annoy_search_k \
             = kwargs["annoy_search_k"] if "annoy_search_k" in kwargs else -1
-
 
         #### pynndescent
 
@@ -140,8 +139,8 @@ class VectorSearchNearestNeighbors:
 
         if self.verbose:
             print(f"\tApplying exclusion Zone")
-            print("\t", knns[0])
-            print("\t", knns[-1])
+            #print("\t", knns[0])
+            #print("\t", knns[-1])
 
         D_exact, knns_exact = apply_exclusion_zone(
             X,
@@ -385,44 +384,6 @@ class VectorSearchNearestNeighbors:
         return D, index_create_time, index_search_time, knns, memory_usage
 
 
-@njit(fastmath=True, cache=True, inline='always')
-def znormed_euclidean_distance_single(a, b, a_i, b_j, means, stds):
-    """ Implementation of z-normalized Euclidean distance """
-    m = len(a)
-    z = 2 * m * (1 - (np.dot(a, b) - m * means[a_i] * means[b_j]) / (
-            m * stds[a_i] * stds[b_j]))
-    return np.sqrt(z)
-
-
-@njit(fastmath=True, cache=True)
-def sliding_mean_std(series, m):
-    end = max(1, series.shape[0] - m + 1)
-    stds = np.zeros(end)
-    means = np.zeros(end)
-    window = series[0:m]
-    series_sum = np.sum(window)
-    square_sum = np.sum(np.multiply(window, window))
-
-    r_window_length = 1.0 / m
-    mean = series_sum * r_window_length
-    buf = np.sqrt(max(square_sum * r_window_length - mean * mean, 0.0))
-    stds[0] = buf if buf > STD_THRESHOLD else 1
-    means[0] = mean
-
-    for w in range(1, end):
-        series_sum += series[w + m - 1] - series[w - 1]
-        mean = series_sum * r_window_length
-        square_sum += (
-                series[w + m - 1] * series[w + m - 1]
-                - series[w - 1] * series[w - 1]
-        )
-        buf = np.sqrt(max(square_sum * r_window_length - mean * mean, 0.0))
-        stds[w] = buf if buf > STD_THRESHOLD else 1
-        means[w] = mean
-
-    return means, stds
-
-
 @njit(fastmath=True, cache=True)
 def make_windows(X, window_size, n_chunks, chunk_size):
     X_windows = np.full((n_chunks, window_size), np.inf, dtype=X.dtype)
@@ -502,7 +463,7 @@ def apply_exclusion_zone(X, m, D_lb, knns_lb, k, slack=0.5):
             if j > -1:
                 # Re-rank based on z-normalized Euclidean distance
                 D[i, a] = znormed_euclidean_distance_single(
-                    query, X[j:j + m], i, j, means, stds)
+                    query, X[j:j + m], i, j, (means, stds))
             else:
                 D[i, a] = np.inf
 

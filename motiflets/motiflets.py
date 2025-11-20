@@ -726,7 +726,7 @@ def get_pairwise_extent(D_full, motifset_pos, upperbound=np.inf):
     return motifset_extent
 
 
-@njit(fastmath=True, cache=True, nogil=True)
+@njit(cache=True, nogil=True)
 def get_pairwise_extent_raw(
         series, motifset_pos, motif_length,
         distance_single, preprocessing, upperbound=np.inf):
@@ -841,7 +841,7 @@ def _argknn(
     return np.array(idx, dtype=np.int32)
 
 
-@njit(fastmath=True, cache=True, nogil=True)
+@njit(cache=True, nogil=True)
 def get_approximate_k_motiflet(
         ts, m, k, D, knns,
         distance_single=None,
@@ -1324,6 +1324,7 @@ def search_k_motiflets_elbow(
                  index_search_time,
                  post_process_time,
                  memory_usage) = backend_imlp.compute_knns(data_raw)
+
             else:
                 backend = check_valid_backend(backend, data_raw, n)
 
@@ -1365,7 +1366,6 @@ def search_k_motiflets_elbow(
 
             del D_full
             del knns
-
     else:
         raise ValueError(
             'Unknown backend: ' + backend + '. ' +
