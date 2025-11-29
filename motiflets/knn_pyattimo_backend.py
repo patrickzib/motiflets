@@ -90,11 +90,12 @@ class PyAttimoNearestNeighbors:
                       f"\n\t\tmax_memory={attimo_args['max_memory']}, "
                       f"\n\t\texclusion_zone={attimo_args['exclusion_zone']}, "
                       f"\n\t\tstop_on_threshold={attimo_args['stop_on_threshold']}, "
-                      f"\n\t\tfraction_threshold=log(n)/n")
+                      f"\n\t\tfraction_threshold=log(n)/n", flush=True)
 
         m_iter = pyattimo.MotifletsIterator(**attimo_args)
 
         try:
+            print("\tComputing motiflets with PyAttimo...", flush=True)
             for mot in m_iter:
                 if verbose:
                     print(f"\t\t{mot}", flush=True)

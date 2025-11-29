@@ -188,7 +188,7 @@ def test_motiflets_scale_n(
 
     last_time = -1
 
-    results = []
+    # results = []
 
     last_n = 0
     for n in n_range:
@@ -267,6 +267,7 @@ def test_motiflets_scale_n(
 
                 duration = time.time() - start
                 memory_usage = mm.memory_usage
+
                 current = [ts_orig.shape[-1],
                            l,
                            backend_name,
@@ -275,11 +276,19 @@ def test_motiflets_scale_n(
                            extents,
                            motiflets,
                            elbow_points]
-
-                results.append(current)
                 df.loc[len(df.index)] = current
-
                 df.to_json(new_filename + ".json")
+
+                current_single = [ts_orig.shape[-1],
+                           l,
+                           backend_name,
+                           duration,
+                           memory_usage,
+                           float(extents[-1]),
+                           motiflets[-1],
+                           elbow_points]
+                df_single.loc[len(df_single.index)] = current_single
+                df_single.to_csv(new_filename + ".csv", index=False)
 
                 print(f"\tDiscovered motiflets in {duration:0.2f} seconds")
                 print("\t'length', 'motif length', 'backend', 'time in s', "

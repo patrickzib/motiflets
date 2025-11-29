@@ -450,6 +450,8 @@ def plot_motifset(
         )
     sns.despine()
 
+    y_labels = []
+
     if motifsets is not None:
         for i, motifset in enumerate(motifsets_sampled):
             if motifset is not None:
@@ -505,7 +507,6 @@ def plot_motifset(
                             y="value")
 
         gt_count = 0
-        y_labels = []
         motif_set_count = 0 if motifsets is None else len(motifsets)
 
         for aaa, column in enumerate(ground_truth):

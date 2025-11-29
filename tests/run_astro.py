@@ -1,5 +1,8 @@
-# import psutil
-# import pandas as pd
+import sys
+
+sys.path.insert(0, "../")
+sys.path.insert(0, "../../")
+
 import utils as ut
 from motiflets.plotting import *
 
@@ -14,6 +17,7 @@ def read_data():
     file = 'ASTRO.csv'  # Dataset Length n:  269286
     ds_name = "ASTRO"
     series = pd.read_csv(path+file, header=None).squeeze('columns')
+    print(f"Loaded dataset {ds_name} with length {len(series)}")
     return ds_name, series
 
 
@@ -31,8 +35,8 @@ def run_motiflets_scale_n(
         delta = None,
         subsampling = None
     ):
-    n_range = 100_000 * np.arange(1, 200, 1)
-    l_range = [70 * 38]  # roughly 6.5 seconds
+    n_range = [300_000]
+    l_range = [4096]
     k_max = 10  # 40
 
     for backend in backends:

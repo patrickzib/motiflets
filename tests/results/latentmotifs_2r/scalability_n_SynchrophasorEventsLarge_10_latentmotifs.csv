@@ -1,0 +1,2 @@
+length,motif length,backend,time in s,memory in MB,extent,motiflet,elbows
+62208000,512,LatentMotif 2r,23116.75772666931,243998.05859375,inf,[],-1

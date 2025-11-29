@@ -1298,6 +1298,10 @@ def search_k_motiflets_elbow(
 
     if backend in ["faiss", "annoy", "pynndescent",
                    "pyattimo", "default", "scalable", "sparse"]:
+
+        print(f"Using backend: {backend} for k-Motiflet search with motif length: {m}")
+        print(f"Jobs used: {n_jobs}")
+
         if backend == "pyattimo":
             backend_imlp = PyAttimoNearestNeighbors(
                     m, k_max_,

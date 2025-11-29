@@ -52,7 +52,14 @@ def test_plot():
     for ds_name in datasets:
 
         if ds_name  in [
-            "SpainishEnergyDataset"
+            # "Lab_FD_061014",
+            #"solarwind",
+            #"Bird12-Week3_2018_1_10",
+            "FingerFlexionECoG",
+            #"SpainishEnergyDataset5sec",
+            ##"lorenzAttractorsLONG",
+            #"recorddata",
+            #"SynchrophasorEventsLarge",
         ]:
             df = pd.DataFrame(columns=[
                 "length",
@@ -67,15 +74,20 @@ def test_plot():
 
             path1 = f"results/latentmotifs_2r/scalability_n_{ds_name}_10_latentmotifs.csv"
             path2 = f"results/latentmotifs_r2/scalability_n_{ds_name}_10_latentmotifs.csv"
-            if os.path.exists(path1) and os.path.exists(path2):
+            if os.path.exists(path1):
                 print("Exists:", path1, path2)
                 latent2r = pd.read_csv(path1)
-                latentr2 = pd.read_csv(path2)
-                motiflet_r2 = set(flatten_with_empties(latentr2["motiflet"].apply(parse_array).to_numpy()))
-                motiflet_2r = set(flatten_with_empties(latent2r["motiflet"].apply(parse_array).to_numpy()))
-                motiflets = np.concatenate((list(motiflet_r2), list(motiflet_2r)))
-                motiflets = motiflets.astype(np.int32)
+                motiflet_2r = set(flatten_with_empties(
+                    latent2r["motiflet"].apply(parse_array).to_numpy()))
 
+                if os.path.exists(path2):
+                    latentr2 = pd.read_csv(path2)
+                    motiflet_r2 = set(flatten_with_empties(
+                        latentr2["motiflet"].apply(parse_array).to_numpy()))
+                    motiflets = np.concatenate((list(motiflet_r2), list(motiflet_2r)))
+                    motiflets = motiflets.astype(np.int32)
+                else:
+                    motiflets = np.array(list(motiflet_2r)).astype(np.int32)
 
                 for i, motif_length in enumerate([512, 1024, 2048, 4096]):
                     print(f"Processing dataset {ds_name} with motif length {motif_length}")
@@ -89,12 +101,39 @@ def test_plot():
                         best_motiflet = []
                         min_extent = np.inf
 
+                    if motif_length in latent2r["motif length"].values:
+                        if os.path.exists(path2):
+                            time = max(latent2r["time in s"].values[i], latentr2["time in s"].values[i])
+                            memory = max(latent2r["memory in MB"].values[i], latentr2["memory in MB"].values[i])
+                        else:
+                            time = latent2r["time in s"].values[i]
+                            memory = latent2r["memory in MB"].values[i]
+                    else:
+                        if os.path.exists(path2):
+                            last_time = max(latent2r["time in s"].values[-1], latentr2["time in s"].values[-1])
+                            last_memory = max(latent2r["memory in MB"].values[-1], latentr2["memory in MB"].values[-1])
+                        else:
+                            last_time = latent2r["time in s"].values[-1]
+                            last_memory = latent2r["memory in MB"].values[-1]
+
+                        last_length = latent2r["motif length"].values[-1]
+
+                        factor = motif_length / last_length
+                        time = last_time * factor * 2
+                        memory = last_memory * factor
+
+                        print(f"Extrapolating time and memory for motif length {motif_length} "
+                              f"based on last known length {last_length}")
+                        print(f"Factor: {factor}")
+                        print(f"\tEstimated time: {time}, Estimated memory: {memory}")
+
+
                     current = [
                         len(ts),
                         motif_length,
                         "LatentMotif",
-                        max(latent2r["time in s"][i], latentr2["time in s"][i]),
-                        max(latent2r["memory in MB"][i], latentr2["memory in MB"][i]),
+                        time,
+                        memory,
                         best_motiflet,
                         min_extent
                     ]
