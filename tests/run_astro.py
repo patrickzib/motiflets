@@ -14,7 +14,7 @@ mpl.rcParams['figure.dpi'] = 150
 path = "../datasets/original/"
 
 def read_data():
-    file = 'ASTRO.csv'  # Dataset Length n:  269286
+    file = 'ASTRO.csv'
     ds_name = "ASTRO"
     series = pd.read_csv(path+file, header=None).squeeze('columns')
     print(f"Loaded dataset {ds_name} with length {len(series)}")
@@ -36,7 +36,7 @@ def run_motiflets_scale_n(
         subsampling = None
     ):
     n_range = [300_000]
-    l_range = [4096]
+    l_range = [4 * 4096]
     k_max = 10  # 40
 
     for backend in backends:

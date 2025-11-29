@@ -68,17 +68,17 @@ def main():
         print(f"Running: {filename, ds_name}")
         data = ut.read_mat(filename)
 
-        # # pyattimo
-        # backend = "pyattimo"
-        # for delta in deltas:
-        #     for subsampling in [16, 32, 64]:
-        #         ut.run_safe(
-        #                filename, data, l_range, k_max, backend,
-        #                pyattimo_delta=delta, subsampling=subsampling
-        #         )
+        # pyattimo
+        backend = "pyattimo"
+        for delta in deltas:
+            # for subsampling in [16, 32, 64]:
+            ut.run_safe(
+                   filename, data, l_range, k_max, backend,
+                   pyattimo_delta=delta # , subsampling=subsampling
+            )
 
         # Running FAISS
-        backend = "faiss"
+        # backend = "faiss"
 
         # faiss_index = "LSH"
         # for nbits in faiss_nbits:
@@ -93,22 +93,22 @@ def main():
         #         faiss_nbits=nbits,
         #      )
 
-        faiss_index = "HNSW"
-        for M in faiss_M:
-            for efConstruction in faiss_efConstruction:
-                for efSearch in faiss_efSearch:
-                    print(f"\n\tRunning faiss {faiss_index} {M} {efConstruction} {efSearch}.", flush=True)
-                    ut.run_safe(
-                        filename,
-                        data,
-                        l_range,
-                        k_max,
-                        backend,
-                        faiss_index=faiss_index,
-                        faiss_M=M,
-                        faiss_efConstruction=efConstruction,
-                        faiss_efSearch=efSearch
-                        )
+        # faiss_index = "HNSW"
+        # for M in faiss_M:
+        #     for efConstruction in faiss_efConstruction:
+        #         for efSearch in faiss_efSearch:
+        #             print(f"\n\tRunning faiss {faiss_index} {M} {efConstruction} {efSearch}.", flush=True)
+        #             ut.run_safe(
+        #                 filename,
+        #                 data,
+        #                 l_range,
+        #                 k_max,
+        #                 backend,
+        #                 faiss_index=faiss_index,
+        #                 faiss_M=M,
+        #                 faiss_efConstruction=efConstruction,
+        #                 faiss_efSearch=efSearch
+        #                 )
 
         # faiss_index = "IVF"
         # for nprobe in faiss_nprobe:

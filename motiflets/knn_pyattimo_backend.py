@@ -1,8 +1,5 @@
 import os
-from tabnanny import verbose
-
 import psutil
-
 import numpy as np
 
 
@@ -97,7 +94,7 @@ class PyAttimoNearestNeighbors:
         try:
             print("\tComputing motiflets with PyAttimo...", flush=True)
             for mot in m_iter:
-                if verbose:
+                if self.verbose:
                     print(f"\t\t{mot}", flush=True)
 
                 test_k = mot.support
@@ -107,7 +104,7 @@ class PyAttimoNearestNeighbors:
                     # TODO: Use mot.lower_bound for confidence scores
                     k_motiflet_candidates[test_k] = np.array(mot.indices)
 
-            if verbose:
+            if self.verbose:
                 print(f"\t{len(k_motiflet_candidates[-1])}-Motiflet"
                       f"\n\t\tPos: {k_motiflet_candidates[-1]} "
                       f"\n\t\tExtent: {k_motiflet_distances[-1]}", flush=True)

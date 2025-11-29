@@ -183,8 +183,12 @@ def test_motiflets_scale_n(
 
     df = pd.DataFrame(
         columns=['length', 'motif length', 'backend', 'time in s', 'memory in MB',
-                 "extent",
-                 "motiflet", "elbows"])
+                 "extent", "motiflet", "elbows"])
+
+    df_single = pd.DataFrame(
+        columns=['length', 'motif length', 'backend', 'time in s', 'memory in MB',
+                 "extent", "motiflet", "elbows"])
+
 
     last_time = -1
 
