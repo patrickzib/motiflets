@@ -1,11 +1,11 @@
-# import psutil
-# import pandas as pd
-from datetime import datetime
+import sys
+
+sys.path.insert(0, "../../")
+sys.path.insert(0, "../")
 
 import scipy.io as sio
 
 import utils as ut
-from motiflets.motiflets import *
 from motiflets.plotting import *
 
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -28,7 +28,8 @@ def test_plot_data():
 
 
 def read_penguin_1m_channel0():
-    return read_penguin_1m(channel="X-Acc")
+    ds_name, series = read_penguin_1m(channel="X-Acc")
+    return ds_name, series.T
 
 
 def read_penguin_1m(channel=None):
@@ -41,7 +42,7 @@ def read_penguin_1m(channel=None):
     ds_name = "Penguin1M"
 
     if channel is not None:
-        return ds_name, series[channel]
+        return ds_name, series[[channel]]
 
     return ds_name, series
 
@@ -51,12 +52,12 @@ def read_penguin_3m():
     ds_name = "Penguin3M"
     test = sio.loadmat(path + 'penguinLabel.mat')
     series = test["data"].T
-    return ds_name, series[2, :]
+    return ds_name, pd.DataFrame(series[2, :]).T
 
 
 def test_plotting():
     ds_name, ts = read_penguin_1m()
-    ts = ts.iloc[497699 - 50_000: 497699 + 50_000, -2].T
+    ts = ts.iloc[497699 - 50_000: 497699 + 50_000, -2]
 
     mm = Motiflets(ds_name, ts)
     mm.plot_dataset(path="results/images/penguin_data_raw.pdf")
@@ -65,12 +66,11 @@ def test_plotting():
 def run_motiflets_scale_n(
         backends=["pyattimo"],
         delta=None,
-        subsampling=None,
-        use_1m=True
+        use_1m=False,
+        k_max = 10,
 ):
-    n_range = 100_000 * np.arange(1, 200, 1)
-    l_range = [125]  # 23
-    k_max = 10  # 20
+    n_range = [3 * 10^6]
+    l_range = [32, 64, 23]
 
     for backend in backends:
         ut.test_motiflets_scale_n(
@@ -78,59 +78,9 @@ def run_motiflets_scale_n(
             n_range,
             l_range,
             k_max,
-            backend,
-            pyattimo_delta=delta,
-            subsampling=subsampling
+            backend=backend,
+            pyattimo_delta=delta
         )
-
-
-# def test_motiflets_scale_k():
-#     timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
-#
-#     df = pd.DataFrame(columns=['length', 'backend', 'time in s', 'memory in MB'])
-#
-#     results = []
-#
-#     n = 25_000
-#     k_range = np.arange(5, 45, 5)
-#     for k_max in k_range:
-#         for backend in ["default", "scalable", "pyattimo", "extent"]:
-#             start = time.time()
-#             print(backend, k_max)
-#             ds_name, ts = read_penguin_1m()
-#             ts = ts.iloc[497699 - n: 497699 + n, 0].T
-#             print("Size of DS: ", ts.shape)
-#
-#             l = 125  # 23
-#             mm = Motiflets(ds_name, ts, backend=backend, n_jobs=64)
-#             dists, _, _ = mm.fit_k_elbow(
-#                 k_max, l, plot_elbows=True,
-#                 plot_motifs_as_grid=True)
-#
-#             duration = time.time() - start
-#             memory_usage = mm.memory_usage
-#             extent = dists[-1]
-#
-#             current = [k_max, backend, duration, memory_usage, extent]
-#
-#             results.append(current)
-#             df.loc[len(df.index)] = current
-#
-#             new_filename = f"results/scalability_k_{timestamp}.csv"
-#
-#             df.to_csv(new_filename, index=False)
-#             print("\tDiscovered motiflets in", duration, "seconds")
-#             print("\t", current)
-#
-#     print(results)
-#
-#     # mm.plot_motifset(path="results/images/penguin_motiflets.pdf")
-#     # fig, ax = plot_motifsets(
-#     #    "ECG",
-#     #    ts,
-#     #    motifsets=motifs,
-#     #    motif_length=l,
-#     #    show=False)
 
 
 def main():

@@ -1,7 +1,7 @@
 import sys
 
-sys.path.insert(0, "../")
 sys.path.insert(0, "../../")
+sys.path.insert(0, "../")
 
 import utils as ut
 from motiflets.plotting import *
@@ -32,12 +32,11 @@ def test_plot_data():
 
 def run_motiflets_scale_n(
         backends=["pyattimo"],
-        delta = None,
-        subsampling = None
+        delta=None,
+        k_max = 10,
     ):
-    n_range = [300_000]
-    l_range = [4 * 4096]
-    k_max = 10  # 40
+    n_range = [1_151_350]
+    l_range = [512, 1024, 2048, 4096, 8096]
 
     for backend in backends:
         ut.test_motiflets_scale_n(
@@ -45,9 +44,8 @@ def run_motiflets_scale_n(
             n_range,
             l_range,
             k_max,
-            backend,
-            pyattimo_delta=delta,
-            subsampling=subsampling
+            backend=backend,
+            pyattimo_delta=delta
         )
 
 

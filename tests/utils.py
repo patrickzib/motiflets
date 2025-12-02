@@ -122,7 +122,8 @@ def force_get(key, kwargs):
     if key in kwargs:
         return kwargs[key]
     else:
-        raise ValueError(f"Parameter '{key}' not set")
+        return None
+        # raise ValueError(f"Parameter '{key}' not set")
 
 
 def find_dominant_window_sizes(X, offset=0.05):

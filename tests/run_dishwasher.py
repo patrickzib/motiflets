@@ -1,5 +1,8 @@
-# import psutil
-# import pandas as pd
+import sys
+
+sys.path.insert(0, "../../")
+sys.path.insert(0, "../")
+
 import utils as ut
 from motiflets.motiflets import *
 from motiflets.plotting import *
@@ -13,9 +16,10 @@ mpl.rcParams['figure.dpi'] = 150
 path = "../datasets/original/"
 
 def read_data():
-    file = 'dishwasher.txt'  # Dataset Length n:  269286
+    file = 'dishwasher.txt'
     ds_name = "Dishwasher"
     series = pd.read_csv(path+file, header=None).squeeze('columns')
+    print(f"Loaded dataset {ds_name} with length {len(series)}")
     return ds_name, series
 
 def test_plot_data():
@@ -29,12 +33,11 @@ def test_plot_data():
 
 def run_motiflets_scale_n(
         backends=["pyattimo"],
-        delta = None,
-        subsampling = None
+        delta=None,
+        k_max = 10,
     ):
-    n_range = 50_000 * np.arange(1, 200, 1)
-    l_range = [125 * 8]  # roughly 6.5 seconds
-    k_max = 10 # 20  # 40
+    n_range = [245_152]
+    l_range = [512, 1024, 2048, 4096]
 
 
     for backend in backends:
@@ -43,9 +46,8 @@ def run_motiflets_scale_n(
             n_range,
             l_range,
             k_max,
-            backend,
-            pyattimo_delta=delta,
-            subsampling=subsampling
+            backend=backend,
+            pyattimo_delta=delta
         )
 
 

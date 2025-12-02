@@ -1,3 +1,8 @@
+import sys
+
+sys.path.insert(0, "../../")
+sys.path.insert(0, "../")
+
 import utils as ut
 from motiflets.plotting import *
 
@@ -12,6 +17,7 @@ path = "../datasets/experiments/"
 def read_data():
     series = pd.read_csv(path + "arrhythmia_subject231_channel0.csv")
     ds_name = "Arrhythmia"
+    print(f"Loaded dataset {ds_name} with length {series.shape}")
     return ds_name, series.iloc[:, 0].T
 
 
@@ -27,11 +33,10 @@ def test_plot_data():
 def run_motiflets_scale_n(
         backends=["pyattimo"],
         delta=None,
-        subsampling=None
+        k_max = 10,
 ):
-    n_range = 100_000 * np.arange(1, 200, 1)
-    l_range = [200]
-    k_max = 10  # 20
+    n_range = [650_000]
+    l_range = [512, 1024, 2048, 4096]
 
     for backend in backends:
         ut.test_motiflets_scale_n(
@@ -39,9 +44,8 @@ def run_motiflets_scale_n(
             n_range,
             l_range,
             k_max,
-            backend,
-            pyattimo_delta=delta,
-            subsampling=subsampling
+            backend=backend,
+            pyattimo_delta = delta
         )
 
 

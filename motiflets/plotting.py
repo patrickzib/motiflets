@@ -439,6 +439,7 @@ def plot_motifset(
         offset -= 1.2 * (np.max(dim_raw_sampled) - np.min(dim_raw_sampled))
         tick_offsets.append(offset)
 
+        # dim_raw_sampled[dim_raw_sampled > 3] = 3
         _ = sns.lineplot(
             x=data_index_sampled,
             y=dim_raw_sampled + offset,
@@ -448,6 +449,8 @@ def plot_motifset(
             errorbar=("ci", None),
             estimator=None
         )
+
+
     sns.despine()
 
     y_labels = []
@@ -480,7 +483,7 @@ def plot_motifset(
                         motif_factor = 1
                         if motif_length_disp > max_points:
                             motif_factor = int(max(1, np.floor(motif_length_disp / max_points)))
-                            print(f"factor{motif_factor}")
+                            print(f"factor {motif_factor}")
 
                         df = pd.DataFrame()
                         df["time"] = range(0, motif_length_disp, motif_factor)

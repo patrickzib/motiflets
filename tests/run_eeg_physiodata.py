@@ -37,10 +37,11 @@ def test_plot_data():
 
 def run_motiflets_scale_n(
         backends=["pyattimo"],
+        delta=None,
+        k_max = 10,
 ):
-    n_range = [300_000]
-    l_range = [25 * 25]  # roughly 6.5 seconds
-    k_max = 10  # 20
+    n_range = [269_287]
+    l_range = [512, 1024, 2048, 4096]
 
     for backend in backends:
         ut.test_motiflets_scale_n(
@@ -48,7 +49,8 @@ def run_motiflets_scale_n(
             n_range,
             l_range,
             k_max,
-            backend=backend
+            backend=backend,
+            pyattimo_delta=delta
         )
 
 

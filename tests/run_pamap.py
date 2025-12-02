@@ -1,3 +1,8 @@
+import sys
+
+sys.path.insert(0, "../../")
+sys.path.insert(0, "../")
+
 import matplotlib as mpl
 
 import utils as ut
@@ -34,7 +39,8 @@ def test_plot_data():
     selection = [126]  # Outdoor
 
     ds_name, series = read_data(selection)
-    ts = series.time_series[0]
+    ts = series
+    print(f"Loaded dataset PAMAP with length {len(ts)}")
 
     ml = Motiflets(ds_name, ts)
     points_to_plot = 10_000
@@ -45,12 +51,11 @@ def test_plot_data():
 
 def run_motiflets_scale_n(
         backends=["pyattimo"],
-        delta = None,
-        subsampling=None
+        delta=None,
+        k_max = 10,
     ):
-    n_range = 50_000 * np.arange(1, 200, 1)
-    l_range = [200]
-    k_max = 10
+    n_range = [173_875]
+    l_range = [512, 1024, 2048, 4096]
 
     for backend in backends:
         ut.test_motiflets_scale_n(
@@ -58,9 +63,8 @@ def run_motiflets_scale_n(
             n_range,
             l_range,
             k_max,
-            backend,
-            pyattimo_delta=delta,
-            subsampling=subsampling
+            backend=backend,
+            pyattimo_delta=delta
         )
 
 
