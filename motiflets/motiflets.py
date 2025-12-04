@@ -11,9 +11,7 @@ from os.path import exists
 
 import math
 
-import numpy as np
 import pandas as pd
-import psutil
 from numba import objmode
 from numba import types
 from numba.typed import Dict, List
@@ -239,8 +237,8 @@ def read_dataset(dataset, sampling_factor=10000):
 
     return zscore(data)
 
-
-@njit(fastmath=True, cache=True)
+# fastmath=True,
+@njit(cache=True)
 def _sliding_dot_product(query, time_series):
     """Compute a sliding dot-product using the Fourier-Transform
 

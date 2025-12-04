@@ -8,7 +8,7 @@ import numpy as np
 from numba import njit
 
 
-@njit(fastmath=True, cache=True, nogil=True)
+@njit(fastmath=True, cache=True)
 def sliding_csum(ts, m):
     """
     Computes the sliding cumulative sum of squares of a time series with a
@@ -107,7 +107,7 @@ def cosine_distance(dot_rolled, n, m, csumsq, order, halve_m):
     return dist
 
 
-@njit(fastmath=True, cache=True, nogil=True)
+@njit(fastmath=True, cache=True)
 def sliding_mean_std(ts, m):
     """Computes the incremental mean, std, given a time series and windows of length m.
 
@@ -144,7 +144,7 @@ def sliding_mean_std(ts, m):
     return [moving_mean, moving_std]
 
 
-@njit(fastmath=True, cache=True, nogil=True)
+@njit(fastmath=True, cache=True)
 def znormed_euclidean_distance(dot_rolled, n, m, preprocessing, order, halve_m):
     """ Implementation of z-normalized Euclidean distance """
     means, stds = preprocessing
@@ -161,7 +161,7 @@ def znormed_euclidean_distance(dot_rolled, n, m, preprocessing, order, halve_m):
     return dist
 
 
-@njit(fastmath=True, cache=True, nogil=True, inline='always')
+@njit(fastmath=True, cache=True)
 def znormed_euclidean_distance_single(a, b, a_i, b_j, preprocessing):
     """ Implementation of z-normalized Euclidean distance """
     means, stds = preprocessing
@@ -170,20 +170,20 @@ def znormed_euclidean_distance_single(a, b, a_i, b_j, preprocessing):
              m * stds[a_i] * stds[b_j]))
 
 
-@njit(fastmath=True, cache=True, nogil=True, inline='always')
+@njit(fastmath=True, cache=True)
 def euclidean_distance_single(a, b, *args):
     """ Implementation of the Euclidean distance """
     diff = (a - b)
     return np.dot(diff, diff)
 
 
-@njit(fastmath=True, cache=True, nogil=True, inline='always')
+@njit(fastmath=True, cache=True)
 def cosine_distance_single(a, b, a_i, b_j, preprocessing):
     dist = 1 - np.dot(a, b) / (preprocessing[a_i] + preprocessing[b_j])
     return dist
 
 
-@njit(fastmath=True, cache=True, nogil=True, inline='always')
+@njit(fastmath=True, cache=True)
 def complexity_invariant_distance_single(a, b, a_i, b_j, preprocessing):
     """ Implementation of the Complexity Invariant Distance (CID) """
     _, ce = preprocessing

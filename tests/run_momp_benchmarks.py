@@ -55,10 +55,10 @@ annoy_search_k = [-1]
 if run_local:
     l_range = [2 ** 9]
 else:
-    l_range = list([2 ** 9, 2 ** 10, 2 ** 11, 2 ** 12, 2 ** 13])
+    l_range = list([2 ** 9, 2 ** 10, 2 ** 11, 2 ** 12])
 
 
-k_max = 10
+k_max = 3
 
 def main():
     lengths = np.array([properties[-1] for properties in list(ut.filenames.values())])
@@ -69,13 +69,13 @@ def main():
         data = ut.read_mat(filename)
 
         # pyattimo
-        backend = "pyattimo"
-        for delta in deltas:
-            # for subsampling in [16, 32, 64]:
-            ut.run_safe(
-                   filename, data, l_range, k_max, backend,
-                   pyattimo_delta=delta # , subsampling=subsampling
-            )
+        # backend = "pyattimo"
+        # for delta in deltas:
+        #     # for subsampling in [16, 32, 64]:
+        #     ut.run_safe(
+        #            filename, data, l_range, k_max, backend,
+        #            pyattimo_delta=delta # , subsampling=subsampling
+        #     )
 
         # Running FAISS
         # backend = "faiss"
@@ -177,10 +177,10 @@ def main():
         #          )
 
         # scalable
-        # backend = "scalable"
-        # ut.run_safe(
-        #   filename, data, l_range, k_max, backend, subsampling=10
-        # )
+        backend = "scalable"
+        ut.run_safe(
+          filename, data, l_range, k_max, backend # , subsampling=10
+        )
 
         # # subsampling
         # backend = "scalable"

@@ -73,11 +73,16 @@ class PyAttimoNearestNeighbors:
         }
 
         if self.pyattimo_delta:
+            #attimo_args.update({
+            #    'delta': self.pyattimo_delta,
+            #    'stop_on_threshold': True,
+            #    'fraction_threshold': np.log(n) / n,
+            #})
+
             attimo_args.update({
                 'delta': self.pyattimo_delta,
-                'stop_on_threshold': True,
-                'fraction_threshold': np.log(n) / n,
-            })
+                'stop_on_threshold': False,
+             })
 
             if self.verbose:
                 print(f"\tPyAttimo: Setting "
@@ -87,7 +92,8 @@ class PyAttimoNearestNeighbors:
                       f"\n\t\tmax_memory={attimo_args['max_memory']}, "
                       f"\n\t\texclusion_zone={attimo_args['exclusion_zone']}, "
                       f"\n\t\tstop_on_threshold={attimo_args['stop_on_threshold']}, "
-                      f"\n\t\tfraction_threshold=log(n)/n", flush=True)
+                      # f"\n\t\tfraction_threshold=log(n)/n", flush=True
+                , flush=True)
 
         m_iter = pyattimo.MotifletsIterator(**attimo_args)
 

@@ -66,8 +66,7 @@ class LatentMotif(object):
         freq : float
             Frequency score. Measures the similarity of the given patterns to the internal set.
         """
-        dist = np.sum((self.set_[:, np.newaxis, :] - patterns[np.newaxis, ...]) ** 2,
-                      axis=2)
+        dist = np.sum((self.set_[:, np.newaxis, :] - patterns[np.newaxis, ...]) ** 2, axis=2)
         exp_dist = np.exp(-self.alpha / self.radius * dist)
         freq = 1 / (self.n_patterns * self.set_size_) * np.sum(exp_dist)
         return freq
@@ -86,12 +85,9 @@ class LatentMotif(object):
             Penalty score. 
         """
         if self.n_patterns > 1:
-            dist = np.sum((patterns[:, np.newaxis, :] - patterns[np.newaxis, ...]) ** 2,
-                          axis=2)
-            pen_m = np.where(dist < 2 * self.radius,
-                             (1 - dist / (2 * self.radius)) ** 2, 0)
-            pen = 2 / (self.n_patterns * (self.n_patterns - 1)) * np.sum(
-                np.triu(pen_m, k=1))
+            dist = np.sum((patterns[:, np.newaxis, :] - patterns[np.newaxis, ...]) ** 2, axis=2)
+            pen_m = np.where(dist < 2 * self.radius, (1 - dist / (2 * self.radius)) ** 2, 0)
+            pen = 2 / (self.n_patterns * (self.n_patterns - 1)) * np.sum(np.triu(pen_m, k=1))
         else:
             pen = 0
         return pen
@@ -127,9 +123,7 @@ class LatentMotif(object):
         """
         diff = self.set_[:, np.newaxis, :] - patterns[np.newaxis, ...]
         exp_dist = np.exp(-self.alpha / self.radius * np.sum(diff ** 2, axis=2))
-        div_freq = -2 * self.alpha / (
-                    self.n_patterns * self.set_size_ * self.radius) * np.sum(
-            exp_dist[..., np.newaxis] * diff, axis=0)
+        div_freq = -2 * self.alpha / (self.n_patterns * self.set_size_ * self.radius) * np.sum(exp_dist[..., np.newaxis] * diff, axis=0)
         return div_freq
 
     def _pen_derivative(self, patterns):
@@ -148,9 +142,7 @@ class LatentMotif(object):
         diff = patterns[:, np.newaxis, :] - patterns[np.newaxis, ...]
         dist = np.sum(diff ** 2, axis=2)
         pen_m = np.where(dist < 2 * self.radius, 2 * self.radius - dist, 0)
-        div_pen = -2 / (self.radius ** 2 * self.n_patterns * (
-                    self.n_patterns - 1)) * np.sum(pen_m[..., np.newaxis] * diff,
-                                                   axis=0)
+        div_pen = -2 / (self.radius ** 2 * self.n_patterns * (self.n_patterns - 1)) * np.sum(pen_m[..., np.newaxis] * diff, axis=0)
         return div_pen
 
     def fit(self, signal: np.ndarray) -> None:
@@ -169,8 +161,7 @@ class LatentMotif(object):
         # initialization
         self.signal_ = signal
         self.set_ = np.lib.stride_tricks.sliding_window_view(signal, self.wlen)
-        self.set_ = (self.set_ - np.mean(self.set_, axis=1).reshape(-1, 1)) / np.std(
-            self.set_, axis=1).reshape(-1, 1)
+        self.set_ = (self.set_ - np.mean(self.set_, axis=1).reshape(-1, 1)) / np.std(self.set_, axis=1).reshape(-1, 1)
         self.set_size_ = self.set_.shape[0]
         self.score_ = -np.inf
         self.patterns_ = np.zeros((self.n_patterns, self.wlen))
@@ -179,11 +170,16 @@ class LatentMotif(object):
             print("Start Trials")
         for i in range(self.n_starts):
             patterns, score = self.one_fit_()
-            if self.verbose:
-                print(f"Trial: {i + 1}/{self.n_starts}, score : {score}")
+            # if self.verbose:
+            print(f"Trial: {i + 1}/{self.n_starts}, score : {score}")
+            if np.isinf(score) or np.isnan(score):
+                print(f"Adjusted radius to {self.radius} due to invalid score.")
+                self.radius *= 2
             if score > self.score_:
+                print(f"New best score found: {score}")
                 self.score_ = score
                 self.patterns_ = patterns
+                break
 
         if self.verbose:
             print(f"Successfully finished, best score: {self.score_}")
