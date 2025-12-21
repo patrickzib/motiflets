@@ -90,32 +90,24 @@ pip install .
 
 ## Usage Example
 
-## Learning the Motif Length `l`
-
-We first identify meaningful **motif lengths (`l`)**.
-
 ```python
+from motiflets.plotting import *
+
 ml = Motiflets(
     ds_name,   # dataset name
     series,    # time series data
-    df_gt,     # optional ground truth
     n_jobs     # number of CPU cores
 )
 
 k_max = 20
-length_range = np.arange(25, 200, 25)
-motif_length = ml.fit_motif_length(k_max, length_range)
-```
+motif_length = 100
 
-## Learning the Motif Size `k`
-
-Given a motif length, we next identify meaningful **motif sizes (`k`)**.
-
-```python
 dists, candidates, elbow_points = ml.fit_k_elbow(
     k_max,
     motif_length
 )
+
+ml.plot_motifset()
 ```
 
 
