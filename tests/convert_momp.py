@@ -129,6 +129,13 @@ def compute_knn(
     min_pos = np.argmin(extents)
     best_motiflet = knns[min_pos]
     min_extent = extents[min_pos]
+
+    if len(motiflets) == k:
+        extend = get_pairwise_extent_raw(a, motiflets, m, distance_single, preprocessing)
+        if min_extent > extend:
+            min_extent = extend
+            best_motiflet = motiflets
+
     # print(f"{ds_name} motiflet extent: {min_extent}")
 
     return best_motiflet, min_extent

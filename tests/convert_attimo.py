@@ -8,31 +8,31 @@ from motiflets.motiflets import _sliding_dot_product, _argknn, get_pairwise_exte
 from numba.typed import List
 from numba import njit, prange
 
-k = 10
+k = 3
 momp_path = f"results/pyattimo_momp/k20/"
 
 datasets = [
-    "EOG_one_hour_50_Hz",
-    "EOG_one_hour_400_Hz",
-    "CinC_Challenge",
-    "swtAttack7",
-    "MGHSleepElectromyography",
-    "recorddata",
-    "Challenge2009Respiration500HZ",
-    "Lab_K_060314",
-    "Bird12-Week3_2018_1_10",
-    "BlackLeggedKittiwake",
-    "water",
-    "FingerFlexionECoG",
-    "SpainishEnergyDataset",
-    "SpainishEnergyDataset5sec",
-    "lorenzAttractorsLONG",
-    "stator_winding",
-    "solarwind",
-    "WindTurbine",
-    "SynchrophasorEventsLarge",
-    "Lab_FD_061014",
-    "house",
+    # "EOG_one_hour_50_Hz",
+    # "EOG_one_hour_400_Hz",
+    # "CinC_Challenge",
+    # "swtAttack7",
+    # "MGHSleepElectromyography",
+    # "recorddata",
+    # "Challenge2009Respiration500HZ",
+    # "Lab_K_060314",
+    # "Bird12-Week3_2018_1_10",
+    # "BlackLeggedKittiwake",
+    # "water",
+    # "FingerFlexionECoG",
+    # "SpainishEnergyDataset",
+    # "SpainishEnergyDataset5sec",
+    # "lorenzAttractorsLONG",
+    # "stator_winding",
+    # "solarwind",
+    # "WindTurbine",
+    # "SynchrophasorEventsLarge",
+    # "Lab_FD_061014",
+    # "house",
     "HAR_Ambient_Sensor_Data",
     "Challenge2009TestSetA_101a",
     "swtAttack38",
@@ -73,7 +73,7 @@ def test_plot():
                 motiflets = parse_array(df_attimo.loc[motif_length, "motiflet"])
                 best_motiflet, min_extent = compute_knn(
                     ts.copy(),
-                    motiflets.copy(),
+                    motiflets,
                     motif_length,
                     k - 1
                 )
@@ -87,7 +87,7 @@ def test_plot():
             else:
                 last_time = df_attimo["time in s"].values[-1]
                 last_memory = df_attimo["memory in MB"].values[-1]
-                last_length = df_attimo["motif length"].values[-1]
+                last_length = df_attimo.index.values[-1]
                 factor = motif_length / last_length
                 time = last_time * factor * 2
                 memory = last_memory * factor
@@ -108,7 +108,7 @@ def test_plot():
             ]
             df.loc[len(df.index)] = current
 
-        new_filename = f"results/attimo_converted/scalability_n_{ds_name}_{k}_attimo.csv"
+        new_filename = f"results/attimo_pair/scalability_n_{ds_name}_{k}_attimo.csv"
         df.to_csv(new_filename, index=False)
 
 

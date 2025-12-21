@@ -29,14 +29,14 @@ def read_penguin_data():
 
 def test_motiflets_sparse():
     lengths = [
-        1_000,
+        #1_000,
         #5_000,
         #10_000,
         #30_000,
         #50_000,
         #100_000,
-        150_000,
-        200_000,
+        #150_000,
+        #200_000,
         250_000
     ]
 
@@ -46,7 +46,7 @@ def test_motiflets_sparse():
     for i, length in enumerate(lengths):
         print("--------------------")
         for distance in ["znormed_ed"]:  # , "ed", "cosine"
-            for backend in ["stitch", "scalable"]:  # , "default"
+            for backend in ["scalable"]:  # "pyattimo",
                 series = B.iloc[:length, 0].T
 
                 print("Distance", distance)
@@ -54,11 +54,10 @@ def test_motiflets_sparse():
                     ds_name,
                     series,
                     distance=distance,
-                    n_jobs=8,
+                    n_jobs=-1,
                     backend=backend
                 )
 
-                # k_max = 20
                 k_max = 10
 
                 t_before = time.time()
@@ -76,12 +75,4 @@ def test_motiflets_sparse():
 
                 print("Time:", time_s[i], "s")
                 print("Memory:", memory_usage, "MB")
-
-                # print("Motiflet: \n", motiflets[2:7])
                 print("Extent", extent[2:7])
-
-        # dict = time_s
-        # df = pd.DataFrame(data=dict, columns=['Time'], index=lengths)
-        # df["Method"] = "Motiflets (one-dim)"
-        # df.index.name = "Lengths"
-        # df.to_csv('csv/scalability_univ_motiflets_k5.csv')

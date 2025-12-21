@@ -8,35 +8,35 @@ from motiflets.motiflets import _sliding_dot_product, _argknn, get_pairwise_exte
 from numba import njit, prange
 
 
-k = 10
+k = 3
 momp_path = f"results/momp_converted2/"
 
-MOMP_results = {
-    # key: [[first_index, second_index], motif_length, time in s]
-    # "EOG_one_hour_50_Hz": [[62478, 83143], 1024, 23.49],
-    # "EOG_one_hour_400_Hz": [[236605, 1321975], 8192, 121.17],
-    # "CinC_Challenge": [[4823203, 4828203], 8192, 999.42],
-    # "swtAttack7": [[133860, 144969], 16384, 142.10],
-    # "MGHSleepElectromyography": [[1964375, 5889161], 32768, 3090.66],
-    # "recorddata": [[3540784, 3998440], 2048, 17370.39],
-    # "Challenge2009Respiration500HZ": [[62963, 1296128], 16384, 562.95],
-    # "Lab_K_060314": [[6817003, 6979308], 65536, 55744.02],
-    # "BlackLeggedKittiwake": [[45696, 742777], 8192, 431.02],
-    # "water": [[973390, 1255811], 8192, 475.08],
-    # "SpainishEnergyDataset5sec": [[12884629, 13368457], 524288, 44034.65],
-    # "stator_winding": [[336089, 392549], 32768, 119.93],
-    # "solarwind": [[2221814, 5071908], 32768, 1049.56],
-    # "WindTurbine": [[929205, 1226751], 32768, 5906.36],
-    # "Lab_FD_061014": [[6684313, 7342637], 32768, 881.47],
-    # "house": [[617128, 928816], 32768, 750.50],
-    # "HAR_Ambient_Sensor_Data": [[425966, 1615881], 4096, 351.91],
-    # "Challenge2009TestSetA_101a": [[353601, 424237], 4096, 300.95],
-    # "swtAttack38": [[311254, 319874], 4096, 307.88],
-    # "SynchrophasorEventsLarge": [[30610002, 61714007], 65536, 17159.20],
-    #"Bird12-Week3_2018_1_10": [[80420, 1374748], 16384, 9324.53],
-    #"lorenzAttractorsLONG": [[1, 15361793], 524288, 48210.02],
-    "FingerFlexionECoG": [[14395771, 19195771], 16384, 10859.10],
-}
+datasets = [
+    # "EOG_one_hour_50_Hz",
+    # "EOG_one_hour_400_Hz",
+    # "CinC_Challenge",
+    # "swtAttack7",
+    # "MGHSleepElectromyography",
+    # "recorddata",
+    # "Challenge2009Respiration500HZ",
+    # "Lab_K_060314",
+    # "Bird12-Week3_2018_1_10",
+    # "BlackLeggedKittiwake",
+    # "water",
+    # "FingerFlexionECoG",
+    # "SpainishEnergyDataset",
+    # "SpainishEnergyDataset5sec",
+    # "lorenzAttractorsLONG",
+    "stator_winding",
+    # "solarwind",
+    # "WindTurbine",
+    # "SynchrophasorEventsLarge",
+    # "Lab_FD_061014",
+    # "house",
+    # "HAR_Ambient_Sensor_Data",
+    # "Challenge2009TestSetA_101a",
+    # "swtAttack38",
+]
 
 def test_plot():
     df_512 = pd.read_csv("results/momp/momp_512.csv").set_index("dataset")
@@ -44,7 +44,7 @@ def test_plot():
     df_2048 = pd.read_csv("results/momp/momp_2048.csv").set_index("dataset")
     df_4096 = pd.read_csv("results/momp/momp_4096.csv").set_index("dataset")
 
-    for ds_name, _ in MOMP_results.items():
+    for ds_name in datasets:
 
         df = pd.DataFrame(columns=[
             "length",
@@ -105,7 +105,7 @@ def test_plot():
             ]
             df.loc[len(df.index)] = current
 
-        new_filename = "results/momp_converted2/MOMP_" + ds_name + ".csv"
+        new_filename = "results/momp_pair/MOMP_" + ds_name + ".csv"
         df.to_csv(new_filename, index=False)
 
 
@@ -147,6 +147,17 @@ def compute_knn(
     min_pos = np.argmin(extents)
     best_motiflet = knns[min_pos]
     min_extent = extents[min_pos]
-    # print(f"{ds_name} motiflet extent: {min_extent}")
+
+    #print(preprocessing[0][1][motiflets[0]])
+    #print(preprocessing[0][1][motiflets[1]])
+
+    if len(motiflets) == k:
+        extend = get_pairwise_extent_raw(a, motiflets, m, distance_single, preprocessing)
+        if min_extent > extend:
+            min_extent = extend
+            best_motiflet = motiflets
+
+    # print(f"{ds_name} motiflet extent: {min_extent})
+
 
     return best_motiflet, min_extent

@@ -404,149 +404,6 @@ def compute_upper_bound(
     return kth_extent
 
 
-@njit(cache=True, nogil=True)
-def compute_distances_with_knns_sparse(
-        time_series,
-        m,
-        k,
-        exclude_trivial_match=True,
-        n_jobs=4,
-        slack=0.5,
-        distance=znormed_euclidean_distance,
-        distance_single=znormed_euclidean_distance_single,
-        distance_preprocessing=sliding_mean_std
-):
-    """ Compute the full Distance Matrix between all pairs of subsequences of a
-        multivariate time series.
-
-        Computes pairwise distances between n-m+1 subsequences, of length, extracted
-        from the time series, of length n.
-
-        Z-normed ED is used for distances.
-
-        This implementation is in O(n^2) by using the sliding dot-product.
-
-        Parameters
-        ----------
-        time_series : array-like
-            The time series
-        m : int
-            The window length
-        k : int
-            Number of nearest neighbors
-        exclude_trivial_match : bool (default: True)
-            Trivial matches will be excluded if this parameter is set
-        n_jobs : int (default: 4)
-            Number of jobs to be used.
-        slack: float (default: 0.5)
-            Defines an exclusion zone around each subsequence to avoid trivial matches.
-            Defined as percentage of m. E.g. 0.5 is equal to half the window length.
-        distance: callable (default: znormed_euclidean_distance)
-                The distance function to be computed.
-        distance_preprocessing: callable (default: sliding_mean_std)
-                The distance preprocessing function to be computed.
-
-        Returns
-        -------
-        D : 2d array-like
-            The O(n^2) z-normed ED distances between all pairs of subsequences
-        knns : 2d array-like
-            The k-nns for each subsequence
-
-    """
-    # Input dim must be 2d
-    assert time_series.ndim == 2, "Dimensionality is not correct"
-
-    dims = time_series.shape[0]
-    n = np.int32(time_series.shape[-1] - m + 1)
-    n_jobs = max(1, min(n // 8, n_jobs))  # Cannot use more jobs than length of the ts
-
-    halve_m = 0
-    if exclude_trivial_match:
-        halve_m = int(m * slack)
-
-    bin_size = np.int32(np.ceil(time_series.shape[-1] / n_jobs))
-
-    D_knn, knns = compute_distances_with_knns(
-        time_series,
-        m,
-        k,
-        exclude_trivial_match,
-        n_jobs,
-        slack,
-        distance,
-        distance_preprocessing
-    )
-
-    preprocessing = []
-    dot_first = []
-    for dim in np.arange(time_series.shape[0]):
-        preprocessing.append(distance_preprocessing(time_series[dim], m))
-        dot_first.append(_sliding_dot_product(time_series[dim, :m], time_series[dim]))
-
-    # TODO no sparse matrix support in numba. Thus we use this hack
-    D_bool = [Dict.empty(key_type=types.int32, value_type=types.uint16) for _ in
-              range(n)]
-
-    # Store an upper bound for each k-nn distance
-    kth_extent = compute_upper_bound(
-        time_series, D_knn, knns, k, m,
-        distance_single, preprocessing,
-    )
-
-    # Parallelizm does not work, as Dict is not thread safe :/
-    for order in np.arange(0, n):
-        # memorize which pairs are needed
-        for ks, dist in zip(knns[order], D_knn[order]):
-            D_bool[order][ks] = True
-
-            bound = False
-            k_index = -1
-            for kk in range(len(kth_extent) - 1, 0, -1):
-                if D_knn[order, kk] <= kth_extent[kk]:
-                    bound = True
-                    k_index = kk + 1
-                    break
-            if bound:
-                for ks2 in knns[order, :k_index]:
-                    D_bool[ks][ks2] = True
-
-    D_sparse = List()
-    for i in range(n):
-        D_sparse.append(Dict.empty(key_type=types.int32, value_type=types.float32))
-
-    # second pass, filling only the pairs needed
-    for idx in prange(n_jobs):
-        dot_rolled = np.zeros((dims, n), dtype=np.float32)
-        dot_prev = np.zeros((dims, n), dtype=np.float32)
-
-        start = idx * bin_size
-        end = min(start + bin_size, n)
-
-        for order in np.arange(start, end, dtype=np.int32):
-            dist = np.zeros(n, dtype=np.float32)
-            for d in np.arange(dims):
-                ts = time_series[d, :]
-                if order == start:
-                    # O(n log n) operation
-                    dot_rolled[d] = (_sliding_dot_product(ts[start:start + m], ts))
-                else:
-                    # constant time O(1) operations
-                    dot_rolled[d] = np.roll(dot_prev[d], 1) \
-                                    + ts[order + m - 1] * ts[m - 1:n + m] \
-                                    - ts[order - 1] * np.roll(ts[:n], 1)
-                    dot_rolled[d][0] = dot_first[d][order]
-
-                dist += distance(dot_rolled[d], n, m, preprocessing[d], order, halve_m)
-                dot_prev[d] = dot_rolled[d]
-
-            # fill the k-nns now with the distances computed
-            for key in D_bool[order]:
-                D_sparse[order][key] = dist[key]
-
-    return D_sparse, knns
-
-
 @njit(nogil=True, cache=True, parallel=True)
 def compute_distances_with_knns(
         time_series,
@@ -1091,11 +948,10 @@ def find_au_ef_motif_length(
     distance_preprocessing: callable
         The distance preprocessing function to be computed.
     backend : String, default="scalable"
-        The backend to use. As of now 'pyattimo', 'scalable', 'sparse' and 'default'
+        The backend to use. As of now 'pyattimo', 'scalable', and 'default'
         are supported.
         Use 'default' for the original exact implementation with excessive memory,
         Use 'scalable' for a scalable, exact implementation with less memory,
-        Use 'sparse' for a scalable, exact implementation with more memory.
 
     Returns
     -------
@@ -1237,11 +1093,10 @@ def search_k_motiflets_elbow(
     distance_preprocessing: callable (default=sliding_mean_std)
             The distance preprocessing function to be computed.
     backend : String, default="scalable"
-        The backend to use. As of now 'pyattimo', 'scalable', 'sparse' and
+        The backend to use. As of now 'pyattimo', 'scalable' and
         'default' are supported.
         Use 'default' for the original exact implementation with excessive memory,
         Use 'scalable' for a scalable, exact implementation with less memory,
-        Use 'sparse' for a scalable, exact implementation with more memory.
 
     Returns
     -------
@@ -1295,7 +1150,9 @@ def search_k_motiflets_elbow(
     k_motiflet_candidates = np.empty(k_max_, dtype=object)
 
     if backend in ["faiss", "annoy", "pynndescent",
-                   "pyattimo", "default", "scalable", "sparse"]:
+                   "pyattimo", "default", "scalable"]:
+
+        backend = check_valid_backend(backend, data_raw, n)
 
         print(f"Using backend: {backend} for k-Motiflet search with motif length: {m}")
         print(f"Jobs used: {n_jobs}")
@@ -1328,14 +1185,9 @@ def search_k_motiflets_elbow(
                  memory_usage) = backend_imlp.compute_knns(data_raw)
 
             else:
-                backend = check_valid_backend(backend, data_raw, n)
-
                 if backend == "scalable":
                     # uses pairwise comparisons to compute the distances
                     call_to_distances = compute_distances_with_knns
-                elif backend == "sparse":
-                    # uses sparse backend with sparse matrix
-                    call_to_distances = compute_distances_with_knns_sparse
                 else:
                     # computes the full matrix
                     call_to_distances = compute_distances_with_knns_full
@@ -1359,7 +1211,7 @@ def search_k_motiflets_elbow(
                     data_raw, m, test_k, D_full, knns,
                     distance_single=distance_single,
                     preprocessing=preprocessing,
-                    use_D_full=(backend in ["default", "sparse"]),
+                    use_D_full=(backend in ["default"]),
                     upper_bound=upper_bound,
                 )
                 k_motiflet_distances[test_k] = candidate_dist
@@ -1372,7 +1224,7 @@ def search_k_motiflets_elbow(
         raise ValueError(
             'Unknown backend: ' + backend + '. ' +
             'Use "scalable", "faiss", "pynndescent", "annoy", '
-            '"pyattimo", "sparse" or "default".')
+            '"pyattimo", or "default".')
 
     # print(f"\tMemory usage: {memory_usage:.2f} MB")
 
@@ -1403,10 +1255,17 @@ def compute_preprocessing(data_raw, distance_preprocessing, m):
 
 
 def check_valid_backend(backend, data_raw, n):
-    """ Switch to scalable matrix representation when length is >25000 or 4 GB. """
-    if backend == "default":
-        if data_raw.ndim == 1:
-            recommend_scalable = n >= 25000
+    """ Switch to LSH-backend, when length is >150_000 and univariate. """
+    if ((n >= 150_000) and (data_raw.shape[0] == 1)
+            and (backend in ["default", "scalable"])):
+        print(f"Setting 'pyattimo' backend for distance computations. "
+              f"Old Backend: '{backend}'")
+        backend = "pyattimo"
+
+    elif backend == "default":
+        """ Switch to scalable matrix representation when length is >25_000 or 4 GB. """
+        if data_raw.shape[0].ndim == 1:
+            recommend_scalable = n >= 25_000
         else:
             d = data_raw.shape[0]
             scalable_gb = ((n ** 2) * d) * 32 / (1024 ** 3) / 8
@@ -1416,4 +1275,5 @@ def check_valid_backend(backend, data_raw, n):
             print(f"Setting 'scalable' backend for distance computations. "
                   f"Old Backend: '{backend}'")
             backend = "scalable"
+
     return backend

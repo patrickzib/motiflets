@@ -1,2 +1,0 @@
-length,motif length,backend,time in s,memory in MB,extent,motiflet,elbows
-10000,512,scalable,0.19419384002685547,1560.25,407.52134764226855,[ 828 8735],[2]

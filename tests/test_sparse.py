@@ -48,23 +48,6 @@ def test_motiflets_sparse():
     _ = ml.fit_k_elbow(ks, motif_length)
 
 
-def test_sparse_matrix():
-    ds_name, T = read_penguin_data()
-    n = 50_001
-    series = T.iloc[497699:497699 + n, 0].T.to_numpy()
-
-    m = 22
-    k = 10
-    D_sparse, knns = ml.compute_distances_with_knns_sparse(series, m=m, k=k)
-
-    elements = 0
-    for A in D_sparse:
-        elements += len(A)
-
-    n = (series.shape[0] - m + 1)
-    print(elements, n ** 2, str(elements * 100 / n ** 2) + "%")
-
-
 def test_full_matrix():
     ds_name, T = read_penguin_data()
     n = 20_000

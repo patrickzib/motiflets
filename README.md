@@ -1,150 +1,126 @@
-# Motiflets
+# Fast Pattern Discovery in Massive Time Series
 
-This page was built in support of our paper "Motiflets - Simple and Accurate Detection of Motifs in Time Series" by Patrick Schäfer and Ulf Leser, published at <a href="https://www.vldb.org/pvldb/vol16/p725-schafer.pdf">PVLDB, 16(4): 725 - 737, 2022</a>.
+This repository provides the reference implementation and experimental material 
+for the paper **“Fast Pattern Discovery in Massive Time Series”**.
 
-Supporting Material
-- `notebooks`: Please see the Jupyter Notebooks for use cases
-- `csvs`: The results of the scalability experiments
-- `motiflets`: Code implementing k-Motiflet
-- `datasets`: Use cases in the paper
-- `jars`: Java code of the competitors used in out paper: EMMA, Latent Motifs and Set Finder.
+Time series motif discovery identifies repeated subsequences for
+applications like ECG, EEG, and activity recognition. State-of-the-
+art methods such as MASS are limited by quadratic time or memory
+complexity, making large-scale analysis impractical. Current CPU
+methods take nearly a day for 30 million points, and even GPU
+acceleration requires hours. 
+AMPED is a scalable anytime motif set finder using LSH-based pruning, anytime
+processing, and a memory-efficient graph structure. On up to 25
+large datasets (180k to 62M points, totaling 413 compute days across
+all competitors), AMPED consistently ranks among the fastest and
+most accurate methods. For million-scale data, it finds high-quality
+motifs in under a minute with only 8 GB RAM, which is four orders
+of magnitude faster than extrapolated MASS (21 days) and three
+orders faster than MOMP (12 hours). Competitors either produced
+low-quality results, needed excessive RAM, or crashed. AMPED
+enables motif discovery in previously infeasible scenarios, including memory-constrained 
+systems, and single-machine analytics,
+while also reducing energy consumption, making it suitable for
+sustainable large-scale data analysis.
 
-# k-Motiflets
 
-Intuitively speaking, k-Motiflets are the set of the exactly k most similar subsequences.
+## Repository Structure
 
-$k$-Motiflets are a novel definition for MD that turns the problem upside-down. $k$-Motiflets take the desired motif set size $k$ as parameter and maximize the similarity of the motif set. This $k$ is an integer with an easily understood interpretation, and in many use cases the expected size of the motif set is known prior to the analysis. Consider for example the possible copyright fraud in the pop song Ice “Ice Baby” by Vanilla Ice compared to “Under pressure” by Queen / David Bowie. Listening to these songs it is easy to obtain an initial guess of the number of repetitions (parameter $k$) of the problematic sections. On the other hand, it is impossible for humans to guess a good value for the numerical, real-valued distance between the different repetitions (parameter r). 
+This repository contains the full framework, benchmark datasets, and reproducible 
+experiments used in the evaluation.
 
-We argue that guessing k is almost always easier, as the concept of *how many repetitions of a motif do you expect* is easy to understand - though the guess itself need not be easy and thus we will also offer algorithms to learn $k$. Furthermore, as $k$ is an integer, there is only a very limited number of options, as use cases with thousands of motif occurrences are rare. In contrast, the concept of *how far apart do you expect motifs to be at maximum* is extremely difficult to understand as distances (far apart) are measured by an opaque mathematical formula for which no intuition exists. Furthermore, $r$ is a real value with infinitely many values, and even small changes may lead to gross changes in the motif found. 
 
-# Showcase
+- `motiflets/`  
+  Core implementation of the k-Motiflets algorithm.
 
-The following video highlights the ease of use of $k$-Motiflets using an ECG recording from the Long Term Atrial Fibrillation (LTAF) database.
+- `notebooks/`  
+  Jupyter notebooks demonstrating typical use cases and reproducing paper figures.
 
-**In essence, there is no need for tuning any real-valued similarity threshold via trial-and-error, as is the case for virtually all motif set competitors. 
-Instead, for $k$-Motiflets we may either directly set the maximal number of repetitions $k$ of a motif, or simply learn this value from the data.**
+- `datasets/momp/`  
+  Benchmark time series datasets used throughout the paper.
 
-https://user-images.githubusercontent.com/7783034/173186103-c8b6302e-2434-4a09-89f4-ddad2e63f997.mp4
+- `tests/csvs/`  
+  Raw experimental results for all competing methods.
 
-# Installation
+## AMPED (scalable Anytime Mining of Patterns under Euclidean Distance)
 
-The easiest is to use pip to install motiflets.
+This paper introduces AMPED (scalable Anytime Mining of Pat-
+terns under Euclidean Distance). It builds upon the Motiflets definition of 
+motif sets but was systematically designed from the
+ground up to exploit commodity multi-core hardware and SOTA
+data structures while maintaining high precision. To overcome
+the inherent quadratic-time bottleneck of motif search, AMPED
+employs Locality-Sensitive Hashing (LSH) to aggressively prune
 
-## a) Install using pip
-```
-pip install motiflets
-```
+## Motiflets
+Motif discovery aims to identify repeated patterns in time series data. A key 
+difficulty in classical motif discovery is that both the motif length and the number 
+of motif occurrences are unknown and must be inferred indirectly.
+**k-Motiflets** introduce a new formulation of motif discovery that explicitly models 
+the desired motif set size.
+Intuitively, a *k-Motiflet* is the set of exactly `k` most similar subsequences of a 
+given length. Instead of fixing a distance threshold and counting matches, k-Motiflets:
 
-You can also install  the project from source.
+- take the motif size `k` as an explicit parameter, and
+- maximize the internal similarity of the resulting motif set.
 
-## b) Build from Source
+This turns classical motif discovery upside down. The parameter `k` has a clear and 
+intuitive interpretation and is often known or easily estimated in real applications. 
+This formulation enables fast algorithms with strong empirical performance on massive 
+time series.
 
-First, download the repository.
-```
+## Installation
+
+Install the project directly from source.
+
+### Build from Source
+
+Clone the repository:
+
+```bash
 git clone https://github.com/patrickzib/motiflets.git
-```
+cd motiflets
+````
 
-Change into the directory and build the package from source.
-```
+Install the package:
+
+```bash
 pip install .
 ```
 
-# Usage
+## Usage Example
 
-Here we illustrate how to use k-Motiflets. 
+## Learning the Motif Length `l`
 
-The following TS is an ECG from the Long Term Atrial Fibrillation (LTAF) database, which 
-is often used for demonstrations in motif discovery (MD). The problem is particularly 
-difficult for MD as actually two motifs exists: The first half of the TS contains a 
-rectangular calibration signal with 6 occurrences, and the second half shows ECG 
-heartbeats with 16 to 17 occurrences. 
+We first identify meaningful **motif lengths (`l`)**.
 
-![The ECG heartbeat dataset](https://github.com/patrickzib/motiflets/raw/main/images/ts_ecg.png)
-
-The major challenges in motif discovery are to learn the length of interesting motifs
-and to find the largest set of the same motif, i.e. all repetitions.
-
-# Learning the motif length `l`
-
-We first extract meaningful **motif lengths (l)** from this use case:
-
-```
-# The Motiflets-class
+```python
 ml = Motiflets(
-    ds_name,     # the name of the series
-    series,      # the data
-    df_gt,       # ground truth, if available
-    n_jobs       # number of jobs (cores) to be used.
+    ds_name,   # dataset name
+    series,    # time series data
+    df_gt,     # optional ground truth
+    n_jobs     # number of CPU cores
 )
 
 k_max = 20
-length_range = np.arange(25,200,25) 
+length_range = np.arange(25, 200, 25)
 motif_length = ml.fit_motif_length(k_max, length_range)
 ```
-<img src="https://github.com/patrickzib/motiflets/raw/main/images/plot_au_ef.png" width="300">
 
-The plot shows that meaningful motifs are within a range of 0.8s to 1s, equal
-to roughly a heartbeat rate of 60-80 bpm.
+## Learning the Motif Size `k`
 
-# Learning the motif size `k`
+Given a motif length, we next identify meaningful **motif sizes (`k`)**.
 
-To extract meaningful **motif sizes (k)** from this use case, we run 
-
-```
+```python
 dists, candidates, elbow_points = ml.fit_k_elbow(
     k_max,
-    motif_length    
+    motif_length
 )
 ```
 
-The variable `elbow_points` holds characteristic motif sizes found.  
-Elbow points represent meaningful motif sizes. Here, $6$ and $16$ are elbows, which are 
-the 6 calibration waves and the 16 heartbeats.
 
-<img src="https://github.com/patrickzib/motiflets/raw/main/images/elbows.png" width="300">
 
-We finally plot these motifs:
+## Raw Experimental Results
 
-<img src="https://github.com/patrickzib/motiflets/raw/main/images/motiflets.png" width="600">
-
-The first repetitions perfectly match the calibration signal (orange), while the latter 16 
-repetitions perfectly match the ECG waves (green).
-
-# Use Cases
-
-Data Sets: We collected challenging real-life data sets to assess the quality and scalability of MD algorithms. An overview of datasets can be found in Table 2 of our paper. 
-
-- Jupyter-Notebook <a href="notebooks/use_cases_paper.ipynb">Use Cases for k-Motiflets</a>: highlights all use cases used in the paper and shows the unique ability of k-Motiflets to learn its parameters from the data and find itneresting motif sets.
-
-- Jupyter-Notebook <a href="notebooks/use_cases_motif_sets_vanilla_ice.ipynb">Vanilla Ice - Ice Ice Baby</a>: This time series is a TS extracted from the pop song Ice Ice Baby by Vanilla Ice using the 2nd MFCC channel sampled at 100Hz. This TS is particularly famous pop song, as it is alleged to have copied its riff from "Under Pressure" by Queen and David Bowie. It contains 20 repeats of the riff in 5 blocks with each riff being 3.6−4s long.
-
-- Jupyter-Notebook <a href="notebooks/use_cases_motif_sets_muscle_activation.ipynb">Muscle Activation</a> was collected from professional in-line speed skating on a large motor driven treadmill with Electromyo- graphy (EMG) data of multiple movements. It consists of 29.899 measurements at 100Hz corresponding to 30s in total. The known motifs are the muscle movement and a recovery phase.
-
-- Jupyter-Notebook <a href="notebooks/use_cases_motif_sets_ecg.ipynb">ECG Heartbeats</a> contains a patient’s (with ID 71) heartbeat from the LTAF database. It consists of 3.000 measurements at 128𝐻𝑧 corresponding to 23𝑠. The heartbeat rate is around 60 to 80 bpm. There are two motifs: A calibration signal and the actual heartbeats.
-
-- Jupyter-Notebook <a href="notebooks/use_cases_motif_sets_physiodata-spindles.ipynb">Physiodata - EEG sleep data</a> contains a recording of an after- noon nap of a healthy, nonsmoking person, between 20 to 40 years old [10]. Data was recorded with an extrathoracic strain belt. The dataset consists of 269.286 points at 100H𝑧 corresponding to 45𝑚𝑖𝑛. Known motifs are so-called sleep spindles and 𝑘-complexes.
-
-- Jupyter-Notebook <a href="notebooks/use_cases_motif_sets_winding.ipynb">Industrial Winding Process</a> is a snapshot of a process where a plastic web is unwound from a first reel (unwinding reel), goes over the second traction reel and is finally rewound on the the third rewinding reel. The recordings correspond to the traction of the second reel angular speed. The data contains 2.500 points sampled at 0.1𝑠, corresponding to 250𝑠. No documented motifs exist.
-
-- Jupyter-Notebook <a href="notebooks/use_cases_fnirs.ipynb">Functional near-infrared spectroscopy (fNIRS)</a> contains brain imag- inary data recorded at 690𝑛𝑚 intensity. There are 208.028 measurements in total. The data is known to be a difficult example, as it contains four motion artifacts, due to movements of the patient, which dominate MD. No documented motifs exist.
-
-- Jupyter-Notebook <a href="notebooks/use_cases_motif_sets_synthetic.ipynb">Semi-Synthetic with implanted Ground Truth</a>: One example series form our 25 semi-synthetic time series. To measure the precision of the different MD methods we created a semi-synthetic dataset using the first 25 datasets of an anomaly benchmark and implanted motif sets of varying sizes $k \in [5, \dots, 10]$ of fixed length $l=500$.
-
-- Jupyter-Notebook <a href="notebooks/use_cases_motif_sets_synthetic-all.ipynb">Full results for the Semi-Synthetic Dataset with implanted Ground Truth</a>: To measure the precision of the different MD methods we created a semi-synthetic dataset using the first 25 datasets of an anomaly benchmark and implanted motif sets of varying sizes $k \in [5, \dots, 10]$ of fixed length $l=500$.
-
-## Citation
-If you use this work, please cite as:
-```
-@article{motiflets2022,
-  title={Motiflets - Simple and Accurate Detection of Motifs in Time Series},
-  author={Schäfer, Patrick and Leser, Ulf},
-  journal={Proceedings of the VLDB Endowment},
-  volume={16},
-  number={4},
-  pages={725--737},
-  year={2022},
-  publisher={PVLDB}
-}
-```
-
-Link to the <a href="https://www.vldb.org/pvldb/vol16/p725-schafer.pdf">paper</a>.
+All raw benchmark results reported in the paper are available in `tests/csvs/` for full 
+reproducibility.
