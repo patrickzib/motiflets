@@ -9,15 +9,15 @@ art methods such as MASS are limited by quadratic time or memory
 complexity, making large-scale analysis impractical. Current CPU
 methods take nearly a day for 30 million points, and even GPU
 acceleration requires hours. 
-AMPED is a scalable anytime motif set finder using LSH-based pruning, anytime
+SCAMPI is a scalable anytime motif set finder using LSH-based pruning, anytime
 processing, and a memory-efficient graph structure. On up to 25
 large datasets (180k to 62M points, totaling 413 compute days across
-all competitors), AMPED consistently ranks among the fastest and
+all competitors), SCAMPI consistently ranks among the fastest and
 most accurate methods. For million-scale data, it finds high-quality
 motifs in under a minute with only 8 GB RAM, which is four orders
 of magnitude faster than extrapolated MASS (21 days) and three
 orders faster than MOMP (12 hours). Competitors either produced
-low-quality results, needed excessive RAM, or crashed. AMPED
+low-quality results, needed excessive RAM, or crashed. SCAMPI
 enables motif discovery in previously infeasible scenarios, including memory-constrained 
 systems, and single-machine analytics,
 while also reducing energy consumption, making it suitable for
@@ -42,14 +42,14 @@ experiments used in the evaluation.
 - `tests/csvs/`  
   Raw experimental results for all competing methods.
 
-## AMPED (scalable Anytime Mining of Patterns under Euclidean Distance)
+## SCAMPI (SCalable Anytime Mining of Patterns In time series)
 
-This paper introduces AMPED (scalable Anytime Mining of Pat-
+This paper introduces SCAMPI (scalable Anytime Mining of Pat-
 terns under Euclidean Distance). It builds upon the Motiflets definition of 
 motif sets but was systematically designed from the
 ground up to exploit commodity multi-core hardware and SOTA
 data structures while maintaining high precision. To overcome
-the inherent quadratic-time bottleneck of motif search, AMPED
+the inherent quadratic-time bottleneck of motif search, SCAMPI
 employs Locality-Sensitive Hashing (LSH) to aggressively prune
 
 ## Motiflets
