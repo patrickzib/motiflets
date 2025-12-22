@@ -1,12 +1,12 @@
 [project]
-name = "motiflets"
+name = "scampi"
 
-version = "0.4.1"
+version = "0.1.0"
 
-description = "Motiflets - Simple and Accurate Detection of Motifs in Time Series"
+description = "scampi - Fast Pattern Discovery in Massive Time Series"
 readme = "README.md"
 authors = [
-    {name = "patrickzib", email = "void@void.com"}
+    {name = "patrickzib", email = "patrick.schaefer@hu-berlin.de"}
 ]
 keywords = [
     "machine-learning",
@@ -15,6 +15,7 @@ keywords = [
     "motif-sets",
     "motif-pairs",    
     "unsupervised",
+    "LSH"
 ]
 classifiers = [
     "Intended Audience :: Science/Research",
@@ -46,11 +47,11 @@ dependencies = [
     "tqdm>=4.63.0",
     "matplotlib>=3.5.1",
     "tsdownsample>=0.1.3",
-    "pyattimo>=0.5.0"
+    "pyattimo>=0.7.1"
 ]
 
 [project.urls]
-repository = "https://github.com/patrickzib/motiflets"
+repository = "https://github.com/patrickzib/scampi"
 #documentation = ""
 #download = ""
 

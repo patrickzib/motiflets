@@ -50,7 +50,7 @@ def test_plot_data():
 
 
 def run_motiflets_scale_n(
-        backends=["pyattimo"],
+        backends=["scampi"],
         delta=None,
         k_max = 10,
     ):
@@ -64,7 +64,7 @@ def run_motiflets_scale_n(
             l_range,
             k_max,
             backend=backend,
-            pyattimo_delta=delta
+            scampi_delta=delta
         )
 
 

@@ -19,7 +19,7 @@ from scipy.signal import argrelextrema
 from scipy.stats import zscore
 
 from motiflets.knn_vector_backend import *
-from motiflets.knn_pyattimo_backend import *
+from motiflets.knn_scampi_backend import *
 from motiflets.distances import *
 
 logging.basicConfig(level=logging.CRITICAL)
@@ -948,7 +948,7 @@ def find_au_ef_motif_length(
     distance_preprocessing: callable
         The distance preprocessing function to be computed.
     backend : String, default="scalable"
-        The backend to use. As of now 'pyattimo', 'scalable', and 'default'
+        The backend to use. As of now 'scampi', 'scalable', and 'default'
         are supported.
         Use 'default' for the original exact implementation with excessive memory,
         Use 'scalable' for a scalable, exact implementation with less memory,
@@ -1093,7 +1093,7 @@ def search_k_motiflets_elbow(
     distance_preprocessing: callable (default=sliding_mean_std)
             The distance preprocessing function to be computed.
     backend : String, default="scalable"
-        The backend to use. As of now 'pyattimo', 'scalable' and
+        The backend to use. As of now 'scampi', 'scalable' and
         'default' are supported.
         Use 'default' for the original exact implementation with excessive memory,
         Use 'scalable' for a scalable, exact implementation with less memory,
@@ -1150,15 +1150,15 @@ def search_k_motiflets_elbow(
     k_motiflet_candidates = np.empty(k_max_, dtype=object)
 
     if backend in ["faiss", "annoy", "pynndescent",
-                   "pyattimo", "default", "scalable"]:
+                   "scampi", "default", "scalable"]:
 
         backend = check_valid_backend(backend, data_raw, n)
 
         print(f"Using backend: {backend} for k-Motiflet search with motif length: {m}")
         print(f"Jobs used: {n_jobs}")
 
-        if backend == "pyattimo":
-            backend_imlp = PyAttimoNearestNeighbors(
+        if backend == "scampi":
+            backend_imlp = SCAMPINearestNeighbors(
                     m, k_max_,
                     slack=slack,
                     **kwargs)
@@ -1224,7 +1224,7 @@ def search_k_motiflets_elbow(
         raise ValueError(
             'Unknown backend: ' + backend + '. ' +
             'Use "scalable", "faiss", "pynndescent", "annoy", '
-            '"pyattimo", or "default".')
+            '"scampi", or "default".')
 
     # print(f"\tMemory usage: {memory_usage:.2f} MB")
 
@@ -1258,9 +1258,9 @@ def check_valid_backend(backend, data_raw, n):
     """ Switch to LSH-backend, when length is >150_000 and univariate. """
     if ((n >= 150_000) and (data_raw.shape[0] == 1)
             and (backend in ["default", "scalable"])):
-        print(f"Setting 'pyattimo' backend for distance computations. "
+        print(f"Setting 'scampi' backend for distance computations. "
               f"Old Backend: '{backend}'")
-        backend = "pyattimo"
+        backend = "scampi"
 
     elif backend == "default":
         """ Switch to scalable matrix representation when length is >25_000 or 4 GB. """

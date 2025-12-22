@@ -29,13 +29,13 @@ def read_penguin_data():
 
 def test_motiflets_sparse():
     lengths = [
-        1_000,
+        #1_000,
         #5_000,
         #10_000,
         #30_000,
         #50_000,
         #100_000,
-        #150_000,
+        150_000,
         #200_000,
         #250_000
     ]
@@ -46,7 +46,7 @@ def test_motiflets_sparse():
     for i, length in enumerate(lengths):
         print("--------------------")
         for distance in ["znormed_ed"]:  # , "ed", "cosine"
-            for backend in ["scalable"]:  # "pyattimo",
+            for backend in ["scampi"]:  # "scampi",
                 series = B.iloc[:length, 0].T
 
                 print("Distance", distance)

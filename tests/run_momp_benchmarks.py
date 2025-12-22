@@ -68,13 +68,13 @@ def main():
         print(f"Running: {filename, ds_name}")
         data = ut.read_mat(filename)
 
-        # pyattimo
-        # backend = "pyattimo"
+        # scampi
+        # backend = "scampi"
         # for delta in deltas:
         #     # for subsampling in [16, 32, 64]:
         #     ut.run_safe(
         #            filename, data, l_range, k_max, backend,
-        #            pyattimo_delta=delta # , subsampling=subsampling
+        #            scampi_delta=delta # , subsampling=subsampling
         #     )
 
         # Running FAISS

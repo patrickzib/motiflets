@@ -22,7 +22,7 @@ def run_safe(module, backends, delta, k_max, use_1m=None):
 
 
 def main():
-    backends = ["pyattimo"]
+    backends = ["scampi"]
     deltas = [0.1]
     k_maxs = [10, 20, 30, 40]
 

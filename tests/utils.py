@@ -171,7 +171,7 @@ def test_motiflets_scale_n(
         n_range,  # Time Series length range
         l_range,  # Motif length range
         k_max,
-        backend="pyattimo",
+        backend="scampi",
         subsampling=None,
         n_jobs=-1,
         **kwargs
@@ -319,12 +319,12 @@ def infer_filename(backend, ds_name, k_max, kwargs, subsampling):
     backend_name = backend
     new_filename = f"results/scalability_n_{ds_name}_{k_max}_{backend}"
 
-    if backend == "pyattimo":
-        pyattimo_delta = force_get("pyattimo_delta", kwargs)
-        backend_name = f"{backend} (delta={pyattimo_delta})"
+    if backend == "scampi":
+        scampi_delta = force_get("scampi_delta", kwargs)
+        backend_name = f"{backend} (delta={scampi_delta})"
 
         new_filename = (new_filename +
-                        f"_delta_{pyattimo_delta}")
+                        f"_delta_{scampi_delta}")
 
     elif backend == "annoy":
         annoy_n_trees = force_get("annoy_n_trees", kwargs)

@@ -27,7 +27,7 @@ def read_data():
 def test_plot_data():
     ds_name, series = read_data()
     ml = Motiflets(
-        ds_name, series, backend="pyattimo"
+        ds_name, series, backend="scampi"
     )
     points_to_plot = 10_000
     ml.plot_dataset(
@@ -36,7 +36,7 @@ def test_plot_data():
 
 
 def run_motiflets_scale_n(
-        backends=["pyattimo"],
+        backends=["scampi"],
         delta=None,
         k_max = 10,
 ):
@@ -50,7 +50,7 @@ def run_motiflets_scale_n(
             l_range,
             k_max,
             backend=backend,
-            pyattimo_delta=delta
+            scampi_delta=delta
         )
 
 

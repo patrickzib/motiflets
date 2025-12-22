@@ -7,9 +7,9 @@ import numpy as np
 #from numba import njit, prange
 
 
-class PyAttimoNearestNeighbors:
+class SCAMPINearestNeighbors:
     """
-    PyAttimo-based nearest neighbor computations for motiflet discovery.
+    SCAMPI-based nearest neighbor computations for motiflet discovery.
 
     Parameters:
     -----------
@@ -36,27 +36,27 @@ class PyAttimoNearestNeighbors:
         self.slack = slack
         self.verbose = verbose
 
-        self.pyattimo_delta = None
-        if "pyattimo_delta" in kwargs:
-            self.pyattimo_delta = kwargs["pyattimo_delta"]
+        self.scampi_delta = None
+        if "scampi_delta" in kwargs:
+            self.scampi_delta = kwargs["scampi_delta"]
 
-        if "pyattimo_max_memory" in kwargs:
-            self.pyattimo_max_memory = kwargs["pyattimo_max_memory"]
-            print(f"Setting PyAttimo max memory to {self.pyattimo_max_memory}")
+        if "scampi_max_memory" in kwargs:
+            self.scampi_max_memory = kwargs["scampi_max_memory"]
+            print(f"Setting SCAMPI max memory to {self.scampi_max_memory}")
         else:
-            self.pyattimo_max_memory = "8 GB"
+            self.scampi_max_memory = "8 GB"
 
 
     def compute_knns(self, X):
-        """Compute k-nearest neighbors using PyAttimo motiflet discovery."""
+        """Compute k-nearest neighbors using SCAMPI motiflet discovery."""
 
         assert X.shape[0] == 1, \
-            "PyAttimo can handle univariate data, only."
+            "SCAMPI can handle univariate data, only."
 
         try:
             import pyattimo
         except ImportError as e:
-            raise PyAttimoError(f"Failed to import PyAttimo: {str(e)}")
+            raise PyAttimoError(f"Failed to import SCAMPI: {str(e)}")
 
         n = X.shape[-1] - self.m + 1
 
@@ -73,26 +73,26 @@ class PyAttimoNearestNeighbors:
             'w': self.m,
             'support': self.k_max - 1,
             'exclusion_zone': int(self.m * self.slack),
-            'max_memory': self.pyattimo_max_memory,
+            'max_memory': self.scampi_max_memory,
             # 'observability_file': "observe.csv"
         }
 
-        if self.pyattimo_delta:
+        if self.scampi_delta:
             attimo_args.update({
-               'delta': self.pyattimo_delta,
+               'delta': self.scampi_delta,
                'stop_on_threshold': True,
                'fraction_threshold': np.log(n) / n
             })
 
             #attimo_args.update({
-            #    'delta': self.pyattimo_delta,
+            #    'delta': self.scampi_delta,
             #    'stop_on_threshold': False,
             # })
 
             if self.verbose:
-                print(f"\tPyAttimo: Setting "
+                print(f"\tSCAMPI: Setting "
                       f"\n\t\tw={self.m}, "
-                      f"\n\t\tdelta={self.pyattimo_delta}, "
+                      f"\n\t\tdelta={self.scampi_delta}, "
                       f"\n\t\tsupport={attimo_args['support']}, "
                       f"\n\t\tmax_memory={attimo_args['max_memory']}, "
                       f"\n\t\texclusion_zone={attimo_args['exclusion_zone']}, "
@@ -103,7 +103,7 @@ class PyAttimoNearestNeighbors:
         m_iter = pyattimo.MotifletsIterator(**attimo_args)
 
         try:
-            print("\tComputing motiflets with PyAttimo...", flush=True)
+            print("\tComputing motiflets with SCAMPI...", flush=True)
             for mot in m_iter:
                 if self.verbose:
                     print(f"\t\t{mot}", flush=True)
@@ -123,7 +123,7 @@ class PyAttimoNearestNeighbors:
             memory_usage = process.memory_info().rss / (1024 * 1024)  # MB
 
         except Exception as e:
-            print(f"PyAttimo computation failed: {str(e)}", flush=True)
+            print(f"SCAMPI computation failed: {str(e)}", flush=True)
 
         if m_iter:
             del m_iter

@@ -45,5 +45,5 @@ def random_walk():
     ml.fit_k_elbow(
         k_max=motif_cardinality+2, motif_length=motif_length)
 
-# TODO It is not possible to run pyattimo from a pytest :(
+# TODO It is not possible to run scampi from a pytest :(
 random_walk()
