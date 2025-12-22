@@ -1256,7 +1256,7 @@ def compute_preprocessing(data_raw, distance_preprocessing, m):
 
 def check_valid_backend(backend, data_raw, n):
     """ Switch to LSH-backend, when length is >150_000 and univariate. """
-    if ((n >= 150_000) and (data_raw.shape[0] == 1)
+    if ((n >= 125_000) and (data_raw.shape[0] == 1)
             and (backend in ["default", "scalable"])):
         print(f"Setting 'scampi' backend for distance computations. "
               f"Old Backend: '{backend}'")

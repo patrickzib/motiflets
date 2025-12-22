@@ -13,7 +13,8 @@ keywords = [
     "time-series",    
     "motif-discovery",
     "motif-sets",
-    "motif-pairs",    
+    "motif-pairs",
+    "pattern-discovery",
     "unsupervised",
     "LSH"
 ]
@@ -52,8 +53,6 @@ dependencies = [
 
 [project.urls]
 repository = "https://github.com/patrickzib/scampi"
-#documentation = ""
-#download = ""
 
 [project.license]
 file = "LICENSE"
