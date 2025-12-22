@@ -28,7 +28,7 @@ class SCAMPINearestNeighbors:
             m,
             k_max,
             slack=0.5,
-            verbose=False,
+            verbose=True,
             **kwargs):
 
         self.m = m
