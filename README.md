@@ -1,3 +1,12 @@
+  <div style="border:1px solid #ddd; padding:12px; border-radius:6px;">
+    <strong>Latest Features</strong>
+    <ul>
+      <li>TOP-N retrieval is supported to find the top-n motiflets.</li>
+      <li>Multivariate Motif Discovery: Supports (naive) multivariate motif discovery..</li>
+    </ul>
+  </div>
+
+
 # Motiflets
 
 This page was built in support of our paper "Motiflets - Simple and Accurate Detection
@@ -187,10 +196,6 @@ uvx motiflets fit_k data.csv --k-max 6 --motif-length 128 --top-n 3
 ```
 
 The call prints a summary of input parameters, and the found k-Motiflet locations.
-
-### Latest Features
-- TOP-N Motif Retrieval: Supports TOP-N retrieval for  retrieving the best N motiflets.
-- Multivariate Motif Discovery: Supports (naive) multivariate motif discovery.
 
 ### Sub-Dimensional Motif Discovery
 
