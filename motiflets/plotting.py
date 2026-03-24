@@ -34,7 +34,7 @@ class Motiflets:
             distance="znormed_ed",
             slack=0.5,
             n_jobs=-1,
-            backend="scalable"
+            backend="default"
     ):
         """Computes the AU_EF plot to extract the best motif lengths
 
@@ -65,7 +65,7 @@ class Motiflets:
                 Defined as percentage of m. E.g. 0.5 is equal to half the window length.
             n_jobs : int
                 Number of jobs to be used.
-            backend : String, default="scalable"
+            backend : String, default="default"
                 The backend to use. As of now 'scalable', 'sparse' and 'default' are supported.
                 Use 'default' for the original exact implementation with excessive memory,
                 Use 'scalable' for a scalable, exact implementation with less memory,
@@ -160,6 +160,7 @@ class Motiflets:
             k_max,
             motif_length=None,  # if None, use best_motif_length
             filter=True,
+            top_N=1,
             plot_elbows=True,
             plot_motifs_as_grid=True,
     ):
@@ -178,6 +179,8 @@ class Motiflets:
                 the length of the motif (user parameter)
             filter: bool, default=True
                 filters overlapping motiflets from the result,
+            top_N : int, default=1
+                Number of best motiflets to return per k.
             plot_elbows: bool, default=False
                 plots the elbow ploints into the plot
 
@@ -190,6 +193,7 @@ class Motiflets:
 
             """
         self.k_max = k_max
+        self.top_N = top_N
 
         if motif_length is None:
             motif_length = self.motif_length
@@ -212,14 +216,17 @@ class Motiflets:
             distance_single=self.distance_single,
             distance_preprocessing=self.distance_preprocessing,
             backend=self.backend,
+            top_N=top_N
         )
 
-        return self.dists, self.motiflets, self.elbow_points
+        # return self.dists, self.motiflets, self.elbow_points
+        return self.get_flattened_motifs()
 
-    def plot_dataset(self, path=None):
+    def plot_dataset(self, max_points=10_000, path=None):
         fig, ax = plot_dataset(
             self.ds_name,
             self.series,
+            max_points=max_points,
             show=path is None,
             ground_truth=self.ground_truth)
 
@@ -229,18 +236,19 @@ class Motiflets:
 
         return fig, ax
 
-    def plot_motifset(self, path=None, elbow_point=None):
+    def plot_motifset(self, max_points=10_000, path=None, elbow_point=None):
 
         if self.dists is None or self.motiflets is None or self.elbow_points is None:
             raise Exception("Please call fit_k_elbow first.")
 
         if elbow_point is None:
-            elbow_point = self.elbow_points[-1]
+            elbow_point = self.elbow_points[0][-1]
 
         fig, ax = plot_motifset(
             self.ds_name,
             self.series,
-            motifsets=self.motiflets[elbow_point],
+            max_points=max_points,
+            motifsets=self.motiflets[elbow_point].reshape((1, -1)),
             dist=self.dists[elbow_point],
             motif_length=self.motif_length,
             show=path is None)
@@ -250,6 +258,18 @@ class Motiflets:
             plt.show()
 
         return fig, ax
+
+    def get_flattened_motifs(self):
+        """Returns the flattened motif sets for the elbow points."""
+        if self.dists is None or self.motiflets is None or self.elbow_points is None:
+            raise Exception("Please call fit_k_elbow first.")
+
+        return ml.flatten_elbows(
+            self.elbow_points,
+            self.motiflets,
+            self.dists,
+            max_items=self.top_N)
+
 
 
 def as_series(data, index_range, index_name):
@@ -333,6 +353,7 @@ def plot_motifset(
         ds_name,
         data,
         motifsets=None,
+        max_points=2_000,
         dist=None,
         motif_length=None,
         ground_truth=None,
@@ -400,11 +421,11 @@ def plot_motifset(
     data_raw_sampled, data_index_sampled = data_raw, data_index
 
     factor = 1
-    if data_raw.shape[-1] > 2_000:
-        data_raw_sampled = np.zeros((data_raw.shape[0], 2_000))
+    if data_raw.shape[-1] > max_points:
+        data_raw_sampled = np.zeros((data_raw.shape[0], max_points))
         for i in range(data_raw.shape[0]):
             index = MinMaxLTTBDownsampler().downsample(
-                np.ascontiguousarray(data_raw[i]), n_out=2_000)
+                np.ascontiguousarray(data_raw[i]), n_out=max_points)
             data_raw_sampled[i] = data_raw[i, index]
 
         data_index_sampled = data_index[index]
@@ -585,7 +606,9 @@ def plot_motifset(
 
 
 def _plot_elbow_points(
-        ds_name, data, motif_length,
+        ds_name,
+        data,
+        motif_length,
         elbow_points,
         motifset_candidates,
         dists):
@@ -610,6 +633,8 @@ def _plot_elbow_points(
 
     data_index, data_raw = ml.pd_series_to_numpy(data)
 
+    # shows only first rank elbow point for now
+    ebs = elbow_points[0]
     if data_raw.ndim == 1:
         data_raw = data_raw.reshape((1, -1))
 
@@ -619,7 +644,7 @@ def _plot_elbow_points(
 
     lim1 = plt.ylim()[0]
     lim2 = plt.ylim()[1]
-    for elbow in elbow_points:
+    for elbow in ebs:
         ax.vlines(
             elbow, lim1, lim2,
             linestyles="--", label=str(elbow) + "-Motiflet"
@@ -627,11 +652,11 @@ def _plot_elbow_points(
     ax.set(xlabel='Size (k)', ylabel='Extent')
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
-    motiflets = motifset_candidates[elbow_points]
+    motiflets = motifset_candidates[ebs][0]
     for i, motiflet in enumerate(motiflets):
         if motiflet is not None:
             axins = ax.inset_axes(
-                [(elbow_points[i] - 3) / (len(motifset_candidates) - 2), 0.7, 0.3, 0.3])
+                [(ebs[i] - 3) / (len(motifset_candidates) - 2), 0.7, 0.3, 0.3])
 
             df = pd.DataFrame()
             df["time"] = data_index[range(0, motif_length)]
@@ -664,10 +689,11 @@ def plot_elbow(
         n_jobs=4,
         elbow_deviation=1.00,
         slack=0.5,
+        top_N=1,
         distance=znormed_euclidean_distance,
         distance_single=znormed_euclidean_distance_single,
         distance_preprocessing=sliding_mean_std,
-        backend="scalable"
+        backend="default"
 ):
     """Plots the elbow-plot for k-Motiflets.
 
@@ -698,11 +724,16 @@ def plot_elbow(
         The minimal absolute deviation needed to detect an elbow.
         It measures the absolute change in deviation from k to k+1.
         1.05 corresponds to 5% increase in deviation.
+    slack: float (default=0.5)
+        Defines an exclusion zone around each subsequence to avoid trivial matches.
+        Defined as percentage of m. E.g. 0.5 is equal to half the window length.
+    top_N : int, default=1
+        Number of best motiflets to return per k.
     distance: callable (default=znormed_euclidean_distance)
         The distance function to be computed.
     distance_preprocessing: callable (default=sliding_mean_std)
         The distance preprocessing function to be computed.
-    backend : String, default="scalable"
+    backend : String, default="default"
         The backend to use. As of now 'scalable', 'sparse' and 'default' are supported.
         Use 'default' for the original exact implementation with excessive memory,
         Use 'scalable' for a scalable, exact implementation with less memory,
@@ -720,7 +751,6 @@ def plot_elbow(
     data = ml.convert_to_2d(data)
     _, raw_data = ml.pd_series_to_numpy(data)
 
-    startTime = time.perf_counter()
     dists, candidates, elbow_points, m, memory_usage = ml.search_k_motiflets_elbow(
         k_max,
         raw_data,
@@ -731,15 +761,8 @@ def plot_elbow(
         distance=distance,
         distance_single=distance_single,
         distance_preprocessing=distance_preprocessing,
-        backend=backend)
-    endTime = (time.perf_counter() - startTime)
-
-    # print(f"Found motiflets in {np.round(endTime, 1)} s")
-
-    if filter:
-        elbow_points = ml.filter_unique(elbow_points, candidates, motif_length)
-
-    # print("\tElbow Points", elbow_points)
+        backend=backend,
+        top_N=top_N)
 
     if plot_elbows:
         _plot_elbow_points(
@@ -764,7 +787,7 @@ def plot_elbow(
             plot_motifset(
                 ds_name,
                 data,
-                motifsets=candidates[elbow_points],
+                motifsets=candidates[elbows[0]][0],
                 motif_length=motif_length,
                 ground_truth=ground_truth,
                 show=True)
@@ -784,7 +807,7 @@ def plot_motif_length_selection(
         distance=znormed_euclidean_distance,
         distance_single=znormed_euclidean_distance_single,
         distance_preprocessing=sliding_mean_std,
-        backend="scalable",
+        backend="default",
         plot=True
 ):
     """Computes the AU_EF plot to extract the best motif lengths
@@ -819,7 +842,7 @@ def plot_motif_length_selection(
         The distance function to be computed.
     distance_preprocessing: callable (default=sliding_mean_std)
         The distance preprocessing function to be computed.
-    backend : String, default="scalable"
+    backend : String, default="default"
         The backend to use. As of now 'scalable', 'sparse' and 'default' are supported.
         Use 'default' for the original exact implementation with excessive memory,
         Use 'scalable' for a scalable, exact implementation with less memory,
@@ -882,12 +905,13 @@ def plot_motif_length_selection(
 
 
 def plot_grid_motiflets(
-        ds_name, data, motifsets, elbow_points, dist,
+        ds_name, data, motifsets_, elbow_points_, dist_,
         motif_length, font_size=20,
         ground_truth=None,
         method_name=None,
         method_names=None,
         show_elbows=False,
+        max_points=2_000,
         color_palette=sns.color_palette("tab10"),
         grid_dim=None,
         plot_index=None):
@@ -899,11 +923,11 @@ def plot_grid_motiflets(
         The name of the time series
     data: array-like
         The time series data
-    motifsets: 2d array-like
+    motifsets_: 2d array-like
         The motifset candidates
-    elbow_points: array-like
+    elbow_points_: array-like
         The elbow points found. Only motif sets from the elbow points will be plotted.
-    dist: array-like
+    dist_: array-like
         The distances (extents) of the motif set candidates
     motif_length: int
         The motif length found.
@@ -936,6 +960,9 @@ def plot_grid_motiflets(
                         "ytick.labelsize": font_size - 10, })
 
     label_cols = 2
+
+    (dists, motiflets, elbow_points) \
+        = ml.flatten_elbows(elbow_points_, motifsets_, dist_)
 
     count_plots = 3 if len(motifsets[elbow_points]) > 6 else 2
     if show_elbows:
@@ -970,11 +997,11 @@ def plot_grid_motiflets(
     data_raw_sampled, data_index_sampled = data_raw, data_index
 
     factor = 1
-    if data_raw.shape[-1] > 2_000:
-        data_raw_sampled = np.zeros((data_raw.shape[0], 2_000))
+    if data_raw.shape[-1] > max_points:
+        data_raw_sampled = np.zeros((data_raw.shape[0], max_points))
         for i in range(data_raw.shape[0]):
             index = MinMaxLTTBDownsampler().downsample(
-                np.ascontiguousarray(data_raw[i]), n_out=2_000)
+                np.ascontiguousarray(data_raw[i]), n_out=max_points)
             data_raw_sampled[i] = data_raw[i, index]
 
         data_index_sampled = data_index[index]
