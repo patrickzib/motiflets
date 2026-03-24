@@ -1347,7 +1347,7 @@ def search_k_motiflets_elbow(
     k_motiflet_distances = np.full((k_max_, top_N), np.inf, dtype=np.float64)
     k_motiflet_candidates = np.empty(k_max_, dtype=object)
 
-    if backend in ["default", "scalable", "sparse"]:
+    if backend in ["default", "scalable"]:
 
         backend = check_valid_backend(backend, data_raw, n)
 
