@@ -1,8 +1,8 @@
 <div style="border:1px solid #ddd; background:#f6f8fa; padding:12px; border-radius:6px;">
-    <strong>Latest Features</strong>
+    <strong>Latest Changes / Features</strong>
     <ul>
-      <li>TOP-N retrieval is supported to find the top-n motiflets.</li>
-      <li>Supports (naive) multivariate motif discovery.</li>
+      <li>v 0.8 - TOP-N retrieval is supported to find the top-n motiflets.</li>
+      <li>v 0.6 - Supports (naive) multivariate motif discovery.</li>
     </ul>
   </div>
 
@@ -123,7 +123,8 @@ ml = Motiflets(
     n_jobs       # number of jobs (cores) to be used.
 )
 
-k_max = 20
+k_max = 20  # maxmimum number of repeats in each motif set
+top_N = 1   # number of motif sets to search
 length_range = np.arange(25,200,25) 
 motif_length = ml.fit_motif_length(k_max, length_range)
 ```
@@ -144,7 +145,7 @@ To extract meaningful **motif sizes (k)** from this use case, we run
 dists, candidates, elbow_points = ml.fit_k_elbow(
     k_max,
     motif_length,
-    top_N=1
+    top_N
 )
 ```
 
@@ -164,16 +165,15 @@ repetitions perfectly match the ECG waves (green).
 
 ## Top-N Motif Retrieval
 
-To recover the top-N motiflets simply set `top_N` to the desired value in the call 
-to `fit_k_elbow`.
+To recover the top-N motiflets, set `top_N` to the desired value when calling `fit_k_elbow`. The parameter `k_max` specifies the maximum number of repeats per motif set, while the actual number of repeats is determined automatically using elbow plots.
 
 ```
 [...]
 
 dists, candidates, elbow_points = ml.fit_k_elbow(
-    k_max,          # Maximum number of repeats within each motif set
+    k_max,          # Maximum number of repeats within each Motif Set
     motif_length,
-    top_N=2         # Desired number of Motif Sets to return
+    top_N=2         # Desired number of Motif Sets to return, e.g. 2
 )
 ```
 
