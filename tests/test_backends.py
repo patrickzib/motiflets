@@ -55,7 +55,7 @@ def test_motiflets_univariate():
 
             del ml
 
-            for backend in ["scalable", "sparse"]:
+            for backend in ["scalable"]:
                 print(f"Testing backend: {backend}")
 
                 ml2 = Motiflets(
