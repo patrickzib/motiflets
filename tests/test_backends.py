@@ -12,6 +12,7 @@ np.printoptions(precision=2, suppress=True)
 def test_motiflets_univariate():
     k_max = 9
     motif_length = 27
+    top_Ns = [3]
 
     lengths = [
         # 1_000,
@@ -24,71 +25,74 @@ def test_motiflets_univariate():
     ds_name, B = read_penguin()
 
     for i, length in enumerate(lengths):
-        series = B.iloc[:length, 0].values
-        print("-------------------------------\n")
-        print(f"Current length: {series.shape}")
+        for top_N in top_Ns:
+            series = B.iloc[:length, 0].values
+            print("-------------------------------\n")
+            print(f"Current length: {series.shape} top-N {top_N}")
 
-        t_before = time.perf_counter()
-        ml = Motiflets(
-            ds_name,
-            series,
-            n_jobs=-1,
-            backend="default"
-        )
-
-        gt_dists, gt_motiflets, gt_elbow_points = ml.fit_k_elbow(
-            k_max=k_max,
-            motif_length=motif_length,
-            plot_elbows=False,
-            plot_motifs_as_grid=False
-        )
-
-        print(f"Testing backend: 'default'")
-        print(f"\tRuntime: {time.perf_counter() - t_before:0.1f} s")
-        print(f"\tMemory usage: {ml.memory_usage:0.1f} MB")
-        print("\tElbow points:", gt_elbow_points)
-        print("\tMotiflets:", *gt_motiflets[gt_elbow_points])
-        print("\tDistances:", *gt_dists[gt_elbow_points])
-
-        del ml
-
-        for backend in ["scalable", "sparse"]:
-            print(f"Testing backend: {backend}")
-
+            t_before = time.perf_counter()
             ml = Motiflets(
                 ds_name,
                 series,
                 n_jobs=-1,
-                backend=backend
+                backend="default"
             )
 
-            t_before = time.perf_counter()
-            dists, motiflets, elbow_points = ml.fit_k_elbow(
+            gt_dists, gt_motiflets, gt_elbow_points = ml.fit_k_elbow(
                 k_max=k_max,
                 motif_length=motif_length,
+                top_N=top_N,
                 plot_elbows=False,
                 plot_motifs_as_grid=False
             )
 
+            print(f"Testing backend: 'default'")
             print(f"\tRuntime: {time.perf_counter() - t_before:0.1f} s")
             print(f"\tMemory usage: {ml.memory_usage:0.1f} MB")
-            print("\tElbow points:", elbow_points)
-            print("\tMotiflets:", *motiflets[elbow_points])
-            print("\tDistances:", *dists[elbow_points])
-
-            assert np.allclose(gt_elbow_points, elbow_points, rtol=1e-2, atol=1e-2), \
-                f"Elbow points do not match for backend {backend} with length {length}"
-
-            for elbow in elbow_points:
-                assert np.allclose(np.sort(gt_motiflets[elbow]),
-                                   np.sort(motiflets[elbow])), \
-                    f"Motiflets do not match for {backend} with length {length}"
-                assert np.allclose(gt_dists[elbow],
-                                   dists[elbow], rtol=1e-2, atol=1e-2), \
-                    f"Distances do not match for {backend} with length {length}"
-
-            print(f"Backend {backend} passed for series length {length}.\n")
+            print("\tElbow points:", gt_elbow_points)
+            print("\tMotiflets:", *gt_motiflets[gt_elbow_points])
+            print("\tDistances:", *gt_dists[gt_elbow_points])
 
             del ml
 
-        print("-------------------------------\n")
+            for backend in ["scalable", "sparse"]:
+                print(f"Testing backend: {backend}")
+
+                ml2 = Motiflets(
+                    ds_name,
+                    series,
+                    n_jobs=-1,
+                    backend=backend
+                )
+
+                t_before = time.perf_counter()
+                dists, motiflets, elbow_points = ml2.fit_k_elbow(
+                    k_max=k_max,
+                    motif_length=motif_length,
+                    top_N=top_N,
+                    plot_elbows=False,
+                    plot_motifs_as_grid=False
+                )
+
+                print(f"\tRuntime: {time.perf_counter() - t_before:0.1f} s")
+                print(f"\tMemory usage: {ml2.memory_usage:0.1f} MB")
+                print("\tElbow points:", elbow_points)
+                print("\tMotiflets:", *motiflets[elbow_points])
+                print("\tDistances:", *dists[elbow_points])
+
+                assert np.allclose(gt_elbow_points, elbow_points, rtol=1e-2, atol=1e-2), \
+                    f"Elbow points do not match for backend {backend} with length {length}"
+
+                for elbow in elbow_points:
+                    assert np.allclose(np.sort(gt_motiflets[elbow].astype(np.int32)),
+                                       np.sort(motiflets[elbow].astype(np.int32))), \
+                        f"Motiflets do not match for {backend} with length {length}"
+                    assert np.allclose(gt_dists[elbow],
+                                       dists[elbow], rtol=1e-2, atol=1e-2), \
+                        f"Distances do not match for {backend} with length {length}"
+
+                print(f"Backend {backend} passed for series length {length}.\n")
+
+                del ml2
+
+            print("-------------------------------\n")
