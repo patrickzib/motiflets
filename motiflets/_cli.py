@@ -165,6 +165,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default=2,
         help="Subsampling factor to speed up automatic length search (default: 2).",
     )
+    fit_k_elbow.add_argument(
+        "--top-n",
+        type=int,
+        default=1,
+        help="Number of best motiflets to return per k (default: 1).",
+    )
 
     return parser
 
@@ -210,6 +216,7 @@ def _run_fit_k_elbow(
         motif_length=motif_length,
         plot_elbows=False,
         plot_motifs_as_grid=False,
+        top_N=args.top_n,
     )
 
     print(f"dataset:      {motiflets.ds_name}")

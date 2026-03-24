@@ -297,6 +297,7 @@ def as_series(data, index_range, index_name):
 def plot_dataset(
         ds_name,
         data,
+        max_points=1000,
         ground_truth=None,
         show=True
 ):
@@ -314,7 +315,11 @@ def plot_dataset(
         Outputs the plot
 
     """
-    return plot_motifset(ds_name, data, ground_truth=ground_truth, show=show)
+    return plot_motifset(
+        ds_name, data,
+        max_points=max_points,
+        ground_truth=ground_truth,
+        show=show)
 
 
 def append_all_motif_sets(df, motif_sets, method_name, D_full):
@@ -640,7 +645,7 @@ def _plot_elbow_points(
 
     fig, ax = plt.subplots(figsize=(8, 4), constrained_layout=True)
     ax.set_title(ds_name + "\nElbow Points")
-    ax.plot(range(2, len(np.sqrt(dists))), dists[2:], "b", label="Extent")
+    ax.plot(range(2, len(np.sqrt(dists))), dists[2:, 0], "b", label="Extent")
 
     lim1 = plt.ylim()[0]
     lim2 = plt.ylim()[1]
@@ -652,7 +657,7 @@ def _plot_elbow_points(
     ax.set(xlabel='Size (k)', ylabel='Extent')
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
-    motiflets = motifset_candidates[ebs][0]
+    motiflets = [motifset_candidates[eb][0] for eb in ebs]
     for i, motiflet in enumerate(motiflets):
         if motiflet is not None:
             axins = ax.inset_axes(
@@ -780,6 +785,7 @@ def plot_elbow(
                 dists,
                 motif_length,
                 method_name=method_name,
+                max_items=top_N if top_N > 1 else None,
                 show_elbows=False,
                 font_size=24,
                 ground_truth=ground_truth)
@@ -907,6 +913,7 @@ def plot_motif_length_selection(
 def plot_grid_motiflets(
         ds_name, data, motifsets_, elbow_points_, dist_,
         motif_length, font_size=20,
+        max_items=None,
         ground_truth=None,
         method_name=None,
         method_names=None,
@@ -961,8 +968,8 @@ def plot_grid_motiflets(
 
     label_cols = 2
 
-    (dists, motiflets, elbow_points) \
-        = ml.flatten_elbows(elbow_points_, motifsets_, dist_)
+    (dist, motifsets, elbow_points) \
+        = ml.flatten_elbows(elbow_points_, motifsets_, dist_, max_items=max_items)
 
     count_plots = 3 if len(motifsets[elbow_points]) > 6 else 2
     if show_elbows:

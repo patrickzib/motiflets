@@ -995,11 +995,11 @@ def _check_unique(motifset_1, motifset_2, motif_length):
     count = 0
     for a in motifset_1:  # smaller motiflet
         for b in motifset_2:  # larger motiflet
-            if abs(a - b) < (motif_length / 4):
+            if abs(a - b) < (motif_length // 3):
                 count = count + 1
                 break
 
-        if count >= len(motifset_1) / 2:
+        if count >= len(motifset_1) // 2:
             return False
     return True
 
@@ -1170,11 +1170,12 @@ def find_au_ef_motif_length(
 
     # TODO parallelize?
     for i, m in enumerate(motif_length_range[::-1]):
-        if m // subsample < data.shape[-1]:
+        m_sub = m // subsample
+        if m_sub < data.shape[-1] and m_sub >= 2:
             dist, candidates, elbow_points, _, memory_usage = search_k_motiflets_elbow(
                 k_max,
                 data,
-                m // subsample,
+                m_sub,
                 n_jobs=n_jobs,
                 elbow_deviation=elbow_deviation,
                 slack=slack,
@@ -1184,6 +1185,7 @@ def find_au_ef_motif_length(
                 backend=backend,
                 top_N=1)
 
+            # flatten the data types
             dist = dist.squeeze(1)
             elbow_points = np.array(elbow_points).flatten()
             candidates_rank = np.empty(len(candidates), dtype=object)
@@ -1199,15 +1201,15 @@ def find_au_ef_motif_length(
                         dists_.max() - dists_.min())).sum()
                              / len(dists_))
 
-            elbow_points = filter_unique(elbow_points, candidates, m // subsample)
+            elbow_points = filter_unique(elbow_points, candidates_rank, m_sub)
 
             if len(elbow_points > 0):
                 elbows[i] = elbow_points
-                top_motiflets[i] = candidates[elbow_points]
+                top_motiflets[i] = candidates_rank[elbow_points]
             else:
                 # we found only the pair motif
                 elbows[i] = [2]
-                top_motiflets[i] = [candidates[2]]
+                top_motiflets[i] = [candidates_rank[2]]
 
                 # no elbow can be found, ignore this part
                 au_efs[i] = 1.0

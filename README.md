@@ -134,7 +134,8 @@ To extract meaningful **motif sizes (k)** from this use case, we run
 
 dists, candidates, elbow_points = ml.fit_k_elbow(
     k_max,
-    motif_length    
+    motif_length,
+    top_N=1
 )
 ```
 
@@ -152,6 +153,24 @@ The first repetitions perfectly match the calibration signal (orange), while the
 16
 repetitions perfectly match the ECG waves (green).
 
+## Top-N Motif Retrieval
+
+To recover the top-N motiflets simply set `top_N` to the desired value in the call 
+to `fit_k_elbow`.
+
+```
+[...]
+
+dists, candidates, elbow_points = ml.fit_k_elbow(
+    k_max,          # Maximum number of repeats within each motif set
+    motif_length,
+    top_N=2         # Desired number of Motif Sets to return
+)
+```
+
+<img src="https://github.com/patrickzib/motiflets/raw/main/images/motiflets_top_n.png" width="600">
+
+
 ## Command Line Interface
 
 You can pull a time series dataset directly from any URL, and detect motiflets using
@@ -164,14 +183,14 @@ uvx motiflets fit_motif_length data.csv --k-max 6 --motif-length-range 64 128 25
 The call prints a summary of input parameters, and the best window length.
 
 ```bash
-uvx motiflets fit_k data.csv --k-max 6 --motif-length 128
+uvx motiflets fit_k data.csv --k-max 6 --motif-length 128 --top-n 3
 ```
 
 The call prints a summary of input parameters, and the found k-Motiflet locations.
 
-### Multivariate Motif Discovery
-
-This release supports (naive) multivariate motif discovery.
+### Latest Features
+- TOP-N Motif Retrieval: Supports TOP-N retrieval for  retrieving the best N motiflets.
+- Multivariate Motif Discovery: Supports (naive) multivariate motif discovery.
 
 ### Sub-Dimensional Motif Discovery
 
