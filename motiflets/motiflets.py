@@ -269,7 +269,7 @@ def read_dataset(dataset, sampling_factor=10000):
     return zscore(data)
 
 
-@njit(fastmath=True, cache=True)
+@njit(cache=True)
 def _sliding_dot_product(query, time_series):
     """Compute a sliding dot-product using the Fourier-Transform
 
@@ -309,7 +309,7 @@ def _sliding_dot_product(query, time_series):
     return conv[m - 1: n]
 
 
-@njit(nogil=True, fastmath=True, cache=True, parallel=True)
+@njit(cache=True, parallel=True)
 def compute_distances_with_knns_full(
         time_series,
         m,
@@ -406,7 +406,7 @@ def compute_distances_with_knns_full(
     return D, knns
 
 
-@njit(fastmath=True, cache=True)
+@njit(cache=True)
 def compute_upper_bound(
         ts, D_knn, knns, k, m,
         distance_single, preprocessing,
@@ -435,7 +435,7 @@ def compute_upper_bound(
     return kth_extent
 
 
-@njit(fastmath=True, cache=True, nogil=True)
+@njit(cache=True)
 def compute_distances_with_knns_sparse(
         time_series,
         m,
@@ -578,7 +578,7 @@ def compute_distances_with_knns_sparse(
     return D_sparse, knns
 
 
-@njit(nogil=True, fastmath=True, cache=True, parallel=True)
+@njit(cache=True, parallel=True)
 def compute_distances_with_knns(
         time_series,
         m,
@@ -686,7 +686,7 @@ def compute_distances_with_knns(
     return D_knn, knns
 
 
-@njit(fastmath=True, cache=True)
+@njit(cache=True)
 def get_radius(D_full, motifset_pos):
     """Computes the radius of the passed motif set (motiflet).
 
@@ -716,7 +716,7 @@ def get_radius(D_full, motifset_pos):
     return motiflet_radius
 
 
-@njit(fastmath=True, cache=True, nogil=True)
+@njit(cache=True)
 def get_pairwise_extent(D_full, motifset_pos, upperbound=np.inf):
     """Computes the extent of the motifset using pre-computed distances.
 
@@ -755,7 +755,7 @@ def get_pairwise_extent(D_full, motifset_pos, upperbound=np.inf):
     return motifset_extent
 
 
-@njit(fastmath=True, cache=True, nogil=True)
+@njit(cache=True)
 def get_pairwise_extent_raw(
         series, motifset_pos, motif_length,
         distance_single, preprocessing, upperbound=np.inf):
@@ -804,7 +804,7 @@ def get_pairwise_extent_raw(
     return motifset_extent
 
 
-@njit(nogil=True, fastmath=True, cache=True)
+@njit(cache=True)
 def _argknn(
         dist, k, m, lowest_dist=np.inf, slack=0.5):
     """Finds the closest k-NN non-overlapping subsequences in candidates.
@@ -870,7 +870,7 @@ def _argknn(
     return np.array(idx, dtype=np.int32)
 
 
-@njit(fastmath=True, cache=True, nogil=True)
+@njit(cache=True)
 def get_approximate_k_motiflet(
         ts, m, k, D, knns,
         distance_single=None,
@@ -973,7 +973,7 @@ def get_approximate_k_motiflet(
     return motiflet_candidates_sorted, motiflet_dists, motiflet_all_candidates
 
 
-@njit(fastmath=True, cache=True)
+@njit(cache=True)
 def _check_unique(motifset_1, motifset_2, motif_length):
     """Check for overlaps between two motif sets.
 
@@ -1041,7 +1041,7 @@ def filter_unique(elbow_points, candidates, motif_length):
     return np.array(filtered_ebp)
 
 
-@njit(fastmath=True, cache=True)
+@njit(cache=True)
 def find_elbow_points(dists, alpha=2, elbow_deviation=1.00):
     """Finds elbow-points in the elbow-plot (extent over each k).
 
@@ -1427,7 +1427,7 @@ def search_k_motiflets_elbow(
     return k_motiflet_distances, k_motiflet_candidates, elbow_points, m, memory_usage
 
 
-@njit(fastmath=True, cache=True)
+@njit(cache=True)
 def candidate_dist(D_full, pool, upperbound, m, slack=0.5):
     motiflet_candidate_dist = np.float64(0.0)
     m_half = int(m * slack)
@@ -1444,7 +1444,7 @@ def candidate_dist(D_full, pool, upperbound, m, slack=0.5):
     return motiflet_candidate_dist
 
 
-@njit(fastmath=True, cache=True)
+@njit(cache=True)
 def find_k_motiflets(ts, D_full, m, k, upperbound=None, slack=0.5):
     """Exact algorithm to compute k-Motiflets
 
@@ -1514,7 +1514,7 @@ def find_k_motiflets(ts, D_full, m, k, upperbound=None, slack=0.5):
     return motiflet_dist, motiflet_pos
 
 
-@njit(fastmath=True, cache=True, parallel=True)
+@njit(cache=True, parallel=True)
 def compute_distances_full(
         ts,
         m,
