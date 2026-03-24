@@ -1,8 +1,8 @@
-  <div style="border:1px solid #ddd; padding:12px; border-radius:6px;">
+<div style="border:1px solid #ddd; background:#f6f8fa; padding:12px; border-radius:6px;">
     <strong>Latest Features</strong>
     <ul>
       <li>TOP-N retrieval is supported to find the top-n motiflets.</li>
-      <li>Multivariate Motif Discovery: Supports (naive) multivariate motif discovery..</li>
+      <li>Supports (naive) multivariate motif discovery.</li>
     </ul>
   </div>
 
@@ -179,6 +179,12 @@ dists, candidates, elbow_points = ml.fit_k_elbow(
 
 <img src="https://github.com/patrickzib/motiflets/raw/main/images/motiflets_top_n.png" width="600">
 
+<div style="border:1px solid #ddd; background:#f6f8fa; padding:12px; border-radius:6px;">
+  <strong>Latest Features</strong>
+  <ul>
+    <li>TOP-N retrieval is supported to find the top-n motiflets (see <code>--top-n</code> in the CLI and <code>top_N</code> in the Python API).</li>
+  </ul>
+</div>
 
 ## Command Line Interface
 
