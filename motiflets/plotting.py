@@ -66,10 +66,9 @@ class Motiflets:
             n_jobs : int
                 Number of jobs to be used.
             backend : String, default="default"
-                The backend to use. As of now 'scalable', 'sparse' and 'default' are supported.
+                The backend to use. As of now 'scalable', and 'default' are supported.
                 Use 'default' for the original exact implementation with excessive memory,
                 Use 'scalable' for a scalable, exact implementation with less memory,
-                Use 'sparse' for a scalable, exact implementation with more memory.
 
             Returns
             -------
@@ -739,10 +738,9 @@ def plot_elbow(
     distance_preprocessing: callable (default=sliding_mean_std)
         The distance preprocessing function to be computed.
     backend : String, default="default"
-        The backend to use. As of now 'scalable', 'sparse' and 'default' are supported.
+        The backend to use. As of now 'scalable', and 'default' are supported.
         Use 'default' for the original exact implementation with excessive memory,
         Use 'scalable' for a scalable, exact implementation with less memory,
-        Use 'sparse' for a scalable, exact implementation with more memory.
 
     Returns
     -------
@@ -849,10 +847,9 @@ def plot_motif_length_selection(
     distance_preprocessing: callable (default=sliding_mean_std)
         The distance preprocessing function to be computed.
     backend : String, default="default"
-        The backend to use. As of now 'scalable', 'sparse' and 'default' are supported.
+        The backend to use. As of now 'scalable', and 'default' are supported.
         Use 'default' for the original exact implementation with excessive memory,
         Use 'scalable' for a scalable, exact implementation with less memory,
-        Use 'sparse' for a scalable, exact implementation with more memory.
 
     Returns
     -------
