@@ -530,10 +530,10 @@ def get_radius(D_full, motifset_pos):
     """
     motiflet_radius = np.inf
 
-    for ii in np.arange(len(motifset_pos) - 1):
+    for ii in range(len(motifset_pos)):
         i = motifset_pos[ii]
         current = np.float64(0.0)
-        for jj in range(1, len(motifset_pos)):
+        for jj in range(0, len(motifset_pos)):
             if (i != jj):
                 j = motifset_pos[jj]
                 current = max(current, D_full[i, j])
@@ -914,7 +914,7 @@ def find_elbow_points(dists, alpha=2, elbow_deviation=1.00):
             m2 = (dists[i] - dists[i - 1]) + 0.00001
 
             # avoid detecting elbows in near constant data
-            # TODO adding this removes reproducability
+            # TODO adding this removes reproducibility
             # if dists[i - 1] == dists[i]:
             #    m2 = 1.0  # peaks[i] = 0
 
