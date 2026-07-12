@@ -1175,6 +1175,8 @@ def search_k_motiflets_elbow(
         raise ValueError("motif_length must be > 0")
     if slack <= 0:
         raise ValueError("slack must be > 0")
+    if not isinstance(top_N, (int, np.integer)) or top_N < 1:
+        raise ValueError("top_N must be a positive integer")
 
     # non-overlapping motifs only
     n = data_raw.shape[-1] - m + 1
