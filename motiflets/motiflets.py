@@ -8,7 +8,6 @@ __author__ = ["patrickzib"]
 
 import itertools
 import os
-import warnings
 from ast import literal_eval
 from os.path import exists
 from pathlib import Path
@@ -17,7 +16,6 @@ import pandas as pd
 import psutil
 from joblib import Parallel, delayed
 from numba import set_num_threads, objmode, prange, get_num_threads
-from numba import types
 from numba.typed import Dict, List
 from scipy.fft import irfft, next_fast_len, rfft
 from scipy.signal import argrelextrema
@@ -78,7 +76,6 @@ class Motiflets:
 
         self.memory_usage = 0
         self.k_max = 0
-        self.top_N = 1
         self.dists = None
         self.motiflets = None
         self.elbow_points = None
@@ -127,13 +124,12 @@ class Motiflets:
             k_max,
             motif_length=None,
             filter=True,
-            top_N=1,
+            top_N=None,
             plot_elbows=True,
             plot_motifs_as_grid=True,
     ):
         """Computes motif sets across k and optionally renders the results."""
         self.k_max = k_max
-        self.top_N = top_N
 
         if motif_length is None:
             motif_length = self.motif_length
@@ -161,10 +157,10 @@ class Motiflets:
             self.plot_elbow(
                 show_elbows=plot_elbows,
                 show_grid=plot_motifs_as_grid,
+                top_N=top_N
             )
 
-        # FIXME : this is bugged ...
-        return self.get_flattened_motifs()
+        return self._get_flattened_motifs(top_N=None)
 
     def plot_dataset(self, max_points=10_000, path=None):
         plotting = _plotting()
@@ -194,7 +190,7 @@ class Motiflets:
             self.au_ef,
         )
 
-    def plot_elbow(self, show_elbows=True, show_grid=True, method_name=None):
+    def plot_elbow(self, show_elbows=True, show_grid=True, method_name=None, top_N=None):
         if self.dists is None or self.motiflets is None or self.elbow_points is None:
             raise Exception("Please call fit_k_elbow first.")
 
@@ -208,7 +204,7 @@ class Motiflets:
             elbow_points=self.elbow_points,
             ground_truth=self.ground_truth,
             method_name=method_name,
-            top_N=self.top_N,
+            top_N=top_N,
             show_elbows=show_elbows,
             show_grid=show_grid,
         )
@@ -236,7 +232,7 @@ class Motiflets:
 
         return fig, ax
 
-    def get_flattened_motifs(self):
+    def _get_flattened_motifs(self, top_N=None):
         """Returns motif candidates with all computed k entries preserved."""
         if self.dists is None or self.motiflets is None or self.elbow_points is None:
             raise Exception("Please call fit_k_elbow first.")
@@ -248,7 +244,7 @@ class Motiflets:
         else:
             elbow_points = np.array(self.elbow_points, dtype=np.int32)
 
-        if self.top_N == 1 and self.dists.ndim == 2:
+        if top_N == 1 and self.dists.ndim == 2:
             dists = self.dists[:, 0]
             motiflets = np.empty(len(self.motiflets), dtype=object)
             motiflets[:] = None
@@ -328,6 +324,7 @@ def convert_to_2d(
 
 
 def flatten_elbows(elbow_points, candidates, dists, max_items=None):
+    # Already flat: return the inputs as arrays without rank-based expansion.
     if not isinstance(elbow_points, list) or (
             len(elbow_points) > 0 and np.isscalar(elbow_points[0])):
         return (
@@ -345,23 +342,21 @@ def flatten_elbows(elbow_points, candidates, dists, max_items=None):
             items.append((k, rank, dists[k, rank]))
 
     if max_items is not None:
+        # Select larger motif sizes first, breaking ties by lower distance.
         items.sort(key=lambda item: (-item[0], item[2]))
         items = items[:max_items]
 
-    flat_candidates = np.empty(len(candidates), dtype=object)
-    flat_candidates[:] = None
-    flat_dists = np.full(len(candidates), np.inf, dtype=np.float64)
+    flat_candidates = []
+    flat_dists = []
     flat_elbows = []
     for k, rank, dist in items:
-        if k not in flat_elbows:
-            flat_elbows.append(k)
-        if flat_candidates[k] is None or dist < flat_dists[k]:
-            flat_candidates[k] = candidates[k][rank]
-            flat_dists[k] = dist
+        flat_candidates.append(candidates[k][rank])
+        flat_dists.append(dist)
+        flat_elbows.append(k)
 
     return (
-        flat_dists,
-        flat_candidates,
+        np.array(flat_dists, dtype=np.float64),
+        np.array(flat_candidates, dtype=object),
         np.array(flat_elbows, dtype=np.int32),
     )
 
@@ -958,7 +953,6 @@ def get_approximate_k_motiflet(
         distance_single=None,
         preprocessing=None,
         use_D_full=True,
-        upper_bound=np.inf,
         top_N=1
 ):
     """Compute the approximate k-Motiflets.
@@ -982,8 +976,11 @@ def get_approximate_k_motiflet(
         If False, uses pairwise distances computed from the time series.
     upper_bound : float
         Used for admissible pruning
-    top_N : int
-        Number of best motiflets to return
+    top_N : int, default=1
+      Number of best non-overlapping motiflet candidates to return for the
+      current k. In elbow-plot searches, this limit applies independently
+      at each tested k.
+
 
     Returns
     -------
@@ -1325,7 +1322,7 @@ def search_k_motiflets_elbow(
         distance_single=znormed_euclidean_distance_single,
         distance_preprocessing=sliding_mean_std,
         backend="default",
-        top_N=1,
+        top_N=None,
 ):
     """Computes the elbow-function.
 
@@ -1369,8 +1366,10 @@ def search_k_motiflets_elbow(
         The backend to use. As of now 'scalable', and 'default' are supported.
         Use 'default' for the original exact implementation with excessive memory,
         Use 'scalable' for a scalable, exact implementation with less memory,
-    top_N : int
-        Number of best motiflets to return per k.
+    top_N : int, default=None
+        Number of best non-overlapping motiflet candidates to return for the
+        current k. In elbow-plot searches, this limit applies independently
+        at each tested k.
 
     Returns
     -------
@@ -1418,8 +1417,11 @@ def search_k_motiflets_elbow(
         raise ValueError("motif_length must be > 0")
     if slack <= 0:
         raise ValueError("slack must be > 0")
-    if not isinstance(top_N, (int, np.integer)) or top_N < 1:
-        raise ValueError("top_N must be a positive integer")
+
+    if top_N is None:
+        top_N = 1
+    elif not isinstance(top_N, (int, np.integer)) or top_N < 1:
+        raise ValueError("top_N must be a positive integer or None")
 
     # non-overlapping motifs only
     n = data_raw.shape[-1] - m + 1
@@ -1454,20 +1456,16 @@ def search_k_motiflets_elbow(
             preprocessing.append(distance_preprocessing(data_raw[dim], m))
         preprocessing = np.array(preprocessing, dtype=np.float64)
 
-        upper_bound = np.inf
         for test_k in np.arange(k_max_ - 1, 1, -1, dtype=np.int32):
             candidates, candidate_dists, _ = get_approximate_k_motiflet(
                 data_raw, m, test_k, D_full, knns,
                 distance_single=distance_single,
                 preprocessing=preprocessing,
                 use_D_full=(backend != "scalable"),
-                upper_bound=upper_bound,
                 top_N=top_N
             )
-            candidate_dist = candidate_dists[0]
             k_motiflet_distances[test_k, :len(candidate_dists)] = candidate_dists
             k_motiflet_candidates[test_k] = candidates
-            upper_bound = min(candidate_dist, upper_bound)
 
         del D_full
         del knns
@@ -1546,7 +1544,7 @@ def find_k_motiflets(ts, D_full, m, k, upperbound=None, slack=0.5):
     motiflet_dist = upperbound
     if upperbound is None:
         motiflet_candidate, motiflet_dist, _ = get_approximate_k_motiflet(
-            ts, m, k, D_full, upper_bound=np.inf, slack=slack)
+            ts, m, k, D_full, slack=slack)
 
         motiflet_pos = motiflet_candidate
 
