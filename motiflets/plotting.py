@@ -498,7 +498,7 @@ def plot_elbow_result(
                 dists,
                 motif_length,
                 method_name=method_name,
-                max_items=top_N if top_N > 1 else None,
+                max_items=top_N if top_N is not None and top_N > 1 else None,
                 show_elbows=False,
                 font_size=24,
                 ground_truth=ground_truth))
