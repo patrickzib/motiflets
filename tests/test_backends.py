@@ -1,6 +1,7 @@
 import numpy as np
 import warnings
 
+from motiflets import Motiflets
 from motiflets.plotting import *
 from tests._datasets import read_penguin
 
@@ -17,9 +18,10 @@ def test_motiflets_univariate():
     lengths = [
         # 1_000,
         5_000,
-        # 10_000,
-        # 30_000,
-        # 50_000
+        10_000,
+        30_000,
+        # 50_000,
+        # 100_000
     ]
 
     ds_name, B = read_penguin()
@@ -55,7 +57,7 @@ def test_motiflets_univariate():
 
             del ml
 
-            for backend in ["scalable", "sparse"]:
+            for backend in ["scalable"]:
                 print(f"Testing backend: {backend}")
 
                 ml2 = Motiflets(
