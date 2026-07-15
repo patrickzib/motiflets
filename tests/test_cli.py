@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest import mock
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -69,11 +70,12 @@ def test_fit_k_runs_pipeline(tmp_path, capsys):
 
         instance = motiflets_cls.return_value
         instance.motif_length = 128
-        instance.fit_k_elbow.return_value = (
-            [None, None, 0.5],
-            [None, None, [10, 20]],
-            [2],
-        )
+        instance.fit_k_elbow.return_value = None
+        instance.dists = np.full((4, 1), np.inf)
+        instance.dists[2, 0] = 0.5
+        instance.motiflets = np.empty(4, dtype=object)
+        instance.motiflets[2] = np.array([[10, 20]])
+        instance.elbow_points = [np.array([2])]
         instance.ds_name = "series"
 
         exit_code = _cli.main(
@@ -100,6 +102,54 @@ def test_fit_k_runs_pipeline(tmp_path, capsys):
     captured = capsys.readouterr()
     assert "motif_length: 128" in captured.out
     assert "k=2" in captured.out
+
+
+def test_fit_k_cli_prints_duplicate_top_n_elbows(tmp_path, capsys):
+    csv_path = _write_series(tmp_path)
+
+    with mock.patch("motiflets._cli._get_motiflets_class") as get_class:
+        motiflets_cls = mock.Mock()
+        get_class.return_value = motiflets_cls
+
+        instance = motiflets_cls.return_value
+        instance.motif_length = 128
+        instance.fit_k_elbow.return_value = None
+        instance.dists = np.full((9, 2), np.inf)
+        instance.dists[8, 0] = 0.8
+        instance.dists[5, 0] = 0.5
+        instance.dists[8, 1] = 0.9
+        instance.motiflets = np.empty(9, dtype=object)
+        instance.motiflets[8] = np.array([
+            np.array([10, 20, 30, 40, 50, 60, 70, 80]),
+            np.array([11, 21, 31, 41, 51, 61, 71, 81]),
+        ], dtype=object)
+        instance.motiflets[5] = np.array([
+            np.array([100, 200, 300, 400, 500]),
+            np.array([101, 201, 301, 401, 501]),
+        ], dtype=object)
+        instance.elbow_points = [np.array([8, 5]), np.array([8])]
+        instance.ds_name = "series"
+
+        exit_code = _cli.main(
+            [
+                "fit_k",
+                str(csv_path),
+                "--k-max",
+                "8",
+                "--motif-length",
+                "128",
+                "--top-n",
+                "2",
+            ]
+        )
+
+        assert exit_code == 0
+
+    captured = capsys.readouterr()
+    assert captured.out.count("k=8:") == 2
+    assert "k=5:" in captured.out
+    assert "motif_set=[10, 20, 30, 40, 50, 60, 70, 80]" in captured.out
+    assert "motif_set=[11, 21, 31, 41, 51, 61, 71, 81]" in captured.out
 
 
 def test_parse_motif_length_range_expands_colon_expressions():

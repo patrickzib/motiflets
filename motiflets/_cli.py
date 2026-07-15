@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import List, Optional, Sequence, Union
 from urllib.parse import urlparse
 
+import numpy as np
 import pandas as pd
 
 os.environ.setdefault("MPLBACKEND", "Agg")
@@ -69,7 +70,7 @@ def _dispatch(args: argparse.Namespace) -> int:
 def _get_motiflets_class():
     global _MOTIFLETS_CLASS
     if _MOTIFLETS_CLASS is None:
-        from motiflets.plotting import Motiflets as motiflets_cls
+        from motiflets.motiflets import Motiflets as motiflets_cls
 
         _MOTIFLETS_CLASS = motiflets_cls
     return _MOTIFLETS_CLASS
@@ -211,12 +212,19 @@ def _run_fit_k_elbow(
     if motif_length is None:
         raise CLIError(f"motif-length parameter must be set.")
 
-    dists, motif_sets, elbow_points = motiflets.fit_k_elbow(
+    motiflets.fit_k_elbow(
         args.k_max,
         motif_length=motif_length,
         plot_elbows=False,
         plot_motifs_as_grid=False,
         top_N=args.top_n,
+    )
+    from motiflets.motiflets import flatten_elbows
+
+    dists, motif_sets, elbow_points = flatten_elbows(
+        motiflets.elbow_points,
+        motiflets.motiflets,
+        motiflets.dists,
     )
 
     print(f"dataset:      {motiflets.ds_name}")
@@ -233,9 +241,11 @@ def _run_fit_k_elbow(
         + (", ".join(str(k) for k in elbow_list) if elbow_list else "none"),
     )
 
-    for k in elbow_list:
-        motif = motif_sets[k]
-        dist = dists[k]
+    dense_flattened = len(motif_sets) == len(elbow_points)
+    for i, k in enumerate(elbow_list):
+        output_index = i if dense_flattened else k
+        motif = motif_sets[output_index]
+        dist = dists[output_index]
         motif_repr = _format_motif_set(motif)
         dist_value = _format_distance(dist)
         print(f"k={k}: distance={dist_value} motif_set={motif_repr}")

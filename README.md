@@ -109,18 +109,18 @@ and to find the largest set of the same motif, i.e. all repetitions.
 We first extract meaningful **motif lengths (l)** from this use case:
 
 ```
-from motiflets.motiflets import *
-from motiflets.plotting import *   # the Motiflets module is located here
+from motiflets import Motiflets
+from motiflets.motiflets import read_dataset_with_index
 
 series, df_gt = read_dataset_with_index(file) 
 
 # The Motiflets-class
 ml = Motiflets(
-    ds_name,     # the name of the series
-    series,      # the data
-    distance,    # Distance measure used, default: z-normed ED
-    df_gt,       # ground truth, if available
-    n_jobs       # number of jobs (cores) to be used.
+    ds_name=ds_name,       # the name of the series
+    series=series,         # the data
+    distance=distance,     # Distance measure used, default: z-normed ED
+    ground_truth=df_gt,    # ground truth, if available
+    n_jobs=n_jobs          # number of jobs (cores) to be used.
 )
 
 k_max = 20  # maxmimum number of repeats in each motif set
@@ -145,13 +145,17 @@ To extract meaningful **motif sizes (k)** from this use case, we run
 dists, candidates, elbow_points = ml.fit_k_elbow(
     k_max,
     motif_length,
-    top_N
+    top_N=top_N
 )
 ```
 
 The variable `elbow_points` holds characteristic motif sizes found.  
 Elbow points represent meaningful motif sizes. Here, $6$ and $16$ are elbows, which are
 the 6 calibration waves and the 16 heartbeats.
+
+The returned `dists`, `candidates`, and `elbow_points` arrays are aligned by position
+for plotting and reporting: `candidates[i]` is the motif set, `dists[i]` its extent,
+and `elbow_points[i]` the corresponding motif size `k`.
 
 <img src="https://github.com/patrickzib/motiflets/raw/main/images/elbows.png" width="300">
 
@@ -175,6 +179,15 @@ dists, candidates, elbow_points = ml.fit_k_elbow(
     motif_length,
     top_N=2         # Desired number of Motif Sets to return, e.g. 2
 )
+```
+
+When `top_N > 1`, multiple returned motif sets can have the same motif size. In that
+case `elbow_points` can contain duplicate `k` values, and each duplicate refers to a
+different motif set at the same row position:
+
+```python
+for k, motif_set, dist in zip(elbow_points, candidates, dists):
+    print(k, motif_set, dist)
 ```
 
 <img src="https://github.com/patrickzib/motiflets/raw/main/images/motiflets_top_n.png" width="600">
@@ -201,7 +214,9 @@ The call prints a summary of input parameters, and the best window length.
 uvx motiflets fit_k data.csv --k-max 6 --motif-length 128 --top-n 3
 ```
 
-The call prints a summary of input parameters, and the found k-Motiflet locations.
+The call prints a summary of input parameters and one line per returned motif set. With
+`--top-n`, the output can contain multiple lines with the same `k`; these are different
+motif sets for the same motif size.
 
 ### Sub-Dimensional Motif Discovery
 
@@ -246,7 +261,7 @@ paper.
 - Jupyter-Notebook <a href="notebooks/use_cases_motif_sets_winding.ipynb">Industrial
   Winding Process</a> is a snapshot of a process where a plastic web is unwound from a
   first reel (unwinding reel), goes over the second traction reel and is finally rewound
-  on the the third rewinding reel. The recordings correspond to the traction of the
+  on the third rewinding reel. The recordings correspond to the traction of the
   second reel angular speed. The data contains 2.500 points sampled at 0.1𝑠,
   corresponding to 250𝑠. No documented motifs exist.
 

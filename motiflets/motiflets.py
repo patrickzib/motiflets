@@ -1,29 +1,257 @@
 # -*- coding: utf-8 -*-
 """Compute k-Motiflets.
-
-
 """
 
 __author__ = ["patrickzib"]
 
 import itertools
-import math
 import os
-import warnings
 from ast import literal_eval
 from os.path import exists
+from pathlib import Path
 
 import pandas as pd
 import psutil
 from joblib import Parallel, delayed
 from numba import set_num_threads, objmode, prange, get_num_threads
-from numba import types
 from numba.typed import Dict, List
+from scipy.fft import irfft, next_fast_len, rfft
 from scipy.signal import argrelextrema
 from scipy.stats import zscore
 
 from motiflets.distances import *
 from motiflets.maxheap import MaxHeap
+
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _resolve_dataset_path(*parts):
+    legacy_path = Path("..", "datasets", *parts)
+    if legacy_path.exists():
+        return legacy_path
+    return _PROJECT_ROOT / "datasets" / Path(*parts)
+
+
+def _plotting():
+    from motiflets import plotting
+    return plotting
+
+
+class Motiflets:
+
+    def __init__(
+            self,
+            ds_name,
+            series,
+            ground_truth=None,
+            elbow_deviation=1.00,
+            distance="znormed_ed",
+            slack=0.5,
+            n_jobs=-1,
+            backend="default"
+    ):
+        """User-facing API for computing and plotting k-Motiflets."""
+        self.ds_name = ds_name
+        self.series = series
+        self.elbow_deviation = elbow_deviation
+        self.slack = slack
+        self.ground_truth = ground_truth
+
+        n_jobs = os.cpu_count() if n_jobs < 1 else n_jobs
+        self.n_jobs = n_jobs
+
+        self.distance_preprocessing, self.distance, self.distance_single \
+            = map_distances(distance)
+        self.backend = backend
+
+        self.motif_length_range = None
+        self.motif_length = 0
+        self.all_extrema = []
+        self.all_elbows = []
+        self.all_top_motiflets = []
+        self.all_dists = []
+
+        self.memory_usage = 0
+        self.k_max = 0
+        self.dists = None
+        self.motiflets = None
+        self.elbow_points = None
+        self.au_ef = None
+
+    def fit_motif_length(
+            self,
+            k_max,
+            motif_length_range,
+            subsample=2,
+            plot=True,
+    ):
+        """Computes the AU_EF plot to extract the best motif length."""
+        self.motif_length_range = np.int32(motif_length_range)
+        self.k_max = k_max
+
+        _, data_raw = pd_series_to_numpy(self.series)
+        (
+            self.motif_length,
+            self.all_extrema,
+            self.au_ef,
+            self.all_elbows,
+            self.all_top_motiflets,
+            self.all_dists,
+        ) = find_au_ef_motif_length(
+            data_raw,
+            k_max,
+            motif_length_range=self.motif_length_range,
+            n_jobs=self.n_jobs,
+            elbow_deviation=self.elbow_deviation,
+            slack=self.slack,
+            subsample=subsample,
+            distance=self.distance,
+            distance_single=self.distance_single,
+            distance_preprocessing=self.distance_preprocessing,
+            backend=self.backend,
+        )
+
+        if plot:
+            self.plot_motif_length_selection()
+
+        return self.motif_length
+
+    def fit_k_elbow(
+            self,
+            k_max,
+            motif_length=None,
+            filter=True,
+            top_N=None,
+            plot_elbows=True,
+            plot_motifs_as_grid=True,
+    ):
+        """Computes motif sets across k and optionally renders the results."""
+        self.k_max = k_max
+
+        if motif_length is None:
+            motif_length = self.motif_length
+        else:
+            self.motif_length = motif_length
+
+        self.dists, self.motiflets, self.elbow_points, _, self.memory_usage = (
+            search_k_motiflets_elbow(
+                k_max,
+                self.series,
+                motif_length,
+                n_jobs=self.n_jobs,
+                elbow_deviation=self.elbow_deviation,
+                filter=filter,
+                slack=self.slack,
+                distance=self.distance,
+                distance_single=self.distance_single,
+                distance_preprocessing=self.distance_preprocessing,
+                backend=self.backend,
+                top_N=top_N,
+            )
+        )
+
+        if plot_elbows or plot_motifs_as_grid:
+            self.plot_elbow(
+                show_elbows=plot_elbows,
+                show_grid=plot_motifs_as_grid,
+                top_N=top_N
+            )
+
+        return self._get_flattened_motifs(top_N=None)
+
+    def plot_dataset(self, max_points=10_000, path=None):
+        plotting = _plotting()
+        fig, ax = plotting.plot_dataset(
+            self.ds_name,
+            self.series,
+            max_points=max_points,
+            show=path is None,
+            ground_truth=self.ground_truth)
+
+        if path is not None:
+            plotting.plt.savefig(path)
+            plotting.plt.show()
+
+        return fig, ax
+
+    def plot_motif_length_selection(self):
+        if self.motif_length_range is None or self.au_ef is None:
+            raise Exception("Please call fit_motif_length first.")
+
+        plotting = _plotting()
+        return plotting.plot_motif_length_result(
+            self.k_max,
+            self.series,
+            self.motif_length_range,
+            self.ds_name,
+            self.au_ef,
+        )
+
+    def plot_elbow(self, show_elbows=True, show_grid=True, method_name=None, top_N=None):
+        if self.dists is None or self.motiflets is None or self.elbow_points is None:
+            raise Exception("Please call fit_k_elbow first.")
+
+        plotting = _plotting()
+        return plotting.plot_elbow_result(
+            ds_name=self.ds_name,
+            data=self.series,
+            motif_length=self.motif_length,
+            dists=self.dists,
+            candidates=self.motiflets,
+            elbow_points=self.elbow_points,
+            ground_truth=self.ground_truth,
+            method_name=method_name,
+            top_N=top_N,
+            show_elbows=show_elbows,
+            show_grid=show_grid,
+        )
+
+    def plot_motifset(self, max_points=10_000, path=None, elbow_point=None):
+        if self.dists is None or self.motiflets is None or self.elbow_points is None:
+            raise Exception("Please call fit_k_elbow first.")
+
+        if elbow_point is None:
+            elbow_point = self.elbow_points[0][-1]
+
+        plotting = _plotting()
+        fig, ax = plotting.plot_motifset(
+            self.ds_name,
+            self.series,
+            max_points=max_points,
+            motifsets=self.motiflets[elbow_point].reshape((1, -1)),
+            dist=self.dists[elbow_point],
+            motif_length=self.motif_length,
+            show=path is None)
+
+        if path is not None:
+            plotting.plt.savefig(path)
+            plotting.plt.show()
+
+        return fig, ax
+
+    def _get_flattened_motifs(self, top_N=None):
+        """Returns motif candidates with all computed k entries preserved."""
+        if self.dists is None or self.motiflets is None or self.elbow_points is None:
+            raise Exception("Please call fit_k_elbow first.")
+
+        if isinstance(self.elbow_points, list):
+            elbow_points = np.array([
+                k for elbows in self.elbow_points for k in elbows
+            ], dtype=np.int32)
+        else:
+            elbow_points = np.array(self.elbow_points, dtype=np.int32)
+
+        if top_N == 1 and self.dists.ndim == 2:
+            dists = self.dists[:, 0]
+            motiflets = np.empty(len(self.motiflets), dtype=object)
+            motiflets[:] = None
+            for k, candidates in enumerate(self.motiflets):
+                if candidates is not None and len(candidates) > 0:
+                    motiflets[k] = candidates[0]
+            return dists, motiflets, elbow_points
+
+        return self.dists, self.motiflets, elbow_points
 
 
 def as_series(data, index_range, index_name):
@@ -94,8 +322,14 @@ def convert_to_2d(
 
 
 def flatten_elbows(elbow_points, candidates, dists, max_items=None):
-    if not isinstance(elbow_points, list):
-        return elbow_points, candidates, dists
+    # Already flat: return the inputs as arrays without rank-based expansion.
+    if not isinstance(elbow_points, list) or (
+            len(elbow_points) > 0 and np.isscalar(elbow_points[0])):
+        return (
+            np.array(dists, dtype=np.float64),
+            np.array(candidates, dtype=object),
+            np.array(elbow_points, dtype=np.int32),
+        )
 
     items = []
     for rank in range(len(elbow_points)):
@@ -106,20 +340,22 @@ def flatten_elbows(elbow_points, candidates, dists, max_items=None):
             items.append((k, rank, dists[k, rank]))
 
     if max_items is not None:
+        # Select larger motif sizes first, breaking ties by lower distance.
         items.sort(key=lambda item: (-item[0], item[2]))
         items = items[:max_items]
 
     flat_candidates = []
     flat_dists = []
+    flat_elbows = []
     for k, rank, dist in items:
         flat_candidates.append(candidates[k][rank])
         flat_dists.append(dist)
+        flat_elbows.append(k)
 
-    flat_elbows = np.arange(len(flat_candidates), dtype=np.int32)
     return (
         np.array(flat_dists, dtype=np.float64),
         np.array(flat_candidates, dtype=object),
-        flat_elbows,
+        np.array(flat_elbows, dtype=np.int32),
     )
 
 
@@ -153,7 +389,7 @@ def read_ground_truth(dataset):
         A series of ground-truth data
 
     """
-    file = '../datasets/ground_truth/' + dataset.split(".")[0] + "_gt.csv"
+    file = _resolve_dataset_path("ground_truth", dataset.split(".")[0] + "_gt.csv")
     if exists(file):
         print(file)
         series = pd.read_csv(file, index_col=0)
@@ -185,7 +421,7 @@ def read_dataset_with_index(dataset, sampling_factor=10000):
             Ground-truth, if available as `dataset`_gt file
 
     """
-    full_path = '../datasets/ground_truth/' + dataset
+    full_path = _resolve_dataset_path("ground_truth", dataset)
     data = pd.read_csv(full_path, index_col=0).squeeze('columns')
     print("Dataset Original Length n: ", len(data))
 
@@ -258,7 +494,7 @@ def read_dataset(dataset, sampling_factor=10000):
         The time series with z-score applied.
 
     """
-    full_path = '../datasets/' + dataset
+    full_path = _resolve_dataset_path(dataset)
     data = pd.read_csv(full_path).T
     data = np.array(data)[0]
     print("Dataset Original Length n: ", len(data))
@@ -290,23 +526,29 @@ def _sliding_dot_product(query, time_series):
     if m > n:
         raise ValueError("query longer than time_series")
 
-    # Reverse query for cross-correlation and cast to float64
+    # Reverse query for cross-correlation.
     q_rev = query[::-1]
-    t = time_series
-
-    # Next power-of-two ≥ n + m  (good for FFT speed)
-    total = n + m
-    exponent = math.ceil(math.log2(total))
-
-    L = 1 << exponent
-    q_pad = np.concatenate((q_rev, np.zeros(L - m, dtype=q_rev.dtype)))
-    t_pad = np.concatenate((t, np.zeros(L - n, dtype=t.dtype)))
 
     with objmode(conv='float64[:]'):
-        conv = np.fft.irfft(np.fft.rfft(q_pad) * np.fft.rfft(t_pad))
+        fft_length = next_fast_len(n + m - 1, real=True)
+        conv = irfft(rfft(q_rev, fft_length) * rfft(time_series, fft_length),
+                     fft_length)
 
     # Trim to the valid sliding-dot range
     return conv[m - 1: n]
+
+
+@njit(fastmath=True, cache=True, inline='always')
+def _update_sliding_dot_product(dot_rolled, dot_first_order, ts, order, m, n):
+    add = ts[order + m - 1]
+    remove = ts[order - 1]
+
+    dot_rolled[1:] = (
+            dot_rolled[:-1]
+            + add * ts[m:n + m - 1]
+            - remove * ts[:n - 1]
+    )
+    dot_rolled[0] = dot_first_order
 
 
 @njit(cache=True, parallel=True)
@@ -372,7 +614,7 @@ def compute_distances_with_knns_full(
     D = np.zeros((n, n), dtype=np.float64)
     knns = np.full((n, k), -1, dtype=np.int32)
 
-    bin_size = np.int32(np.ceil(time_series.shape[-1] / n_jobs))
+    bin_size = np.int32(np.ceil(n / n_jobs))
 
     for idx in prange(n_jobs):
         start = idx * bin_size
@@ -383,199 +625,23 @@ def compute_distances_with_knns_full(
             preprocessing = distance_preprocessing(ts, m)
             dot_first = _sliding_dot_product(ts[:m], ts)
 
-            dot_prev = None
             for order in range(start, end):
                 if order == start:
                     # O(n log n) operation
                     dot_rolled = _sliding_dot_product(ts[start:start + m], ts)
                 else:
-                    # constant time O(1) operations
-                    dot_rolled = np.roll(dot_prev, 1) \
-                                 + ts[order + m - 1] * ts[m - 1:n + m] \
-                                 - ts[order - 1] * np.roll(ts[:n], 1)
-                    dot_rolled[0] = dot_first[order]
+                    # constant time O(n) operations
+                    _update_sliding_dot_product(
+                        dot_rolled, dot_first[order], ts, order, m, n)
 
                 dist = distance(dot_rolled, n, m, preprocessing, order, halve_m)
                 D[order] += dist
-                dot_prev = dot_rolled
 
         for order in range(start, end):
             knn = _argknn(D[order], k, m, slack=slack)
             knns[order, :len(knn)] = knn
 
     return D, knns
-
-
-@njit(cache=True)
-def compute_upper_bound(
-        ts, D_knn, knns, k, m,
-        distance_single, preprocessing,
-):
-    kth_extent = np.zeros(k, dtype=np.float64)
-    kth_extent[0] = np.inf
-
-    for kk in np.arange(1, len(kth_extent)):
-        # kk is the kk-th NN
-        # The motiflet candidate has thus kk+1 elements (including the query itself)
-        best_knn_pos = np.argmin(D_knn[:, kk])
-        candidate = knns[best_knn_pos, :kk + 1]
-        kth_extent[kk] = get_pairwise_extent_raw(
-            ts, candidate, m,
-            distance_single,
-            preprocessing)
-
-        # extent must be within the diameter of the sphere
-        kth_nn_min = np.min(D_knn[:, kk])
-        if kth_extent[kk] > 4 * kth_nn_min or kth_extent[kk] < kth_nn_min:
-            kth_extent[kk] = kth_nn_min
-
-        # assert kth_extent[kk] <= 4 * kth_nn_min
-        # assert kth_extent[kk] >= kth_nn_min
-
-    return kth_extent
-
-
-@njit(cache=True)
-def compute_distances_with_knns_sparse(
-        time_series,
-        m,
-        k,
-        exclude_trivial_match=True,
-        n_jobs=4,
-        slack=0.5,
-        distance=znormed_euclidean_distance,
-        distance_single=znormed_euclidean_distance_single,
-        distance_preprocessing=sliding_mean_std
-):
-    """ Compute the full Distance Matrix between all pairs of subsequences of a
-        multivariate time series.
-
-        Computes pairwise distances between n-m+1 subsequences, of length, extracted
-        from the time series, of length n.
-
-        Z-normed ED is used for distances.
-
-        This implementation is in O(n^2) by using the sliding dot-product.
-
-        Parameters
-        ----------
-        time_series : array-like
-            The time series
-        m : int
-            The window length
-        k : int
-            Number of nearest neighbors
-        exclude_trivial_match : bool (default: True)
-            Trivial matches will be excluded if this parameter is set
-        n_jobs : int (default: 4)
-            Number of jobs to be used.
-        slack: float (default: 0.5)
-            Defines an exclusion zone around each subsequence to avoid trivial matches.
-            Defined as percentage of m. E.g. 0.5 is equal to half the window length.
-        distance: callable (default: znormed_euclidean_distance)
-                The distance function to be computed.
-        distance_preprocessing: callable (default: sliding_mean_std)
-                The distance preprocessing function to be computed.
-
-        Returns
-        -------
-        D : 2d array-like
-            The O(n^2) z-normed ED distances between all pairs of subsequences
-        knns : 2d array-like
-            The k-nns for each subsequence
-
-    """
-    # Input dim must be 2d
-    assert time_series.ndim == 2, "Dimensionality is not correct"
-
-    dims = time_series.shape[0]
-    n = np.int32(time_series.shape[-1] - m + 1)
-    n_jobs = max(1, min(n // 8, n_jobs))  # Cannot use more jobs than length of the ts
-
-    halve_m = 0
-    if exclude_trivial_match:
-        halve_m = int(m * slack)
-
-    bin_size = np.int32(np.ceil(time_series.shape[-1] / n_jobs))
-
-    D_knn, knns = compute_distances_with_knns(
-        time_series,
-        m,
-        k,
-        exclude_trivial_match,
-        n_jobs,
-        slack,
-        distance,
-        distance_preprocessing
-    )
-
-    preprocessing = []
-    dot_first = []
-    for dim in np.arange(time_series.shape[0]):
-        preprocessing.append(distance_preprocessing(time_series[dim], m))
-        dot_first.append(_sliding_dot_product(time_series[dim, :m], time_series[dim]))
-
-    # TODO no sparse matrix support in numba. Thus we use this hack
-    D_bool = [Dict.empty(key_type=types.int32, value_type=types.uint16) for _ in
-              np.arange(n)]
-
-    # Store an upper bound for each k-nn distance
-    kth_extent = compute_upper_bound(
-        time_series, D_knn, knns, k, m,
-        distance_single, preprocessing,
-    )
-
-    # Parallelizm does not work, as Dict is not thread safe :/
-    for order in np.arange(0, n):
-        # memorize which pairs are needed
-        for ks, dist in zip(knns[order], D_knn[order]):
-            D_bool[order][ks] = True
-
-            bound = False
-            k_index = -1
-            for kk in range(len(kth_extent) - 1, 0, -1):
-                if D_knn[order, kk] <= kth_extent[kk]:
-                    bound = True
-                    k_index = kk + 1
-                    break
-            if bound:
-                for ks2 in knns[order, :k_index]:
-                    D_bool[ks][ks2] = True
-
-    D_sparse = List()
-    for i in np.arange(n):
-        D_sparse.append(Dict.empty(key_type=types.int32, value_type=types.float64))
-
-    # second pass, filling only the pairs needed
-    for idx in prange(n_jobs):
-        dot_rolled = np.zeros((dims, n), dtype=np.float64)
-        dot_prev = np.zeros((dims, n), dtype=np.float64)
-
-        start = idx * bin_size
-        end = min(start + bin_size, n)
-
-        for order in range(start, end):
-            dist = np.zeros(n, dtype=np.float64)
-            for d in range(dims):
-                ts = time_series[d, :]
-                if order == start:
-                    # O(n log n) operation
-                    dot_rolled[d] = (_sliding_dot_product(ts[start:start + m], ts))
-                else:
-                    # constant time O(1) operations
-                    dot_rolled[d] = np.roll(dot_prev[d], 1) \
-                                    + ts[order + m - 1] * ts[m - 1:n + m] \
-                                    - ts[order - 1] * np.roll(ts[:n], 1)
-                    dot_rolled[d][0] = dot_first[d][order]
-
-                dist += distance(dot_rolled[d], n, m, preprocessing[d], order, halve_m)
-                dot_prev[d] = dot_rolled[d]
-
-            # fill the k-nns now with the distances computed
-            for key in D_bool[order]:
-                D_sparse[order][key] = dist[key]
-
-    return D_sparse, knns
 
 
 @njit(cache=True, parallel=True)
@@ -642,7 +708,7 @@ def compute_distances_with_knns(
     D_knn = np.zeros((n, k), dtype=np.float64)
     knns = np.full((n, k), -1, dtype=np.int32)
 
-    bin_size = np.int32(np.ceil(time_series.shape[-1] / n_jobs))
+    bin_size = np.int32(np.ceil(n / n_jobs))
 
     preprocessing = []
     dot_first = []
@@ -655,7 +721,6 @@ def compute_distances_with_knns(
     # first pass, computing the k-nns
     for idx in prange(n_jobs):
         dot_rolled = np.zeros((dims, n), dtype=np.float64)
-        dot_prev = np.zeros((dims, n), dtype=np.float64)
 
         start = np.int32(idx * bin_size)
         end = np.int32(min(start + bin_size, n))
@@ -668,16 +733,13 @@ def compute_distances_with_knns(
                     # O(n log n) operation
                     dot_rolled[d] = _sliding_dot_product(ts[start:start + m], ts)
                 else:
-                    # constant time O(1) operations
-                    dot_rolled[d] = np.roll(dot_prev[d], 1) \
-                                    + ts[order + m - 1] * ts[m - 1:n + m] \
-                                    - ts[order - 1] * np.roll(ts[:n], 1)
-                    dot_rolled[d][0] = dot_first[d][order]
+                    # constant time O(n) operations
+                    _update_sliding_dot_product(
+                        dot_rolled[d], dot_first[d][order], ts, order, m, n)
 
                 dists = distance(dot_rolled[d], n, m, preprocessing[d], order, halve_m)
                 for i in range(len(dists)):
                     dist[i] += dists[i]
-                dot_prev[d] = dot_rolled[d]
 
             knn = _argknn(dist, k, m, slack=slack)
             D_knn[order, :len(knn)] = dist[knn]
@@ -704,7 +766,7 @@ def get_radius(D_full, motifset_pos):
     """
     motiflet_radius = np.inf
 
-    for ii in np.arange(len(motifset_pos) - 1):
+    for ii in range(len(motifset_pos)):
         i = motifset_pos[ii]
         current = np.float64(0.0)
         for jj in range(1, len(motifset_pos)):
@@ -741,16 +803,22 @@ def get_pairwise_extent(D_full, motifset_pos, upperbound=np.inf):
         return np.inf
 
     motifset_extent = np.float64(0.0)
+    k = len(motifset_pos)
 
-    for ii in np.arange(len(motifset_pos) - 1):
+    for ii in range(k - 1):
         i = motifset_pos[ii]
 
-        for jj in range(ii + 1, len(motifset_pos)):
+        for jj in range(ii + 1, k):
             j = motifset_pos[jj]
 
-            motifset_extent = max(motifset_extent, D_full[i][j])
-            if motifset_extent > upperbound:
-                return np.inf
+            dist = D_full[i, j]
+            if dist > motifset_extent:
+                motifset_extent = dist
+                if motifset_extent > upperbound:
+                    return np.inf
+
+    if k > 0 and motifset_pos[k - 1] < 0:
+        return np.inf
 
     return motifset_extent
 
@@ -784,22 +852,29 @@ def get_pairwise_extent_raw(
         return np.inf
 
     motifset_extent = np.float64(0.0)
+    k = len(motifset_pos)
+    dims = series.shape[0]
 
-    for ii in np.arange(len(motifset_pos) - 1):
+    for ii in range(k - 1):
         i = motifset_pos[ii]
-        a = series[:, i:i + motif_length]
 
-        for jj in range(ii + 1, len(motifset_pos)):
+        for jj in range(ii + 1, k):
             j = motifset_pos[jj]
-            b = series[:, j:j + motif_length]
 
             dist = np.float64(0.0)
-            for dim in range(series.shape[0]):
-                dist += distance_single(a[dim], b[dim], i, j, preprocessing[dim])
+            for dim in range(dims):
+                dist += distance_single(
+                    series[dim, i:i + motif_length],
+                    series[dim, j:j + motif_length],
+                    i, j, preprocessing[dim])
 
-            motifset_extent = max(motifset_extent, dist)
-            if motifset_extent > upperbound:
-                return np.inf
+            if dist > motifset_extent:
+                motifset_extent = dist
+                if motifset_extent > upperbound:
+                    return np.inf
+
+    if k > 0 and motifset_pos[k - 1] < 0:
+        return np.inf
 
     return motifset_extent
 
@@ -876,7 +951,6 @@ def get_approximate_k_motiflet(
         distance_single=None,
         preprocessing=None,
         use_D_full=True,
-        upper_bound=np.inf,
         top_N=1
 ):
     """Compute the approximate k-Motiflets.
@@ -900,8 +974,11 @@ def get_approximate_k_motiflet(
         If False, uses pairwise distances computed from the time series.
     upper_bound : float
         Used for admissible pruning
-    top_N : int
-        Number of best motiflets to return
+    top_N : int, default=1
+      Number of best non-overlapping motiflet candidates to return for the
+      current k. In elbow-plot searches, this limit applies independently
+      at each tested k.
+
 
     Returns
     -------
@@ -1075,7 +1152,7 @@ def find_elbow_points(dists, alpha=2, elbow_deviation=1.00):
             m2 = (dists[i] - dists[i - 1]) + 0.00001
 
             # avoid detecting elbows in near constant data
-            # TODO adding this removes reproducability
+            # TODO adding this removes reproducibility
             # if dists[i - 1] == dists[i]:
             #    m2 = 1.0  # peaks[i] = 0
 
@@ -1134,10 +1211,9 @@ def find_au_ef_motif_length(
     distance_preprocessing: callable
         The distance preprocessing function to be computed.
     backend : String, default="default"
-        The backend to use. As of now 'scalable', 'sparse' and 'default' are supported.
+        The backend to use. As of now 'scalable', and 'default' are supported.
         Use 'default' for the original exact implementation with excessive memory,
         Use 'scalable' for a scalable, exact implementation with less memory,
-        Use 'sparse' for a scalable, exact implementation with more memory.
 
     Returns
     -------
@@ -1244,7 +1320,7 @@ def search_k_motiflets_elbow(
         distance_single=znormed_euclidean_distance_single,
         distance_preprocessing=sliding_mean_std,
         backend="default",
-        top_N=1,
+        top_N=None,
 ):
     """Computes the elbow-function.
 
@@ -1285,12 +1361,13 @@ def search_k_motiflets_elbow(
     distance_preprocessing: callable (default=sliding_mean_std)
             The distance preprocessing function to be computed.
     backend : String, default="default"
-        The backend to use. As of now 'scalable', 'sparse' and 'default' are supported.
+        The backend to use. As of now 'scalable', and 'default' are supported.
         Use 'default' for the original exact implementation with excessive memory,
         Use 'scalable' for a scalable, exact implementation with less memory,
-        Use 'sparse' for a scalable, exact implementation with more memory.
-    top_N : int
-        Number of best motiflets to return per k.
+    top_N : int, default=None
+        Number of best non-overlapping motiflet candidates to return for the
+        current k. In elbow-plot searches, this limit applies independently
+        at each tested k.
 
     Returns
     -------
@@ -1339,6 +1416,11 @@ def search_k_motiflets_elbow(
     if slack <= 0:
         raise ValueError("slack must be > 0")
 
+    if top_N is None:
+        top_N = 1
+    elif not isinstance(top_N, (int, np.integer)) or top_N < 1:
+        raise ValueError("top_N must be a positive integer or None")
+
     # non-overlapping motifs only
     n = data_raw.shape[-1] - m + 1
     k_max_ = max(3, min(int(n // (m * slack)), k_max))
@@ -1347,23 +1429,13 @@ def search_k_motiflets_elbow(
     k_motiflet_distances = np.full((k_max_, top_N), np.inf, dtype=np.float64)
     k_motiflet_candidates = np.empty(k_max_, dtype=object)
 
-    if backend in ["default", "scalable", "sparse"]:
+    if backend in ["default", "scalable"]:
 
         backend = check_valid_backend(backend, data_raw, n)
 
         if backend == "scalable":
             # uses pairwise comparisons to compute the distances
             call_to_distances = compute_distances_with_knns
-        elif backend == "sparse":
-            warnings.warn(
-                "Backend 'sparse' is deprecated and will be removed in a "
-                "future version. Use backend 'scalable' instead.",
-                DeprecationWarning,
-                stacklevel=2
-            )
-
-            # uses sparse backend with sparse matrix
-            call_to_distances = compute_distances_with_knns_sparse
         else:
             # computes the full matrix
             call_to_distances = compute_distances_with_knns_full
@@ -1382,20 +1454,16 @@ def search_k_motiflets_elbow(
             preprocessing.append(distance_preprocessing(data_raw[dim], m))
         preprocessing = np.array(preprocessing, dtype=np.float64)
 
-        upper_bound = np.inf
         for test_k in np.arange(k_max_ - 1, 1, -1, dtype=np.int32):
             candidates, candidate_dists, _ = get_approximate_k_motiflet(
                 data_raw, m, test_k, D_full, knns,
                 distance_single=distance_single,
                 preprocessing=preprocessing,
                 use_D_full=(backend != "scalable"),
-                upper_bound=upper_bound,
                 top_N=top_N
             )
-            candidate_dist = candidate_dists[0]
             k_motiflet_distances[test_k, :len(candidate_dists)] = candidate_dists
             k_motiflet_candidates[test_k] = candidates
-            upper_bound = min(candidate_dist, upper_bound)
 
         del D_full
         del knns
@@ -1403,7 +1471,7 @@ def search_k_motiflets_elbow(
     else:
         raise ValueError(
             'Unknown backend: ' + backend + '. ' +
-            'Use "scalable" , "sparse", or "default".')
+            'Use "scalable" , or "default".')
 
     # smoothen the line to make it monotonically increasing
     k_motiflet_distances[0:2] = k_motiflet_distances[2]
@@ -1474,7 +1542,7 @@ def find_k_motiflets(ts, D_full, m, k, upperbound=None, slack=0.5):
     motiflet_dist = upperbound
     if upperbound is None:
         motiflet_candidate, motiflet_dist, _ = get_approximate_k_motiflet(
-            ts, m, k, D_full, upper_bound=np.inf, slack=slack)
+            ts, m, k, D_full, slack=slack)
 
         motiflet_pos = motiflet_candidate
 
@@ -1516,7 +1584,6 @@ def find_k_motiflets(ts, D_full, m, k, upperbound=None, slack=0.5):
     return motiflet_dist, motiflet_pos
 
 
-@njit(cache=True, parallel=True)
 def compute_distances_full(
         ts,
         m,
@@ -1553,11 +1620,30 @@ def compute_distances_full(
             The k-nns for each subsequence
 
     """
+    _, ts = pd_series_to_numpy(ts)
+    D = _compute_distances_full(
+        ts,
+        m,
+        exclude_trivial_match=exclude_trivial_match,
+        n_jobs=n_jobs,
+        slack=slack)
+    return D
 
-    D, _ = compute_distances_with_knns_full(ts, m, k=1,
-                                            exclude_trivial_match=exclude_trivial_match,
-                                            n_jobs=n_jobs,
-                                            slack=slack)
+
+@njit(cache=True, parallel=True)
+def _compute_distances_full(
+        ts,
+        m,
+        exclude_trivial_match=True,
+        n_jobs=4,
+        slack=0.5):
+    D, _ = compute_distances_with_knns_full(
+        ts,
+        m,
+        k=1,
+        exclude_trivial_match=exclude_trivial_match,
+        n_jobs=n_jobs,
+        slack=slack)
     return D
 
 

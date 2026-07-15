@@ -1,3 +1,4 @@
+from motiflets import Motiflets
 from motiflets.motiflets import *
 from motiflets.plotting import *
 

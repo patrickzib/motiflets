@@ -60,7 +60,7 @@ def test_sliding_dot_product_implementations():
         # 10_000,
         # 10_001
     ]
-    window_sizes = [100, 101]
+    window_sizes = [100, 101, 1000, 1001]
 
     ds_name, B = read_penguin()
     times = np.zeros(3, dtype=np.float64)
