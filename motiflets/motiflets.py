@@ -11,6 +11,7 @@ import os
 import warnings
 from ast import literal_eval
 from os.path import exists
+from pathlib import Path
 
 import pandas as pd
 import psutil
@@ -24,6 +25,239 @@ from scipy.stats import zscore
 
 from motiflets.distances import *
 from motiflets.maxheap import MaxHeap
+
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _resolve_dataset_path(*parts):
+    legacy_path = Path("..", "datasets", *parts)
+    if legacy_path.exists():
+        return legacy_path
+    return _PROJECT_ROOT / "datasets" / Path(*parts)
+
+
+def _plotting():
+    from motiflets import plotting
+    return plotting
+
+
+class Motiflets:
+
+    def __init__(
+            self,
+            ds_name,
+            series,
+            ground_truth=None,
+            elbow_deviation=1.00,
+            distance="znormed_ed",
+            slack=0.5,
+            n_jobs=-1,
+            backend="default"
+    ):
+        """User-facing API for computing and plotting k-Motiflets."""
+        self.ds_name = ds_name
+        self.series = series
+        self.elbow_deviation = elbow_deviation
+        self.slack = slack
+        self.ground_truth = ground_truth
+
+        n_jobs = os.cpu_count() if n_jobs < 1 else n_jobs
+        self.n_jobs = n_jobs
+
+        self.distance_preprocessing, self.distance, self.distance_single \
+            = map_distances(distance)
+        self.backend = backend
+
+        self.motif_length_range = None
+        self.motif_length = 0
+        self.all_extrema = []
+        self.all_elbows = []
+        self.all_top_motiflets = []
+        self.all_dists = []
+
+        self.memory_usage = 0
+        self.k_max = 0
+        self.top_N = 1
+        self.dists = None
+        self.motiflets = None
+        self.elbow_points = None
+        self.au_ef = None
+
+    def fit_motif_length(
+            self,
+            k_max,
+            motif_length_range,
+            subsample=2,
+            plot=True,
+    ):
+        """Computes the AU_EF plot to extract the best motif length."""
+        self.motif_length_range = np.int32(motif_length_range)
+        self.k_max = k_max
+
+        _, data_raw = pd_series_to_numpy(self.series)
+        (
+            self.motif_length,
+            self.all_extrema,
+            self.au_ef,
+            self.all_elbows,
+            self.all_top_motiflets,
+            self.all_dists,
+        ) = find_au_ef_motif_length(
+            data_raw,
+            k_max,
+            motif_length_range=self.motif_length_range,
+            n_jobs=self.n_jobs,
+            elbow_deviation=self.elbow_deviation,
+            slack=self.slack,
+            subsample=subsample,
+            distance=self.distance,
+            distance_single=self.distance_single,
+            distance_preprocessing=self.distance_preprocessing,
+            backend=self.backend,
+        )
+
+        if plot:
+            self.plot_motif_length_selection()
+
+        return self.motif_length
+
+    def fit_k_elbow(
+            self,
+            k_max,
+            motif_length=None,
+            filter=True,
+            top_N=1,
+            plot_elbows=True,
+            plot_motifs_as_grid=True,
+    ):
+        """Computes motif sets across k and optionally renders the results."""
+        self.k_max = k_max
+        self.top_N = top_N
+
+        if motif_length is None:
+            motif_length = self.motif_length
+        else:
+            self.motif_length = motif_length
+
+        self.dists, self.motiflets, self.elbow_points, _, self.memory_usage = (
+            search_k_motiflets_elbow(
+                k_max,
+                self.series,
+                motif_length,
+                n_jobs=self.n_jobs,
+                elbow_deviation=self.elbow_deviation,
+                filter=filter,
+                slack=self.slack,
+                distance=self.distance,
+                distance_single=self.distance_single,
+                distance_preprocessing=self.distance_preprocessing,
+                backend=self.backend,
+                top_N=top_N,
+            )
+        )
+
+        if plot_elbows or plot_motifs_as_grid:
+            self.plot_elbow(
+                show_elbows=plot_elbows,
+                show_grid=plot_motifs_as_grid,
+            )
+
+        # FIXME : this is bugged ...
+        return self.get_flattened_motifs()
+
+    def plot_dataset(self, max_points=10_000, path=None):
+        plotting = _plotting()
+        fig, ax = plotting.plot_dataset(
+            self.ds_name,
+            self.series,
+            max_points=max_points,
+            show=path is None,
+            ground_truth=self.ground_truth)
+
+        if path is not None:
+            plotting.plt.savefig(path)
+            plotting.plt.show()
+
+        return fig, ax
+
+    def plot_motif_length_selection(self):
+        if self.motif_length_range is None or self.au_ef is None:
+            raise Exception("Please call fit_motif_length first.")
+
+        plotting = _plotting()
+        return plotting.plot_motif_length_result(
+            self.k_max,
+            self.series,
+            self.motif_length_range,
+            self.ds_name,
+            self.au_ef,
+        )
+
+    def plot_elbow(self, show_elbows=True, show_grid=True, method_name=None):
+        if self.dists is None or self.motiflets is None or self.elbow_points is None:
+            raise Exception("Please call fit_k_elbow first.")
+
+        plotting = _plotting()
+        return plotting.plot_elbow_result(
+            ds_name=self.ds_name,
+            data=self.series,
+            motif_length=self.motif_length,
+            dists=self.dists,
+            candidates=self.motiflets,
+            elbow_points=self.elbow_points,
+            ground_truth=self.ground_truth,
+            method_name=method_name,
+            top_N=self.top_N,
+            show_elbows=show_elbows,
+            show_grid=show_grid,
+        )
+
+    def plot_motifset(self, max_points=10_000, path=None, elbow_point=None):
+        if self.dists is None or self.motiflets is None or self.elbow_points is None:
+            raise Exception("Please call fit_k_elbow first.")
+
+        if elbow_point is None:
+            elbow_point = self.elbow_points[0][-1]
+
+        plotting = _plotting()
+        fig, ax = plotting.plot_motifset(
+            self.ds_name,
+            self.series,
+            max_points=max_points,
+            motifsets=self.motiflets[elbow_point].reshape((1, -1)),
+            dist=self.dists[elbow_point],
+            motif_length=self.motif_length,
+            show=path is None)
+
+        if path is not None:
+            plotting.plt.savefig(path)
+            plotting.plt.show()
+
+        return fig, ax
+
+    def get_flattened_motifs(self):
+        """Returns motif candidates with all computed k entries preserved."""
+        if self.dists is None or self.motiflets is None or self.elbow_points is None:
+            raise Exception("Please call fit_k_elbow first.")
+
+        if isinstance(self.elbow_points, list):
+            elbow_points = np.array([
+                k for elbows in self.elbow_points for k in elbows
+            ], dtype=np.int32)
+        else:
+            elbow_points = np.array(self.elbow_points, dtype=np.int32)
+
+        if self.top_N == 1 and self.dists.ndim == 2:
+            dists = self.dists[:, 0]
+            motiflets = np.empty(len(self.motiflets), dtype=object)
+            motiflets[:] = None
+            for k, candidates in enumerate(self.motiflets):
+                if candidates is not None and len(candidates) > 0:
+                    motiflets[k] = candidates[0]
+            return dists, motiflets, elbow_points
+
+        return self.dists, self.motiflets, elbow_points
 
 
 def as_series(data, index_range, index_name):
@@ -94,8 +328,13 @@ def convert_to_2d(
 
 
 def flatten_elbows(elbow_points, candidates, dists, max_items=None):
-    if not isinstance(elbow_points, list):
-        return elbow_points, candidates, dists
+    if not isinstance(elbow_points, list) or (
+            len(elbow_points) > 0 and np.isscalar(elbow_points[0])):
+        return (
+            np.array(dists, dtype=np.float64),
+            np.array(candidates, dtype=object),
+            np.array(elbow_points, dtype=np.int32),
+        )
 
     items = []
     for rank in range(len(elbow_points)):
@@ -109,17 +348,21 @@ def flatten_elbows(elbow_points, candidates, dists, max_items=None):
         items.sort(key=lambda item: (-item[0], item[2]))
         items = items[:max_items]
 
-    flat_candidates = []
-    flat_dists = []
+    flat_candidates = np.empty(len(candidates), dtype=object)
+    flat_candidates[:] = None
+    flat_dists = np.full(len(candidates), np.inf, dtype=np.float64)
+    flat_elbows = []
     for k, rank, dist in items:
-        flat_candidates.append(candidates[k][rank])
-        flat_dists.append(dist)
+        if k not in flat_elbows:
+            flat_elbows.append(k)
+        if flat_candidates[k] is None or dist < flat_dists[k]:
+            flat_candidates[k] = candidates[k][rank]
+            flat_dists[k] = dist
 
-    flat_elbows = np.arange(len(flat_candidates), dtype=np.int32)
     return (
-        np.array(flat_dists, dtype=np.float64),
-        np.array(flat_candidates, dtype=object),
-        flat_elbows,
+        flat_dists,
+        flat_candidates,
+        np.array(flat_elbows, dtype=np.int32),
     )
 
 
@@ -153,7 +396,7 @@ def read_ground_truth(dataset):
         A series of ground-truth data
 
     """
-    file = '../datasets/ground_truth/' + dataset.split(".")[0] + "_gt.csv"
+    file = _resolve_dataset_path("ground_truth", dataset.split(".")[0] + "_gt.csv")
     if exists(file):
         print(file)
         series = pd.read_csv(file, index_col=0)
@@ -185,7 +428,7 @@ def read_dataset_with_index(dataset, sampling_factor=10000):
             Ground-truth, if available as `dataset`_gt file
 
     """
-    full_path = '../datasets/ground_truth/' + dataset
+    full_path = _resolve_dataset_path("ground_truth", dataset)
     data = pd.read_csv(full_path, index_col=0).squeeze('columns')
     print("Dataset Original Length n: ", len(data))
 
@@ -258,7 +501,7 @@ def read_dataset(dataset, sampling_factor=10000):
         The time series with z-score applied.
 
     """
-    full_path = '../datasets/' + dataset
+    full_path = _resolve_dataset_path(dataset)
     data = pd.read_csv(full_path).T
     data = np.array(data)[0]
     print("Dataset Original Length n: ", len(data))
@@ -533,7 +776,7 @@ def get_radius(D_full, motifset_pos):
     for ii in range(len(motifset_pos)):
         i = motifset_pos[ii]
         current = np.float64(0.0)
-        for jj in range(0, len(motifset_pos)):
+        for jj in range(1, len(motifset_pos)):
             if (i != jj):
                 j = motifset_pos[jj]
                 current = max(current, D_full[i, j])
@@ -1345,7 +1588,6 @@ def find_k_motiflets(ts, D_full, m, k, upperbound=None, slack=0.5):
     return motiflet_dist, motiflet_pos
 
 
-@njit(cache=True, parallel=True)
 def compute_distances_full(
         ts,
         m,
@@ -1382,11 +1624,30 @@ def compute_distances_full(
             The k-nns for each subsequence
 
     """
+    _, ts = pd_series_to_numpy(ts)
+    D = _compute_distances_full(
+        ts,
+        m,
+        exclude_trivial_match=exclude_trivial_match,
+        n_jobs=n_jobs,
+        slack=slack)
+    return D
 
-    D, _ = compute_distances_with_knns_full(ts, m, k=1,
-                                            exclude_trivial_match=exclude_trivial_match,
-                                            n_jobs=n_jobs,
-                                            slack=slack)
+
+@njit(cache=True, parallel=True)
+def _compute_distances_full(
+        ts,
+        m,
+        exclude_trivial_match=True,
+        n_jobs=4,
+        slack=0.5):
+    D, _ = compute_distances_with_knns_full(
+        ts,
+        m,
+        k=1,
+        exclude_trivial_match=exclude_trivial_match,
+        n_jobs=n_jobs,
+        slack=slack)
     return D
 
 

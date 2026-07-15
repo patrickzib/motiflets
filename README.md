@@ -109,18 +109,18 @@ and to find the largest set of the same motif, i.e. all repetitions.
 We first extract meaningful **motif lengths (l)** from this use case:
 
 ```
-from motiflets.motiflets import *
-from motiflets.plotting import *   # the Motiflets module is located here
+from motiflets import Motiflets
+from motiflets.motiflets import read_dataset_with_index
 
 series, df_gt = read_dataset_with_index(file) 
 
 # The Motiflets-class
 ml = Motiflets(
-    ds_name,     # the name of the series
-    series,      # the data
-    distance,    # Distance measure used, default: z-normed ED
-    df_gt,       # ground truth, if available
-    n_jobs       # number of jobs (cores) to be used.
+    ds_name=ds_name,       # the name of the series
+    series=series,         # the data
+    distance=distance,     # Distance measure used, default: z-normed ED
+    ground_truth=df_gt,    # ground truth, if available
+    n_jobs=n_jobs          # number of jobs (cores) to be used.
 )
 
 k_max = 20  # maxmimum number of repeats in each motif set
@@ -246,7 +246,7 @@ paper.
 - Jupyter-Notebook <a href="notebooks/use_cases_motif_sets_winding.ipynb">Industrial
   Winding Process</a> is a snapshot of a process where a plastic web is unwound from a
   first reel (unwinding reel), goes over the second traction reel and is finally rewound
-  on the the third rewinding reel. The recordings correspond to the traction of the
+  on the third rewinding reel. The recordings correspond to the traction of the
   second reel angular speed. The data contains 2.500 points sampled at 0.1𝑠,
   corresponding to 250𝑠. No documented motifs exist.
 

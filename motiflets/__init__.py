@@ -12,5 +12,6 @@ try:
 except PackageNotFoundError:  # pragma: no cover - package not installed
     __version__ = "0.0.0"
 
+from motiflets.motiflets import Motiflets
 
-__all__ = ["__version__"]
+__all__ = ["Motiflets", "__version__"]

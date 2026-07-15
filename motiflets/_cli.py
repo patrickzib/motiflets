@@ -69,7 +69,7 @@ def _dispatch(args: argparse.Namespace) -> int:
 def _get_motiflets_class():
     global _MOTIFLETS_CLASS
     if _MOTIFLETS_CLASS is None:
-        from motiflets.plotting import Motiflets as motiflets_cls
+        from motiflets.motiflets import Motiflets as motiflets_cls
 
         _MOTIFLETS_CLASS = motiflets_cls
     return _MOTIFLETS_CLASS
