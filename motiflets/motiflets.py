@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 """Compute k-Motiflets.
-
-
 """
 
 __author__ = ["patrickzib"]

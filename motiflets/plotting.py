@@ -16,7 +16,6 @@ from scipy.stats import zscore
 from tsdownsample import MinMaxLTTBDownsampler
 
 import motiflets.motiflets as ml
-from motiflets.motiflets import Motiflets
 from motiflets.distances import *
 
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -477,7 +476,7 @@ def plot_elbow_result(
         show_grid=True,
         ground_truth=None,
         method_name=None,
-        top_N=1,
+        top_N=None,
 ):
     """Render already-computed elbow results."""
     data = ml.convert_to_2d(data)
@@ -529,7 +528,7 @@ def plot_elbow(
         n_jobs=4,
         elbow_deviation=1.00,
         slack=0.5,
-        top_N=1,
+        top_N=None,
         distance=znormed_euclidean_distance,
         distance_single=znormed_euclidean_distance_single,
         distance_preprocessing=sliding_mean_std,
@@ -746,7 +745,10 @@ def plot_grid_motiflets(
     (dist, motifsets, elbow_points) \
         = ml.flatten_elbows(elbow_points_, motifsets_, dist_, max_items=max_items)
 
-    count_plots = 3 if len(motifsets[elbow_points]) > 6 else 2
+    dense_flattened = len(motifsets) == len(elbow_points)
+    selected_motifsets = motifsets if dense_flattened else motifsets[elbow_points]
+
+    count_plots = 3 if len(selected_motifsets) > 6 else 2
     if show_elbows:
         count_plots = count_plots + 1
 
@@ -818,7 +820,7 @@ def plot_grid_motiflets(
                              errorbar=None, estimator=None
                              )
 
-    if len(motifsets[elbow_points]) > 6:
+    if len(selected_motifsets) > 6:
         ax_bars = fig.add_subplot(gs[1:3, :], sharex=ax_ts)
         next_id = 3
     else:
@@ -863,8 +865,8 @@ def plot_grid_motiflets(
 
     y_labels = []
     ii = -1
-    motiflets_sampled = motifsets_sampled[elbow_points]
-    motiflets = motifsets[elbow_points]
+    motiflets_sampled = motifsets_sampled if dense_flattened else motifsets_sampled[elbow_points]
+    motiflets = selected_motifsets
     for i, motiflet in enumerate(motiflets_sampled):
         if motiflet is not None:
             motif_length_sampled = np.int32(max(2, motif_length // factor))
@@ -906,7 +908,8 @@ def plot_grid_motiflets(
             if (dist is not None):
                 dist = np.array(dist)
                 dist[dist == float("inf")] = 0
-                dists = str(dist[elbow_points[i]].astype(int))
+                dist_index = i if dense_flattened else elbow_points[i]
+                dists = str(dist[dist_index].astype(int))
                 # dists = str(int(dist[elbow_points[i]]))
 
             label = ""
@@ -933,13 +936,16 @@ def plot_grid_motiflets(
                 ax_motiflet.legend(loc="upper right")
 
             if method_names is not None:
-                ax_bars.plot([], [], label=method_names[elbow_points[i]].split()[0],
+                name_index = elbow_points[i]
+                if name_index >= len(method_names):
+                    name_index = i
+                ax_bars.plot([], [], label=method_names[name_index].split()[0],
                              linewidth=10,
                              color=color_palette[
                                  (len(ground_truth) + ii % grid_dim) % len(
                                      color_palette)])
                 if plot_minature:
-                    ax_motiflet.set_title(method_names[elbow_points[i]])
+                    ax_motiflet.set_title(method_names[name_index])
 
             elif method_name is not None:
                 ax_bars.plot([], [], label=method_name, linewidth=10,
