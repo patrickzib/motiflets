@@ -145,13 +145,17 @@ To extract meaningful **motif sizes (k)** from this use case, we run
 dists, candidates, elbow_points = ml.fit_k_elbow(
     k_max,
     motif_length,
-    top_N
+    top_N=top_N
 )
 ```
 
 The variable `elbow_points` holds characteristic motif sizes found.  
 Elbow points represent meaningful motif sizes. Here, $6$ and $16$ are elbows, which are
 the 6 calibration waves and the 16 heartbeats.
+
+The returned `dists`, `candidates`, and `elbow_points` arrays are aligned by position
+for plotting and reporting: `candidates[i]` is the motif set, `dists[i]` its extent,
+and `elbow_points[i]` the corresponding motif size `k`.
 
 <img src="https://github.com/patrickzib/motiflets/raw/main/images/elbows.png" width="300">
 
@@ -175,6 +179,15 @@ dists, candidates, elbow_points = ml.fit_k_elbow(
     motif_length,
     top_N=2         # Desired number of Motif Sets to return, e.g. 2
 )
+```
+
+When `top_N > 1`, multiple returned motif sets can have the same motif size. In that
+case `elbow_points` can contain duplicate `k` values, and each duplicate refers to a
+different motif set at the same row position:
+
+```python
+for k, motif_set, dist in zip(elbow_points, candidates, dists):
+    print(k, motif_set, dist)
 ```
 
 <img src="https://github.com/patrickzib/motiflets/raw/main/images/motiflets_top_n.png" width="600">
@@ -201,7 +214,9 @@ The call prints a summary of input parameters, and the best window length.
 uvx motiflets fit_k data.csv --k-max 6 --motif-length 128 --top-n 3
 ```
 
-The call prints a summary of input parameters, and the found k-Motiflet locations.
+The call prints a summary of input parameters and one line per returned motif set. With
+`--top-n`, the output can contain multiple lines with the same `k`; these are different
+motif sets for the same motif size.
 
 ### Sub-Dimensional Motif Discovery
 
