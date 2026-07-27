@@ -19,7 +19,7 @@ keywords = [
 classifiers = [
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: BSD License",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Python",
     "Topic :: Software Development",
     "Topic :: Scientific/Engineering",
@@ -27,20 +27,17 @@ classifiers = [
     "Operating System :: POSIX",
     "Operating System :: Unix",
     "Operating System :: MacOS",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
-requires-python = ">=3.7"
+requires-python = ">=3.9"
 dependencies = [
     "joblib>=1.1.0",
     "numba>=0.55.1",
     "numpy>=1.21.0",
     "pandas>=1.1.0",
-    'importlib-metadata>=4.11.0; python_version < "3.8"',
     "scikit-learn>=0.24.0",
     "scipy<2.0.0",
     "seaborn>=0.11.2",
@@ -62,7 +59,7 @@ repository = "https://github.com/patrickzib/motiflets"
 file = "LICENSE"
 
 [build-system]
-requires = ["setuptools>=64", "wheel", "toml"]
+requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]

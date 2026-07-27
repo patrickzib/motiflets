@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-try:  # Python 3.8+
-    from importlib.metadata import PackageNotFoundError, version as _pkg_version
-except ImportError:  # pragma: no cover - fallback for Python 3.7
-    from importlib_metadata import PackageNotFoundError, version as _pkg_version  # type: ignore
+from importlib.metadata import PackageNotFoundError, version as _pkg_version
 
 try:
     __version__ = _pkg_version("motiflets")
