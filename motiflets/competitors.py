@@ -14,14 +14,15 @@ warnings.simplefilter("ignore")
 
 @njit
 def get_pair_motif(D_full):
+    D = D_full.copy()
     # ignore self
-    for order in range(0, len(D_full)):
-        D_full[order, order] = np.inf
+    for order in range(0, len(D)):
+        D[order, order] = np.inf
 
-    pair_motif_dist = np.min(D_full)
-    pair_motif = np.argwhere(D_full == pair_motif_dist)
+    pair_motif_dist = np.min(D)
+    pair_motif = np.argwhere(D == pair_motif_dist)
 
-    return np.unique(pair_motif), pair_motif_dist, D_full
+    return np.unique(pair_motif), pair_motif_dist, D
 
 
 @njit
@@ -118,6 +119,8 @@ def get_k_motifs(
         D_full=None):
     if D_full is None:
         D_full = ml.compute_distances_full(data, motif_length)
+    else:
+        D_full = D_full.copy()
 
     # allow subsequence itself
     np.fill_diagonal(D_full, 0)
