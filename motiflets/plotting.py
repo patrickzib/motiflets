@@ -7,6 +7,7 @@ __author__ = ["patrickzib"]
 import time
 
 import matplotlib
+import numpy as np
 import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
@@ -16,7 +17,11 @@ from scipy.stats import zscore
 from tsdownsample import MinMaxLTTBDownsampler
 
 import motiflets.motiflets as ml
-from motiflets.distances import *
+from motiflets.distances import (
+    sliding_mean_std,
+    znormed_euclidean_distance,
+    znormed_euclidean_distance_single,
+)
 
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
@@ -51,28 +56,6 @@ def _iter_ground_truth_intervals(value):
             yield from _iter_ground_truth_intervals(item)
 
 
-def as_series(data, index_range, index_name):
-    """Coverts a time series to a series with an index.
-
-    Parameters
-    ----------
-    data : array-like
-        The time series raw data as numpy array
-    index_range :
-        The index to use
-    index_name :
-        The name of the index to use (e.g. time)
-
-    Returns
-    -------
-    series : PD.Series
-
-    """
-    series = pd.Series(data=data, index=index_range)
-    series.index.name = index_name
-    return series
-
-
 def plot_dataset(
         ds_name,
         data,
@@ -99,38 +82,6 @@ def plot_dataset(
         max_points=max_points,
         ground_truth=ground_truth,
         show=show)
-
-
-def append_all_motif_sets(df, motif_sets, method_name, D_full):
-    """Utility function.
-
-    Parameters
-    ----------
-    df: pd.DataFrame
-        a dataframe to append to
-    motif_sets: 2d-array-like
-        The motif-sets to append under row `method_name`
-    method_name: String
-        The column to append as
-    D_full:
-        The distance matrix
-
-    Returns
-    -------
-    df: pd.DataFrame
-        the dataframe with appended data
-
-    """
-
-    filtered_motif_sets = [m for m in motif_sets if m is not None]
-    extent = [ml.get_pairwise_extent(D_full, motiflet) for motiflet in
-              filtered_motif_sets]
-    count = [len(motiflet) for motiflet in filtered_motif_sets]
-
-    for m, e, c in zip(filtered_motif_sets, extent, count):
-        entry = {"Method": method_name, "Motif": m, "Extent": e, "k": c}
-        df = df.append(entry, ignore_index=True)
-    return df
 
 
 def plot_motifset(

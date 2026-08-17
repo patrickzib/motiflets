@@ -14,7 +14,6 @@ import pandas as pd
 import psutil
 from joblib import Parallel, delayed
 from numba import set_num_threads, objmode, prange, get_num_threads
-from numba.typed import Dict, List
 from scipy.fft import irfft, next_fast_len, rfft
 from scipy.signal import argrelextrema
 from scipy.stats import zscore
@@ -84,6 +83,7 @@ class Motiflets:
             k_max,
             motif_length_range,
             subsample=2,
+            motiflet_chunk_size=256,
             plot=True,
     ):
         """Computes the AU_EF plot to extract the best motif length."""
@@ -110,6 +110,7 @@ class Motiflets:
             distance_single=self.distance_single,
             distance_preprocessing=self.distance_preprocessing,
             backend=self.backend,
+            motiflet_chunk_size=motiflet_chunk_size,
         )
 
         if plot:
@@ -123,6 +124,7 @@ class Motiflets:
             motif_length=None,
             filter=True,
             top_N=None,
+            motiflet_chunk_size=256,
             plot_elbows=True,
             plot_motifs_as_grid=True,
     ):
@@ -148,6 +150,7 @@ class Motiflets:
                 distance_preprocessing=self.distance_preprocessing,
                 backend=self.backend,
                 top_N=top_N,
+                motiflet_chunk_size=motiflet_chunk_size,
             )
         )
 
@@ -158,7 +161,7 @@ class Motiflets:
                 top_N=top_N
             )
 
-        return self._get_flattened_motifs(top_N=None)
+        return self._get_flattened_motifs(top_N=top_N)
 
     def plot_dataset(self, max_points=10_000, path=None):
         plotting = _plotting()
@@ -254,28 +257,6 @@ class Motiflets:
         return self.dists, self.motiflets, elbow_points
 
 
-def as_series(data, index_range, index_name):
-    """Converts a time series to a series with an index.
-
-    Parameters
-    ----------
-    data : array-like
-        The time series raw data as numpy array
-    index_range :
-        The index to use
-    index_name :
-        The name of the index to use (e.g. time)
-
-    Returns
-    -------
-    series : PD.Series
-
-    """
-    series = pd.Series(data=data, index=index_range)
-    series.index.name = index_name
-    return series
-
-
 def resample(data, sampling_factor=10000):
     """Resamples a time series to roughly `sampling_factor` points.
 
@@ -357,22 +338,6 @@ def flatten_elbows(elbow_points, candidates, dists, max_items=None):
         np.array(flat_candidates, dtype=object),
         np.array(flat_elbows, dtype=np.int32),
     )
-
-
-@njit(fastmath=True, cache=True)
-def compute_paa(ts, segment_size):
-    segments = np.int32(np.ceil(len(ts) / segment_size))
-
-    paa = np.zeros(segments, dtype=np.float64)
-    paa_segment_sizes = np.zeros(segments, dtype=np.int32)  # needed for lower bounding
-
-    for i in np.arange(0, segments, dtype=np.int32):
-        start = i * segment_size
-        end = min((i + 1) * segment_size, len(ts))
-        paa[i] = ts[start:end].mean()
-        paa_segment_sizes[i] = end - start
-
-    return paa, paa_segment_sizes
 
 
 def read_ground_truth(dataset):
@@ -721,12 +686,13 @@ def compute_distances_with_knns(
     # first pass, computing the k-nns
     for idx in prange(n_jobs):
         dot_rolled = np.zeros((dims, n), dtype=np.float64)
+        dist = np.empty(n, dtype=np.float64)
 
         start = np.int32(idx * bin_size)
         end = np.int32(min(start + bin_size, n))
 
         for order in range(start, end, ):
-            dist = np.zeros(n, dtype=np.float64)
+            dist[:] = 0.0
             for d in range(dims):
                 ts = time_series[d, :]
                 if order == start:
@@ -880,6 +846,55 @@ def get_pairwise_extent_raw(
 
 
 @njit(cache=True)
+def _is_valid_candidate(idx, n):
+    for i in np.arange(len(idx)):
+        if idx[i] < 0 or idx[i] >= n:
+            return False
+    return True
+
+
+@njit(cache=True, parallel=True)
+def _compute_candidate_extents_chunk(
+        ts, m, k, D, knns, best_order, start, end,
+        distance_single, preprocessing, use_D_full, bound_check):
+    extents = np.full(end - start, np.inf, dtype=np.float64)
+    n = knns.shape[0]
+
+    for pos in prange(start, end):
+        order = best_order[pos]
+        idx = knns[order, :k]
+        if _is_valid_candidate(idx, n):
+            if use_D_full:
+                extents[pos - start] = get_pairwise_extent(D, idx, bound_check)
+            else:
+                extents[pos - start] = get_pairwise_extent_raw(
+                    ts, idx, m, distance_single, preprocessing, bound_check)
+
+    return extents
+
+
+@njit(cache=True)
+def _merge_candidate_into_heap(heap, idx, motiflet_extent, bound_check, top_N, m):
+    if (not np.isnan(motiflet_extent)
+            and not np.isinf(motiflet_extent)
+            and motiflet_extent <= bound_check):
+        # Search for overlap - if there is just a single overlap, replace the
+        # overlapping motiflet if this one is tighter.
+        overlap_count = 0
+        replace_pos = 0
+        for j in np.arange(heap.size):
+            if not _check_unique(idx, heap.heap_candidates[j], m):
+                overlap_count += 1
+                replace_pos = j
+
+        if (overlap_count == 0) and (heap.size < top_N):
+            heap.push(motiflet_extent, idx)
+        elif overlap_count <= 1:
+            if motiflet_extent < heap.heap_dist[replace_pos]:
+                heap.replace_at(replace_pos, motiflet_extent, idx)
+
+
+@njit(cache=True)
 def _argknn(
         dist, k, m, lowest_dist=np.inf, slack=0.5):
     """Finds the closest k-NN non-overlapping subsequences in candidates.
@@ -951,7 +966,8 @@ def get_approximate_k_motiflet(
         distance_single=None,
         preprocessing=None,
         use_D_full=True,
-        top_N=1
+        top_N=1,
+        chunk_size=256,
 ):
     """Compute the approximate k-Motiflets.
 
@@ -978,7 +994,9 @@ def get_approximate_k_motiflet(
       Number of best non-overlapping motiflet candidates to return for the
       current k. In elbow-plot searches, this limit applies independently
       at each tested k.
-
+    chunk_size : int, default=256
+        Number of lower-bound-sorted candidates to evaluate in each parallel
+        extent-computation chunk after the heap has been filled.
 
     Returns
     -------
@@ -1010,41 +1028,52 @@ def get_approximate_k_motiflet(
     # order by increasing k-nn distance
     best_order = np.argsort(knn_distances)
 
-    for i, order in enumerate(best_order):
-        idx = knns[order, :k]
-        motiflet_all_candidates[i, :min(k, len(idx))] = idx
+    if chunk_size < 1:
+        chunk_size = 1
 
-        if len(idx) >= k and idx[-1] >= 0:
-            bound_check = heap.heap_dist[0] if heap.size == top_N else np.inf
-            if knn_distances[order] <= bound_check:
-                if use_D_full:
-                    # get_pairwise_extent requires the full distance matrix
-                    motiflet_extent = get_pairwise_extent(D, idx, bound_check)
-                else:
-                    # get_pairwise_extent_raw does pairwise comparisons
-                    motiflet_extent = get_pairwise_extent_raw(
-                        ts, idx, m, distance_single, preprocessing, bound_check)
+    pos = 0
+    while pos < len(best_order):
+        order = best_order[pos]
+        bound_check = heap.heap_dist[0] if heap.size == top_N else np.inf
 
-                if motiflet_extent <= bound_check:
-                    # Search for overlap - if there is a just a single overlap, replace the
-                    # motiflet with the largest distance in the heap
-                    overlap_pos = []
-                    for j in np.arange(heap.size):
-                        if not _check_unique(idx, heap.heap_candidates[j], m):
-                            # if heap.heap_dist[j] > heap.heap_dist[overlap_pos]:
-                            overlap_pos.append(j)
+        if knn_distances[order] > bound_check:
+            # There is no point in continuing, as the distances are sorted
+            # and the next k-NN will have a larger distance.
+            break
 
-                    if (len(overlap_pos) == 0) and (heap.size < top_N):
-                        heap.push(motiflet_extent, idx)
-                    elif len(overlap_pos) <= 1:
-                        replace_pos = overlap_pos[0] if len(overlap_pos) == 1 else 0
-                        if motiflet_extent < heap.heap_dist[replace_pos]:
-                            # print(idx, "replacing", heap.heap_candidates[replace_pos], "overlap?", overlap_pos!=-1)
-                            heap.replace_at(replace_pos, motiflet_extent, idx)
-            else:
-                # There is no point in continuing, as the distances are sorted
-                # and the next k-NN will have a larger distance.
+        end = min(pos + chunk_size, len(best_order))
+        for chunk_pos in np.arange(pos, end):
+            if knn_distances[best_order[chunk_pos]] > bound_check:
+                end = chunk_pos
                 break
+
+        if end <= pos:
+            break
+
+        extents = _compute_candidate_extents_chunk(
+            ts, m, k, D, knns, best_order, pos, end,
+            distance_single, preprocessing, use_D_full, bound_check)
+
+        stop_search = False
+        for chunk_pos in np.arange(pos, end):
+            order = best_order[chunk_pos]
+            current_bound = heap.heap_dist[0] if heap.size == top_N else np.inf
+            if knn_distances[order] > current_bound:
+                stop_search = True
+                break
+
+            idx = knns[order, :k]
+            if _is_valid_candidate(idx, n):
+                motiflet_all_candidates[chunk_pos, :] = idx
+
+                motiflet_extent = extents[chunk_pos - pos]
+                _merge_candidate_into_heap(
+                    heap, idx, motiflet_extent, current_bound, top_N, m)
+
+        if stop_search:
+            break
+
+        pos = end
 
     motiflet_candidates_sorted, motiflet_dists = heap.sorted_entries()
     return motiflet_candidates_sorted, motiflet_dists, motiflet_all_candidates
@@ -1186,7 +1215,8 @@ def find_au_ef_motif_length(
         distance=znormed_euclidean_distance,
         distance_single=znormed_euclidean_distance_single,
         distance_preprocessing=sliding_mean_std,
-        backend="default"):
+        backend="default",
+        motiflet_chunk_size=256):
     """Computes the Area under the Elbow-Function within an of motif lengths.
 
     Parameters
@@ -1259,7 +1289,8 @@ def find_au_ef_motif_length(
                 distance_single=distance_single,
                 distance_preprocessing=distance_preprocessing,
                 backend=backend,
-                top_N=1)
+                top_N=1,
+                motiflet_chunk_size=motiflet_chunk_size)
 
             # flatten the data types
             dist = dist.squeeze(1)
@@ -1321,6 +1352,7 @@ def search_k_motiflets_elbow(
         distance_preprocessing=sliding_mean_std,
         backend="default",
         top_N=None,
+        motiflet_chunk_size=256,
 ):
     """Computes the elbow-function.
 
@@ -1368,6 +1400,9 @@ def search_k_motiflets_elbow(
         Number of best non-overlapping motiflet candidates to return for the
         current k. In elbow-plot searches, this limit applies independently
         at each tested k.
+    motiflet_chunk_size : int, default=256
+        Number of lower-bound-sorted motiflet candidates to evaluate per
+        parallel extent-computation chunk.
 
     Returns
     -------
@@ -1460,7 +1495,8 @@ def search_k_motiflets_elbow(
                 distance_single=distance_single,
                 preprocessing=preprocessing,
                 use_D_full=(backend != "scalable"),
-                top_N=top_N
+                top_N=top_N,
+                chunk_size=motiflet_chunk_size,
             )
             k_motiflet_distances[test_k, :len(candidate_dists)] = candidate_dists
             k_motiflet_candidates[test_k] = candidates
